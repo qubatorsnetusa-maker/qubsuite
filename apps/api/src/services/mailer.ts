@@ -1,3 +1,4 @@
+import { isPlaceholderEmail } from '@qub/shared';
 import type { FastifyBaseLogger } from 'fastify';
 import nodemailer, { type Transporter } from 'nodemailer';
 import type { Env } from '../config/env';
@@ -58,4 +59,19 @@ export class MemoryMailer implements Mailer {
 
 export function createMailer(env: Env, log: FastifyBaseLogger): Mailer {
   return env.MAIL_TRANSPORT === 'smtp' ? new SmtpMailer(env, log) : new ConsoleMailer(log);
+}
+
+/** Drops mail to placeholder addresses (`*.invalid`) that KingsChat-only accounts have until they add a real one. */
+export class SkipUndeliverableMailer implements Mailer {
+  constructor(
+    private readonly inner: Mailer,
+    private readonly log: FastifyBaseLogger,
+  ) {}
+  async send(message: MailMessage): Promise<void> {
+    if (isPlaceholderEmail(message.to)) {
+      this.log.debug({ subject: message.subject }, 'Skipped email to a placeholder address');
+      return;
+    }
+    await this.inner.send(message);
+  }
 }

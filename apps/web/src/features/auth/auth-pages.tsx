@@ -1,3 +1,4 @@
+import { KingsChatButton } from './kingschat-button';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { forgotPasswordSchema, loginSchema, passwordSchema, registerSchema, type LoginInput, type RegisterInput } from '@qub/shared';
 import { useMutation } from '@tanstack/react-query';
@@ -52,6 +53,8 @@ export function LoginPage() {
   const form = useForm<LoginInput>({ resolver: zodResolver(loginSchema), defaultValues: { email: search.email ?? '', password: '' } });
   const login = useMutation({ mutationFn: authService.login, meta: { silent: true } });
 
+  const [kcError, setKcError] = useState<string | null>(null);
+
   const onSubmit = form.handleSubmit(async (values) => {
     await login.mutateAsync(values);
     await navigate({ href: safeRedirect(search.redirect), replace: true });
@@ -70,7 +73,11 @@ export function LoginPage() {
         </>
       }
     >
-      <FormError error={login.error} />
+      <FormError error={login.error || kcError} />
+      <KingsChatButton
+        onSignedIn={() => void navigate({ href: safeRedirect(search.redirect), replace: true })}
+        onError={setKcError}
+      />
       <form onSubmit={onSubmit} noValidate className="space-y-5">
         <div>
           <Label htmlFor="email">Email</Label>
@@ -99,6 +106,7 @@ export function RegisterPage() {
   const search = useSearch({ from: '/register' });
   const navigate = useNavigate();
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [kcError, setKcError] = useState<string | null>(null);
   const form = useForm<RegisterInput>({ resolver: zodResolver(registerSchema), defaultValues: { name: '', email: search.email ?? '', password: '' } });
   const register = useMutation({ mutationFn: authService.register, meta: { silent: true } });
 

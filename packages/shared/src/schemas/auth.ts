@@ -49,3 +49,13 @@ export const updateProfileSchema = z.object({
   name: nameSchema.optional(),
 });
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+export const kingschatLoginSchema = z.object({
+  accessToken: z.string().min(1, 'Access token is required'),
+});
+export type KingschatLoginInput = z.infer<typeof kingschatLoginSchema>;
+
+export const addEmailSchema = z.object({
+  email: emailSchema,
+});
+export type AddEmailInput = z.infer<typeof addEmailSchema>;

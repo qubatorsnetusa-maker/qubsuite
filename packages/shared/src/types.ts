@@ -710,3 +710,14 @@ export interface AdminSystemDto {
   databaseBytes: number;
   uptimeSeconds: number;
 }
+
+export const KINGSCHAT_ENVIRONMENTS = ['prod', 'staging', 'dev'] as const;
+export type KingsChatEnvironment = (typeof KINGSCHAT_ENVIRONMENTS)[number];
+
+export interface AuthProviders {
+  kingschat: { clientId: string; environment: KingsChatEnvironment } | null;
+}
+
+export const PLACEHOLDER_EMAIL_DOMAIN = 'kingschat.invalid';
+export const placeholderEmailFor = (userId: string) => `kc-${userId}@${PLACEHOLDER_EMAIL_DOMAIN}`;
+export const isPlaceholderEmail = (email: string) => email.toLowerCase().endsWith(`@${PLACEHOLDER_EMAIL_DOMAIN}`);

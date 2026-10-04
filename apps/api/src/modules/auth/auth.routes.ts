@@ -1,10 +1,13 @@
 import {
+  addEmailSchema,
   changePasswordSchema,
   forgotPasswordSchema,
+  kingschatLoginSchema,
   loginSchema,
   registerSchema,
   resetPasswordSchema,
   verifyEmailSchema,
+  type AuthProviders,
 } from '@qub/shared';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
@@ -22,6 +25,8 @@ export async function authRoutes(app: FastifyInstance) {
   const authLimit = { rateLimit: { max: env.AUTH_RATE_LIMIT_MAX, timeWindow: '1 minute' } };
 
   const client = (request: FastifyRequest) => ({ ...auditContext(request), actorId: null });
+  /** With COOKIE_DOMAIN, one sign-in covers every sibling site (drive., docs., …) that proxies to this API. */
+  const domain = env.COOKIE_DOMAIN ? { domain: env.COOKIE_DOMAIN } : {};
 
   function setSessionCookies(reply: FastifyReply, session: IssuedSession) {
     // The refresh token is only ever sent to /api/auth, is invisible to JavaScript, and never cross-site.
@@ -31,6 +36,7 @@ export async function authRoutes(app: FastifyInstance) {
       sameSite: 'strict',
       path: '/api/auth',
       expires: session.refreshTokenExpiresAt,
+      ...domain,
     });
     setMediaCookie(reply, session.user.id, session.sessionId);
   }
@@ -42,12 +48,13 @@ export async function authRoutes(app: FastifyInstance) {
       sameSite: 'lax',
       path: '/api/',
       maxAge: MEDIA_TOKEN_TTL_SECONDS,
+      ...domain,
     });
   }
 
   function clearCookies(reply: FastifyReply) {
-    reply.clearCookie(REFRESH_COOKIE, { path: '/api/auth' });
-    reply.clearCookie(MEDIA_COOKIE, { path: '/api/' });
+    reply.clearCookie(REFRESH_COOKIE, { path: '/api/auth', ...domain });
+    reply.clearCookie(MEDIA_COOKIE, { path: '/api/', ...domain });
   }
 
   /** CSRF defence for cookie-authenticated endpoints: the Origin (when sent) must be an allowed app origin. */
@@ -56,7 +63,12 @@ export async function authRoutes(app: FastifyInstance) {
     if (origin && !env.corsOrigins.includes(origin)) throw forbidden('Cross-site request rejected.');
   }
 
-  const publicSession = (s: IssuedSession) => ({ accessToken: s.accessToken, accessTokenExpiresAt: s.accessTokenExpiresAt, user: s.user });
+  const publicSession = (s: IssuedSession) => ({
+    accessToken: s.accessToken,
+    accessTokenExpiresAt: s.accessTokenExpiresAt,
+    refreshToken: s.refreshToken,
+    user: s.user,
+  });
 
   r.post('/register', { config: authLimit, schema: { body: registerSchema } }, async (request, reply) => {
     const result = await auth.register(request.body, client(request));
@@ -71,6 +83,19 @@ export async function authRoutes(app: FastifyInstance) {
     return ok(publicSession(session));
   });
 
+  r.get('/providers', async () => {
+    const providers: AuthProviders = {
+      kingschat: env.KINGSCHAT_CLIENT_ID ? { clientId: env.KINGSCHAT_CLIENT_ID, environment: env.KINGSCHAT_ENV } : null,
+    };
+    return ok(providers);
+  });
+
+  r.post('/kingschat', { config: authLimit, schema: { body: kingschatLoginSchema } }, async (request, reply) => {
+    const session = await auth.kingschatSignIn(request.body.accessToken, client(request));
+    setSessionCookies(reply, session);
+    return ok(publicSession(session));
+  });
+
   r.post('/refresh', { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (request, reply) => {
     assertSameOrigin(request);
     const token = request.cookies[REFRESH_COOKIE];
@@ -79,6 +104,44 @@ export async function authRoutes(app: FastifyInstance) {
       const session = await auth.refresh(token, client(request));
       setSessionCookies(reply, session);
       return ok(publicSession(session));
+    } catch (err) {
+      if (err instanceof AppError && err.statusCode === 401) clearCookies(reply);
+      throw err;
+    }
+  });
+
+  r.post('/verify-token', { config: authLimit, schema: { body: z.object({ token: z.string().min(1) }) } }, async (request, reply) => {
+    try {
+      const authCtx = await app.verifyAccessToken(request.body.token);
+      return reply.send({
+        valid: true,
+        user: {
+          id: authCtx.userId,
+          username: authCtx.name,
+          email: authCtx.email,
+          roles: [authCtx.platformRole],
+          display_name: authCtx.name,
+        },
+      });
+    } catch {
+      return reply.send({
+        valid: false,
+        error: 'Invalid or expired token',
+      });
+    }
+  });
+
+  r.post('/refresh-token', { config: authLimit, schema: { body: z.object({ refresh_token: z.string().min(1) }) } }, async (request, reply) => {
+    try {
+      const session = await auth.refresh(request.body.refresh_token, client(request));
+      setSessionCookies(reply, session);
+      return reply.send({
+        access_token: session.accessToken,
+        accessToken: session.accessToken,
+        refresh_token: session.refreshToken,
+        refreshToken: session.refreshToken,
+        user: session.user,
+      });
     } catch (err) {
       if (err instanceof AppError && err.statusCode === 401) clearCookies(reply);
       throw err;
@@ -143,6 +206,11 @@ export async function authRoutes(app: FastifyInstance) {
     return ok({ changed: true });
   });
 
+  r.post('/add-email', { preHandler: app.authenticate, config: authLimit, schema: { body: addEmailSchema } }, async (request) => {
+    await auth.addEmail(requireAuth(request).userId, request.body.email, auditContext(request));
+    return ok({ sent: true });
+  });
+
   r.get('/me', { preHandler: app.authenticate }, async (request) => {
     const user = await UserRepository.findById(app.services.db, requireAuth(request).userId);
     return ok(await UserRepository.toCurrentUser(app.services.db, user!));
@@ -157,11 +225,4 @@ export async function authRoutes(app: FastifyInstance) {
     await auth.revokeOwnSession(requireAuth(request).userId, request.params.id, auditContext(request));
     return ok({ revoked: true });
   });
-
-  r.post('/redeem-invite', { config: authLimit, schema: { body: z.object({ token: z.string().min(20).max(200) }) } }, async (request, reply) => {
-    const { session, targetUrl } = await auth.redeemInvite(request.body.token, client(request));
-    setSessionCookies(reply, session);
-    return ok({ ...publicSession(session), targetUrl });
-  });
-
 }

@@ -15,8 +15,11 @@ import {
   Calendar,
   FileText,
   ChevronDown,
+  Mic,
+  MicOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSpeechInput } from '@/hooks/use-speech-input';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -47,6 +50,12 @@ export function FloatingAiBar({ editor, mode, onModeChange }: FloatingAiBarProps
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { isListening, toggleListening, isSupported: voiceSupported } = useSpeechInput({
+    onTranscript: (spokenText) => {
+      setPrompt((prev) => (prev ? `${prev} ${spokenText}` : spokenText));
+    },
+  });
+
 
   const handleGenerate = async (customPrompt?: string) => {
     const textToSubmit = customPrompt || prompt;
@@ -181,9 +190,23 @@ export function FloatingAiBar({ editor, mode, onModeChange }: FloatingAiBarProps
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
-              placeholder="Ask AI anything..."
+              placeholder={isListening ? "Listening... Speak your prompt" : "Ask AI anything..."}
               className="flex-1 bg-transparent px-2 text-xs text-slate-800 focus:outline-hidden dark:text-slate-100"
             />
+            {voiceSupported && (
+              <button
+                type="button"
+                onClick={toggleListening}
+                className={`mr-1 flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
+                  isListening
+                    ? 'bg-rose-500 text-white animate-pulse'
+                    : 'text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-slate-200'
+                }`}
+                title={isListening ? "Stop voice input" : "Speak instruction"}
+              >
+                {isListening ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => handleGenerate()}
@@ -260,9 +283,24 @@ export function FloatingAiBar({ editor, mode, onModeChange }: FloatingAiBarProps
             }
           }}
           disabled={loading}
-          placeholder="Help me write, brainstorm ideas, draft a proposal..."
+          placeholder={isListening ? "Listening... Speak your instructions to AI" : "Help me write, brainstorm ideas, draft a proposal..."}
           className="flex-1 bg-transparent px-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-hidden dark:text-slate-100 dark:placeholder-slate-500"
         />
+
+        {voiceSupported && (
+          <button
+            type="button"
+            onClick={toggleListening}
+            className={`flex h-8 w-8 items-center justify-center rounded-full transition-all ${
+              isListening
+                ? 'bg-rose-500 text-white shadow-md animate-pulse'
+                : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200'
+            }`}
+            title={isListening ? "Stop voice input" : "Voice input - speak to AI"}
+          >
+            {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+          </button>
+        )}
 
         {/* AI Assist Indicator */}
         <div className="flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-400">

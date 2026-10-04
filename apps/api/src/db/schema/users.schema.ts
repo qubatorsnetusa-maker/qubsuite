@@ -10,7 +10,8 @@ export const users = pgTable(
     email: text('email').notNull(),
     name: text('name').notNull(),
     avatarUrl: text('avatar_url'),
-    passwordHash: text('password_hash').notNull(),
+    /** Null for accounts that only sign in with KingsChat. */
+    passwordHash: text('password_hash'),
     emailVerified: boolean('email_verified').notNull().default(false),
     emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
     status: userStatusEnum('status').notNull().default('ACTIVE'),

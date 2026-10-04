@@ -1,3 +1,4 @@
+import { KINGSCHAT_ENVIRONMENTS } from '@qub/shared';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,6 +33,7 @@ const envSchema = z
     ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
     REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(30),
     COOKIE_SECURE: bool.optional(),
+    COOKIE_DOMAIN: z.string().optional(),
     REQUIRE_EMAIL_VERIFICATION: bool.default(false),
 
     CORS_ORIGIN: z.string().default('http://localhost:5180'),
@@ -65,6 +67,8 @@ const envSchema = z
     RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(600),
     AUTH_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(20),
 
+        KINGSCHAT_CLIENT_ID: z.string().min(1).optional(),
+    KINGSCHAT_ENV: z.enum(KINGSCHAT_ENVIRONMENTS).default('prod'),
     SERVE_WEB_DIST: z.string().optional(),
 
     CLOUDFLARE_ACCOUNT_ID: z.string().optional(),

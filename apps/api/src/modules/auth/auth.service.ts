@@ -1,4 +1,4 @@
-import type { AuthResult, ChangePasswordInput, LoginInput, RegisterInput, SessionInfo } from '@qub/shared';
+import { isPlaceholderEmail, placeholderEmailFor, type AuthResult, type ChangePasswordInput, type LoginInput, type RegisterInput, type SessionInfo } from '@qub/shared';
 import { and, desc, eq, gt, isNull, ne, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { Env } from '../../config/env';
@@ -10,18 +10,20 @@ import {
   fileShares,
   folderPermissions,
   passwordResetTokens,
-  inviteTokens,
   refreshTokens,
   sessions,
+  userIdentities,
   users,
   type UserRow,
 } from '../../db/schema';
 import { dummyPasswordHash, hashPassword, hmacToken, randomToken, verifyPassword } from '../../utils/crypto';
 import { AppError, conflict, unauthenticated } from '../../utils/errors';
+import { isUniqueViolation } from '../../utils/pg';
 import type { AuditContext, AuditService } from '../activity/activity.service';
 import type { PolicyService } from '../admin/policy.service';
 import type { Mailer } from '../../services/mailer';
 import { UserRepository } from '../users/user.repository';
+import type { KingsChatClient, KingsChatProfile } from './kingschat.client';
 
 export interface ClientContext extends AuditContext {
   userAgent?: string | null;
@@ -50,6 +52,8 @@ export class AuthService {
     private readonly mailer: Mailer,
     private readonly audit: AuditService,
     private readonly policies: PolicyService,
+    /** Null when KingsChat sign-in is not configured. */
+    private readonly kingschat: KingsChatClient | null = null,
   ) {}
 
   private hash(token: string): string {
@@ -79,7 +83,7 @@ export class AuthService {
   }
 
   /** A new account with its My Drive; invitations sent to the email before it existed become real permissions. */
-  async provisionUser(tx: Executor, data: { email: string; name: string; passwordHash: string }): Promise<UserRow> {
+  async provisionUser(tx: Executor, data: { email: string; name: string; passwordHash: string | null; emailVerified?: boolean }): Promise<UserRow> {
     const created = await UserRepository.create(tx, data);
     await tx.insert(driveFolders).values({ ownerId: created.id, name: 'My Drive', isRoot: true });
     await this.acceptPendingShares(tx, created);
@@ -160,6 +164,69 @@ ${link}`,
     await UserRepository.update(this.db, user.id, { lastLoginAt: new Date() });
     await this.audit.log({ ...ctx, actorId: user.id }, 'auth.login', { type: 'user', id: user.id });
     return this.issueSession({ ...user, lastLoginAt: new Date() }, ctx);
+  }
+
+  /**
+   * Signs in with a KingsChat access token. A returning user is found only by KingsChat user id; otherwise an
+   * account with the same email is linked (trusting KingsChat's email), otherwise a new account is created.
+   */
+  async kingschatSignIn(accessToken: string, ctx: ClientContext): Promise<IssuedSession> {
+    if (!this.kingschat) throw new AppError('RESOURCE_NOT_FOUND', 'KingsChat sign-in is not available.');
+    const profile = await this.kingschat.fetchProfile(accessToken);
+    let user: UserRow;
+    try {
+      user = await this.db.transaction((tx) => this.resolveKingsChatUser(tx, profile, ctx));
+    } catch (err) {
+      // Two first sign-ins raced (double click, two tabs): the other one created the identity; use it.
+      if (!isUniqueViolation(err)) throw err;
+      const again = await this.findKingsChatUser(this.db, profile.userId);
+      if (!again) throw err;
+      user = again;
+    }
+    if (user.status !== 'ACTIVE') throw new AppError('FORBIDDEN', 'This account is not active.');
+    const now = new Date();
+    await UserRepository.update(this.db, user.id, { lastLoginAt: now });
+    await this.audit.log({ ...ctx, actorId: user.id }, 'auth.login', { type: 'user', id: user.id }, { method: 'kingschat' });
+    return this.issueSession({ ...user, lastLoginAt: now }, ctx);
+  }
+
+  private async findKingsChatUser(tx: Executor, kingschatUserId: string): Promise<UserRow | undefined> {
+    const [row] = await tx
+      .select({ user: users })
+      .from(userIdentities)
+      .innerJoin(users, eq(users.id, userIdentities.userId))
+      .where(and(eq(userIdentities.provider, 'kingschat'), eq(userIdentities.providerUserId, kingschatUserId)))
+      .limit(1);
+    return row?.user;
+  }
+
+  private async resolveKingsChatUser(tx: Executor, profile: KingsChatProfile, ctx: ClientContext): Promise<UserRow> {
+    const seen = { username: profile.username, email: profile.email, lastLoginAt: new Date() };
+    const known = await this.findKingsChatUser(tx, profile.userId);
+    if (known) {
+      await tx
+        .update(userIdentities)
+        .set(seen)
+        .where(and(eq(userIdentities.provider, 'kingschat'), eq(userIdentities.providerUserId, profile.userId)));
+      return known;
+    }
+    const identity = { provider: 'kingschat', providerUserId: profile.userId, ...seen };
+    const byEmail = profile.email ? await UserRepository.findByEmail(tx, profile.email) : undefined;
+    if (byEmail) {
+      await tx.insert(userIdentities).values({ ...identity, userId: byEmail.id });
+      await this.audit.log({ ...ctx, actorId: byEmail.id }, 'auth.kingschat_linked', { type: 'user', id: byEmail.id }, { kingschatUserId: profile.userId, username: profile.username }, tx);
+      return byEmail;
+    }
+    const name = (profile.name ?? profile.username ?? 'KingsChat user').slice(0, 100);
+    const created = await this.provisionUser(tx, {
+      email: profile.email ?? placeholderEmailFor(profile.userId),
+      name,
+      passwordHash: null,
+      emailVerified: profile.email !== null,
+    });
+    await tx.insert(userIdentities).values({ ...identity, userId: created.id });
+    await this.audit.log({ ...ctx, actorId: created.id }, 'auth.kingschat_registered', { type: 'user', id: created.id }, { kingschatUserId: profile.userId, username: profile.username }, tx);
+    return created;
   }
 
   private signAccessToken(userId: string, sessionId: string): { token: string; expiresAt: Date } {
@@ -353,17 +420,30 @@ ${link}`,
     }
     await this.db.transaction(async (tx) => {
       await tx.update(emailVerifications).set({ usedAt: new Date() }).where(eq(emailVerifications.id, row.id));
-      await tx
-        .update(users)
-        .set({ emailVerified: true, emailVerifiedAt: new Date() })
-        .where(and(eq(users.id, row.userId), eq(users.email, row.email)));
+      const user = await UserRepository.findById(tx, row.userId);
+      if (user && isPlaceholderEmail(user.email) && row.email !== user.email) {
+        // A KingsChat account confirming its first real address: it replaces the placeholder.
+        const owner = await UserRepository.findByEmail(tx, row.email);
+        if (owner && owner.id !== user.id) throw conflict('Another account now uses this email address.');
+        const [updated] = await tx
+          .update(users)
+          .set({ email: row.email, emailVerified: true, emailVerifiedAt: new Date() })
+          .where(eq(users.id, user.id))
+          .returning();
+        await this.acceptPendingShares(tx, updated!);
+      } else {
+        await tx
+          .update(users)
+          .set({ emailVerified: true, emailVerifiedAt: new Date() })
+          .where(and(eq(users.id, row.userId), eq(users.email, row.email)));
+      }
       await this.audit.log({ ...ctx, actorId: row.userId }, 'auth.email_verified', { type: 'user', id: row.userId }, {}, tx);
     });
   }
 
   async resendVerification(userId: string): Promise<void> {
     const user = await UserRepository.findById(this.db, userId);
-    if (!user || user.emailVerified) return;
+    if (!user || user.emailVerified || isPlaceholderEmail(user.email)) return;
     // Limit to one outstanding email every minute.
     const [recent] = await this.db
       .select({ id: emailVerifications.id })
@@ -374,6 +454,17 @@ ${link}`,
     const token = randomToken();
     await this.db.insert(emailVerifications).values({ userId, email: user.email, tokenHash: this.hash(token), expiresAt: new Date(Date.now() + VERIFY_TTL_MS) });
     await this.sendVerificationEmail(user, token);
+  }
+
+  /** For KingsChat accounts with a placeholder email: emails a verification link to a real address. */
+  async addEmail(userId: string, email: string, ctx: ClientContext): Promise<void> {
+    const user = await UserRepository.findById(this.db, userId);
+    if (!user || !isPlaceholderEmail(user.email)) throw new AppError('BAD_REQUEST', 'This account already has an email address.');
+    if (await UserRepository.findByEmail(this.db, email)) throw conflict('An account with this email already exists.');
+    const token = randomToken();
+    await this.db.insert(emailVerifications).values({ userId, email, tokenHash: this.hash(token), expiresAt: new Date(Date.now() + VERIFY_TTL_MS) });
+    await this.audit.log({ ...ctx, actorId: userId }, 'auth.email_add_requested', { type: 'user', id: userId });
+    await this.sendVerificationEmail({ ...user, email }, token);
   }
 
   private async sendVerificationEmail(user: UserRow, token: string): Promise<void> {
@@ -387,7 +478,10 @@ ${link}`,
 
   async changePassword(userId: string, sessionId: string, input: ChangePasswordInput, ctx: ClientContext): Promise<void> {
     const user = await UserRepository.findById(this.db, userId);
-    if (!user || !(await verifyPassword(user.passwordHash, input.currentPassword))) {
+    if (user && user.passwordHash === null) {
+      throw new AppError('BAD_REQUEST', "Your account doesn't have a password yet. Use Forgot password on the sign-in page to set one.");
+    }
+    if (!user || !(await verifyPassword(user.passwordHash!, input.currentPassword))) {
       throw new AppError('VALIDATION_ERROR', 'Current password is incorrect.', { fieldErrors: { currentPassword: ['Current password is incorrect.'] } });
     }
     const passwordHash = await hashPassword(input.newPassword);
@@ -397,41 +491,4 @@ ${link}`,
       await this.audit.log({ ...ctx, actorId: userId }, 'auth.password_changed', { type: 'user', id: userId }, {}, tx);
     });
   }
-
-  /** Creates a direct access link for invited collaborators. Valid for 7 days. */
-  async createInviteToken(email: string, targetUrl: string): Promise<string> {
-    const token = randomToken(32);
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await this.db.insert(inviteTokens).values({
-      email,
-      tokenHash: this.hash(token),
-      targetUrl,
-      expiresAt,
-    });
-    return token;
-  }
-
-  /** Resolves the invite link: provisions account automatically if not registered, and issues active session. */
-  async redeemInvite(token: string, ctx: ClientContext): Promise<{ session: IssuedSession; targetUrl: string }> {
-    const tokenHash = this.hash(token);
-    const [row] = await this.db.select().from(inviteTokens).where(eq(inviteTokens.tokenHash, tokenHash)).limit(1);
-    if (!row || row.usedAt || row.expiresAt.getTime() < Date.now()) {
-      throw new AppError('BAD_REQUEST', 'This invitation link is invalid or has expired.');
-    }
-
-    let user = await UserRepository.findByEmail(this.db, row.email);
-    if (!user) {
-      // Auto-provision user account seamlessly from the invited email
-      const name = row.email.split('@')[0]!.replace(/[^a-zA-Z0-9]/g, ' ').trim() || 'Collaborator';
-      const passwordHash = await hashPassword(randomToken(24));
-      user = await this.db.transaction(async (tx) => {
-        return this.provisionUser(tx, { email: row.email, name, passwordHash });
-      });
-    }
-
-    await this.db.update(inviteTokens).set({ usedAt: new Date() }).where(eq(inviteTokens.id, row.id));
-    const session = await this.issueSession(user, ctx);
-    return { session, targetUrl: row.targetUrl };
-  }
-
 }

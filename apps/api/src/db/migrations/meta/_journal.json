@@ -71,6 +71,20 @@
       "when": 1791129969318,
       "tag": "0009_secret_gorilla_man",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791148494607,
+      "tag": "0010_nebulous_vision",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791149694242,
+      "tag": "0011_demonic_golden_guardian",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,5 @@
-import { index, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { check, index, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { createdAt } from './_types';
 import { users } from './users.schema';
 
@@ -85,3 +86,31 @@ export const inviteTokens = pgTable(
   },
   (t) => [uniqueIndex('invite_tokens_hash_unique').on(t.tokenHash), index('invite_tokens_email_idx').on(t.email)],
 );
+
+/**
+ * Sign-in identities from other providers (currently KingsChat). A returning user is found ONLY by
+ * (provider, providerUserId) - never by username or email, which can change hands.
+ */
+export const userIdentities = pgTable(
+  'user_identities',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    provider: text('provider').notNull(),
+    providerUserId: text('provider_user_id').notNull(),
+    /** Last seen KingsChat username and email, for display and audit only. */
+    username: text('username'),
+    email: text('email'),
+    createdAt: createdAt(),
+    lastLoginAt: timestamp('last_login_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('user_identities_provider_user_unique').on(t.provider, t.providerUserId),
+    uniqueIndex('user_identities_user_provider_unique').on(t.userId, t.provider),
+    check('user_identities_provider_known', sql`${t.provider} in ('kingschat')`),
+  ],
+);
+
+export type UserIdentityRow = typeof userIdentities.$inferSelect;

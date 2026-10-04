@@ -30,10 +30,10 @@ import { DocRoomHub } from '../websocket/doc-rooms';
 import { FormRoomHub } from '../websocket/form-rooms';
 import { NotificationHub } from '../websocket/notification-hub';
 import { SheetRoomHub } from '../websocket/sheet-rooms';
-import { createMailer, type Mailer } from './mailer';
+import { KingsChatClient } from '../modules/auth/kingschat.client';
+import { createMailer, SkipUndeliverableMailer, type Mailer } from './mailer';
 import { createStorageProvider, StorageService, type StorageProvider } from './storage';
 import { ThumbnailService } from './thumbnails';
-import { AIService } from './ai.service';
 
 export interface ServiceOverrides {
   /** The server-default transport (what "Server default" sends with). */
@@ -53,7 +53,7 @@ export function createServices(app: FastifyInstance, env: Env, db: Database, ove
   const audit = new AuditService(db);
   // All app email goes through the provider chosen in the admin console, else the .env transport.
   const email = new EmailSettingsService(db, env, overrides.mailer ?? createMailer(env, log), audit, log, overrides.fetch);
-  const mailer: Mailer = email;
+  const mailer: Mailer = new SkipUndeliverableMailer(email, log);
   const activity = new ActivityService(db);
   const notifications = new NotificationService(db);
   const policies = new PolicyService(db, env, audit);
@@ -65,8 +65,9 @@ export function createServices(app: FastifyInstance, env: Env, db: Database, ove
   const search = new SearchService(db, permissions);
   const library = new LibraryService(db, drive);
   const spam = new SpamService(db, drive);
-  const auth = new AuthService(app, db, env, mailer, audit, policies);
-  const sharing = new SharingService(db, env, permissions, notifications, activity, audit, mailer, policies, auth);
+  const sharing = new SharingService(db, env, permissions, notifications, activity, audit, mailer, policies);
+  const kingschatClient = env.KINGSCHAT_CLIENT_ID ? new KingsChatClient(env.KINGSCHAT_ENV, overrides.fetch ?? fetch) : null;
+  const auth = new AuthService(app, db, env, mailer, audit, policies, kingschatClient);
   const docs = new DocumentService(db, files, permissions, notifications, sharing, storage, natives, usage);
   const comments = new CommentService(db, docs, sharing, notifications, activity);
   const sheets = new SpreadsheetService(db, files, permissions, natives);
@@ -77,7 +78,6 @@ export function createServices(app: FastifyInstance, env: Env, db: Database, ove
   const publicShare = new PublicShareService(app, db, permissions, sheets, activity, policies);
   const adminUsers = new AdminUserService(db, auth, audit, activity, policies, storage, natives, notifications);
   const adminInsights = new AdminInsightsService(db, env, policies, audit, activity, adminUsers);
-    const ai = new AIService(env, log);
 
   const realtime = {
     docs: new DocRoomHub(docs, permissions, log),
@@ -106,7 +106,6 @@ export function createServices(app: FastifyInstance, env: Env, db: Database, ove
     usage,
     adminUsers,
     adminInsights,
-      ai,
     notifications,
     permissions,
     folders,

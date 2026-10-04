@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { PenTool, Sparkles, Loader2, Plus, Wand2 } from 'lucide-react';
+import { PenTool, Sparkles, Loader2, Plus, Wand2, Mic, MicOff } from 'lucide-react';
+import { useSpeechInput } from '@/hooks/use-speech-input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog';
 import { Input, Textarea } from '@/components/ui/form-controls';
@@ -18,6 +19,12 @@ export function FormAiGenerator({ canEdit, onApplyGeneratedFields }: FormAiProps
   const [questionCount, setQuestionCount] = useState(5);
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<{ title: string; description: string; fields: any[] } | null>(null);
+  const { isListening, toggleListening, isSupported: voiceSupported } = useSpeechInput({
+    onTranscript: (spokenText) => {
+      setPrompt((prev) => (prev ? `${prev} ${spokenText}` : spokenText));
+    },
+  });
+
 
   const handleGenerate = async (customPrompt?: string) => {
     const textToSubmit = customPrompt || prompt;
@@ -100,16 +107,47 @@ export function FormAiGenerator({ canEdit, onApplyGeneratedFields }: FormAiProps
         <DialogContent title="Generate Form with AI" className="max-w-lg">
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                What kind of form do you want to create?
-              </label>
-              <Textarea
-                rows={3}
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="e.g. Customer satisfaction survey for a restaurant with rating, food quality, and feedback questions..."
-                className="text-xs"
-              />
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  What kind of form do you want to create?
+                </label>
+                {voiceSupported && (
+                  <button
+                    type="button"
+                    onClick={toggleListening}
+                    className={`flex items-center gap-1 rounded px-2 py-0.5 text-xs transition-colors ${
+                      isListening
+                        ? 'bg-rose-500 text-white animate-pulse'
+                        : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                    }`}
+                    title={isListening ? "Stop voice input" : "Speak form prompt"}
+                  >
+                    {isListening ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5 text-blue-600" />}
+                    <span>{isListening ? 'Listening...' : 'Voice Input'}</span>
+                  </button>
+                )}
+              </div>
+              <div className="relative">
+                <Textarea
+                  rows={3}
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder={isListening ? "Listening... Speak your form requirements to AI" : "e.g. Customer satisfaction survey for a restaurant with rating, food quality, and feedback questions..."}
+                  className="text-xs pr-8"
+                />
+                {voiceSupported && (
+                  <button
+                    type="button"
+                    onClick={toggleListening}
+                    className={`absolute bottom-2.5 right-2 flex h-6 w-6 items-center justify-center rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 ${
+                      isListening ? 'text-rose-500 animate-pulse' : ''
+                    }`}
+                    title={isListening ? "Stop voice" : "Voice input"}
+                  >
+                    {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center gap-2">

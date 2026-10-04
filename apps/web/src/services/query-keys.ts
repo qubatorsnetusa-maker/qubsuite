@@ -1,5 +1,6 @@
 /** Hierarchical query keys: invalidating a prefix (e.g. ['drive']) refreshes every dependent view. */
 export const qk = {
+    authProviders: ['auth', 'providers'] as const,
   me: ['me'] as const,
   sessions: ['me', 'sessions'] as const,
   drive: {

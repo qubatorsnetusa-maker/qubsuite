@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { PenTool, Sparkles, Loader2, Check, ArrowRight } from 'lucide-react';
+import { PenTool, Sparkles, Loader2, Check, ArrowRight, Mic, MicOff } from 'lucide-react';
+import { useSpeechInput } from '@/hooks/use-speech-input';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/misc';
 import { api, errorMessage } from '@/lib/api';
@@ -17,6 +18,12 @@ export function SheetAiAssistant({ canEdit, onApplyFormula, selectedRangeText, s
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ formula: string; explanation: string } | null>(null);
+  const { isListening, toggleListening, isSupported: voiceSupported } = useSpeechInput({
+    onTranscript: (spokenText) => {
+      setPrompt((prev) => (prev ? `${prev} ${spokenText}` : spokenText));
+    },
+  });
+
 
   const handleGenerate = async (customInstruction?: string) => {
     const textToSubmit = customInstruction || prompt;
@@ -78,15 +85,46 @@ export function SheetAiAssistant({ canEdit, onApplyFormula, selectedRangeText, s
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[11px] font-medium text-muted-foreground">What calculation do you want to perform?</label>
-            <input
-              type="text"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
-              placeholder="e.g. Sum column B if column A is 'Closed'"
-              className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs outline-none focus:ring-1 focus:ring-blue-500"
-            />
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-medium text-muted-foreground">What calculation do you want to perform?</label>
+              {voiceSupported && (
+                <button
+                  type="button"
+                  onClick={toggleListening}
+                  className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] transition-colors ${
+                    isListening
+                      ? 'bg-rose-500 text-white animate-pulse'
+                      : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                  title={isListening ? "Stop listening" : "Speak formula instruction"}
+                >
+                  {isListening ? <MicOff className="h-3 w-3" /> : <Mic className="h-3 w-3" />}
+                  <span>{isListening ? 'Listening...' : 'Voice'}</span>
+                </button>
+              )}
+            </div>
+            <div className="relative flex items-center">
+              <input
+                type="text"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
+                placeholder={isListening ? "Listening... Speak your formula request" : "e.g. Sum column B if column A is 'Closed'"}
+                className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 pr-8 text-xs outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              {voiceSupported && (
+                <button
+                  type="button"
+                  onClick={toggleListening}
+                  className={`absolute right-1.5 flex h-5 w-5 items-center justify-center rounded-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 ${
+                    isListening ? 'text-rose-500 animate-pulse' : ''
+                  }`}
+                  title={isListening ? "Stop voice" : "Voice input"}
+                >
+                  {isListening ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-1">

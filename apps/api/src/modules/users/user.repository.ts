@@ -1,8 +1,7 @@
-import { userSummaryCache } from '../../utils/fast-cache';
 import type { CurrentUser, UserSummary } from '@qub/shared';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { Executor } from '../../db';
-import { driveFolders, users, type UserRow } from '../../db/schema';
+import { driveFolders, userIdentities, users, type UserRow } from '../../db/schema';
 
 export function toUserSummary(u: Pick<UserRow, 'id' | 'email' | 'name' | 'avatarUrl'>): UserSummary {
   return { id: u.id, email: u.email, name: u.name, avatarUrl: u.avatarUrl };
@@ -19,8 +18,11 @@ export const UserRepository = {
     return row;
   },
 
-  async create(db: Executor, data: { email: string; name: string; passwordHash: string }): Promise<UserRow> {
-    const [row] = await db.insert(users).values({ ...data, email: data.email.toLowerCase() }).returning();
+  async create(db: Executor, data: { email: string; name: string; passwordHash: string | null; emailVerified?: boolean }): Promise<UserRow> {
+    const [row] = await db
+      .insert(users)
+      .values({ ...data, email: data.email.toLowerCase(), emailVerified: data.emailVerified ?? false, emailVerifiedAt: data.emailVerified ? new Date() : null })
+      .returning();
     return row!;
   },
 
@@ -32,25 +34,11 @@ export const UserRepository = {
   async summaries(db: Executor, ids: string[]): Promise<Map<string, UserSummary>> {
     const unique = [...new Set(ids.filter(Boolean))];
     if (unique.length === 0) return new Map();
-    const out = new Map<string, UserSummary>();
-    const missing: string[] = [];
-    for (const id of unique) {
-      const cached = userSummaryCache.get(id);
-      if (cached) out.set(id, cached);
-      else missing.push(id);
-    }
-    if (missing.length > 0) {
-      const rows = await db
-        .select({ id: users.id, email: users.email, name: users.name, avatarUrl: users.avatarUrl })
-        .from(users)
-        .where(inArray(users.id, missing));
-      for (const r of rows) {
-        const s = toUserSummary(r);
-        userSummaryCache.set(r.id, s);
-        out.set(r.id, s);
-      }
-    }
-    return out;
+    const rows = await db
+      .select({ id: users.id, email: users.email, name: users.name, avatarUrl: users.avatarUrl })
+      .from(users)
+      .where(inArray(users.id, unique));
+    return new Map(rows.map((r) => [r.id, toUserSummary(r)]));
   },
 
   async rootFolderId(db: Executor, userId: string): Promise<string | undefined> {
@@ -64,6 +52,11 @@ export const UserRepository = {
 
   async toCurrentUser(db: Executor, user: UserRow): Promise<CurrentUser> {
     const rootFolderId = await UserRepository.rootFolderId(db, user.id);
+    const [kc] = await db
+      .select({ username: userIdentities.username })
+      .from(userIdentities)
+      .where(and(eq(userIdentities.userId, user.id), eq(userIdentities.provider, 'kingschat')))
+      .limit(1);
     return {
       ...toUserSummary(user),
       emailVerified: user.emailVerified,
@@ -71,6 +64,8 @@ export const UserRepository = {
       lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
       rootFolderId: rootFolderId!,
       platformRole: user.platformRole,
+      hasPassword: user.passwordHash !== null,
+      kingschat: kc ? { username: kc.username } : null,
     };
   },
 };

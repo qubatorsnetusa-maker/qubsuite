@@ -103,19 +103,32 @@ export function PublicSharePage() {
   if (initial.error) return <ErrorState error={initial.error} title="This link isn’t available" />;
   const d = data!;
 
+  const activeDownloadFile = d.file ? { id: d.file.id, name: d.name } : (openFile ? { id: openFile.id, name: (d.folder?.items?.find((i) => i.id === openFile.id)?.name ?? d.name) } : null);
+
   const header = (
     <header className="flex items-center gap-3 border-b border-border bg-background px-4 py-3">
       <QubLogo />
       <span className="mx-2 h-6 w-px bg-border" />
-      <FileIcon type={d.resourceType === 'FOLDER' ? 'FOLDER' : (d.file?.fileType ?? 'OTHER')} size={22} />
-      <h1 className="min-w-0 flex-1 truncate">{d.name}</h1>
+      <FileIcon type={d.resourceType === 'FOLDER' ? (openFile ? (openFile.fileType as any) : 'FOLDER') : (d.file?.fileType ?? 'OTHER')} size={22} />
+      <h1 className="min-w-0 flex-1 truncate">{openFile ? (d.folder?.items?.find((i) => i.id === openFile.id)?.name ?? d.name) : d.name}</h1>
       <span className="hidden text-sm text-muted sm:inline">Shared by {d.owner.name}</span>
+      {activeDownloadFile && d.accessToken && (
+        <Button asChild variant="primary" size="sm" className="gap-1.5 font-medium shadow-xs">
+          <a
+            href={shareService.downloadUrl(token, d.accessToken, activeDownloadFile.id, false)}
+            download={activeDownloadFile.name || d.name}
+          >
+            <Download className="size-4" />
+            <span>Download</span>
+          </a>
+        </Button>
+      )}
       {auth.status === 'authenticated' ? (
-        <Button variant="secondary" onClick={() => redeem.mutate()} loading={redeem.isPending}>
+        <Button variant="secondary" size="sm" onClick={() => redeem.mutate()} loading={redeem.isPending}>
           Open in Qub
         </Button>
       ) : (
-        <Button asChild variant="outline">
+        <Button asChild variant="outline" size="sm">
           <Link to="/login" search={{ redirect: `/share/${token}` }}>
             Sign in
           </Link>

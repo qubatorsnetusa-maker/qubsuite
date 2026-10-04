@@ -1,4 +1,5 @@
 import type {
+  AuthProviders,
   AuthResult,
   ChangePasswordInput,
   CurrentUser,
@@ -16,6 +17,21 @@ export const authService = {
     authStore.setSession(result);
     return result;
   },
+  
+  async providers() {
+    return api<AuthProviders>('/auth/providers', { anonymous: true });
+  },
+
+  async kingschat(accessToken: string) {
+    const result = await api<AuthResult>('/auth/kingschat', { method: 'POST', body: { accessToken }, anonymous: true });
+    authStore.setSession(result);
+    return result;
+  },
+
+  async addEmail(email: string) {
+    return api<{ sent: boolean }>('/auth/add-email', { method: 'POST', body: { email } });
+  },
+
   async register(input: RegisterInput) {
     const result = await api<AuthResult | { requiresVerification: true; email: string }>('/auth/register', { method: 'POST', body: input, anonymous: true });
     if ('accessToken' in result) authStore.setSession(result);
