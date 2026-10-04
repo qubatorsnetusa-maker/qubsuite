@@ -23,6 +23,7 @@ import { MoveDialog } from '../drive/dialogs';
 import { ShareDialog } from '../sharing/share-dialog';
 import { FormIssues } from './builder/form-issues';
 import { FormSettingsDialog } from './builder/form-settings-dialog';
+import { FormAiGenerator } from './form-ai-generator';
 import { BuilderOpsProvider, useBuilderOps } from './builder/ops/builder-ops';
 import { QuestionEditor } from './builder/question-editor';
 import { ThemeButton } from './builder/theme-button';
@@ -273,6 +274,23 @@ function Builder() {
               ))}
               {canEdit && (
                 <div className="flex flex-wrap gap-2 pb-20">
+                  <FormAiGenerator
+                    canEdit={canEdit}
+                    onApplyGeneratedFields={(data) => {
+                      if (data.title && !form.title) ops.apply(formSetTx(form, { title: data.title }));
+                      if (data.description && !form.description) ops.apply(formSetTx(form, { description: data.description }));
+                      data.fields.forEach((field) => {
+                        const newField = {
+                          id: crypto.randomUUID(),
+                          type: field.type,
+                          label: field.label,
+                          required: field.required,
+                          options: field.options?.map((opt) => ({ id: crypto.randomUUID(), label: opt })),
+                        };
+                        ops.apply(addFieldTx(form, newField as any));
+                      });
+                    }}
+                  />
                   <TypePicker
                     onPick={addField}
                     trigger={

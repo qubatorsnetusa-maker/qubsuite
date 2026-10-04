@@ -55,6 +55,7 @@ import { listPickInput } from './validation';
 import { ImportDialog } from './import-dialog';
 import { planAutoSum } from './autosum';
 import { FunctionItems, FunctionsMenu } from './functions-menu';
+import { SheetAiAssistant } from './sheet-ai-assistant';
 import { printHtml } from '@/lib/print-frame';
 import { buildPrintHtml } from './print-sheet';
 import { measureText } from './spill';
@@ -854,6 +855,16 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
           <span className="px-2 font-serif italic text-muted" aria-hidden>
             fx
           </span>
+          <div className="mr-2">
+            <SheetAiAssistant
+              canEdit={canEdit}
+              onApplyFormula={(formula) => {
+                setEditing({ value: formula, fromFormulaBar: true });
+                // Automatically commit into cell
+                applyOp({ type: 'set_cell', row: sel.active.row, col: sel.active.col, value: formula });
+              }}
+            />
+          </div>
           <div className="relative flex-1">
             <input
               aria-label="Formula bar"
