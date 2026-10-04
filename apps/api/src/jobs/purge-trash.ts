@@ -1,4 +1,4 @@
-import { and, eq, isNull, lt, sql } from 'drizzle-orm';
+import { and, eq, isNull, isNotNull, lt, sql } from 'drizzle-orm';
 import type { FastifyBaseLogger } from 'fastify';
 import { driveFiles, driveFolders, emailVerifications, passwordResetTokens, sessions } from '../db/schema';
 import type { Services } from '../services/container';
@@ -6,6 +6,7 @@ import type { Services } from '../services/container';
 export interface PurgeResult {
   folders: number;
   files: number;
+  expiredUploads: number;
   orphanUploads: number;
   expiredSpam: number;
   expiredSessions: number;
@@ -20,7 +21,7 @@ export async function purgeTrash(services: Services, log: FastifyBaseLogger): Pr
   // Retention is an organization policy (admin console → Drive policies).
   const retentionDays = (await services.policies.get()).trash.retentionDays;
   const cutoff = new Date(Date.now() - retentionDays * 86_400_000);
-  const result: PurgeResult = { folders: 0, files: 0, orphanUploads: 0, expiredSpam: 0, expiredSessions: 0 };
+  const result: PurgeResult = { folders: 0, files: 0, expiredUploads: 0, orphanUploads: 0, expiredSpam: 0, expiredSessions: 0 };
 
   const folders = await db
     .select({ id: driveFolders.id, ownerId: driveFolders.ownerId })
@@ -47,6 +48,21 @@ export async function purgeTrash(services: Services, log: FastifyBaseLogger): Pr
       result.files++;
     } catch (err) {
       log.error({ err, fileId: f.id }, 'Trash purge failed for file');
+    }
+  }
+
+  // WeTransfer-style temporary storage: delete free-tier files that reached their 7-day expiration (expiresAt < now)
+  const expiredUploads = await db
+    .select({ id: driveFiles.id, ownerId: driveFiles.ownerId })
+    .from(driveFiles)
+    .where(and(isNotNull(driveFiles.expiresAt), lt(driveFiles.expiresAt, new Date())))
+    .limit(2000);
+  for (const f of expiredUploads) {
+    try {
+      await services.files.deletePermanently(f.ownerId, f.id, { system: true });
+      result.expiredUploads++;
+    } catch (err) {
+      log.error({ err, fileId: f.id }, 'Expired upload purge failed');
     }
   }
 

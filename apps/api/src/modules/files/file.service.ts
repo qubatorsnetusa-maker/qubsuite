@@ -2,7 +2,7 @@ import type { Readable } from 'node:stream';
 import type { DriveFileDto, FileVersionDto, NativeFileType, UpdateItemInput } from '@qub/shared';
 import { and, eq, sql } from 'drizzle-orm';
 import type { Database, Executor } from '../../db';
-import { driveFiles, fileVersions } from '../../db/schema';
+import { driveFiles, fileVersions, users } from '../../db/schema';
 import type { StorageService } from '../../services/storage';
 import { AppError, badRequest, forbidden, notFound } from '../../utils/errors';
 import { nextDuplicateName, sanitizeFilename } from '../../utils/filename';
@@ -76,6 +76,11 @@ export class FileService {
 
   async upload(userId: string, folderId: string | undefined, source: UploadSource): Promise<DriveFileDto> {
     const folder = await this.folders.resolveTarget(userId, folderId);
+    const [user] = await this.db.select({ isPro: users.isPro, storageUnlimited: users.storageUnlimited, platformRole: users.platformRole }).from(users).where(eq(users.id, userId)).limit(1);
+    const isPro = Boolean(user?.isPro || user?.storageUnlimited || user?.platformRole === 'SUPERADMIN' || user?.platformRole === 'ADMIN');
+    // WeTransfer-style 7-day retention for free users; permanent for Pro users
+    const expiresAt = isPro ? null : new Date(Date.now() + 7 * 86_400_000);
+
     const filename = sanitizeFilename(source.filename, 'Untitled file');
     const key = this.storage.newKey('files', userId);
     const stored = await this.storage.ingest(source.stream, { filename, key, ...(await this.uploadLimits(userId, userId)) });
@@ -92,6 +97,7 @@ export class FileService {
           storageKey: stored.key,
           checksum: stored.checksum,
           currentVersion: 1,
+          expiresAt,
         });
         await tx.insert(fileVersions).values({
           fileId: created.id,

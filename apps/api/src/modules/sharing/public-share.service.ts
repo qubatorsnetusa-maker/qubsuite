@@ -82,6 +82,8 @@ export class PublicShareService {
       const f = (await DriveFileRepository.findById(this.db, link.fileId))!;
       const owner = (await UserRepository.summaries(this.db, [f.ownerId])).get(f.ownerId)!;
       const resources = await DriveFileRepository.resourceIds(this.db, [f.id]);
+      const expiresAt = f.expiresAt ? f.expiresAt.toISOString() : null;
+      const isPermanent = !f.expiresAt;
       return {
         resourceType: 'FILE',
         role,
@@ -89,7 +91,9 @@ export class PublicShareService {
         owner,
         requiresPassword: !!link.passwordHash && !accessToken,
         accessToken,
-        file: accessToken ? { id: f.id, fileType: f.fileType, mimeType: f.mimeType, size: f.size, resourceId: resources.get(f.id) ?? null, updatedAt: f.updatedAt.toISOString() } : undefined,
+        expiresAt,
+        isPermanent,
+        file: accessToken ? { id: f.id, fileType: f.fileType, mimeType: f.mimeType, size: f.size, resourceId: resources.get(f.id) ?? null, updatedAt: f.updatedAt.toISOString(), expiresAt } : undefined,
       };
     }
     const [folder] = await this.db.select().from(driveFolders).where(eq(driveFolders.id, link.folderId!)).limit(1);

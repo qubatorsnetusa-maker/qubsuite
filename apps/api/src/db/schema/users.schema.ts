@@ -20,6 +20,7 @@ export const users = pgTable(
     storageQuotaBytes: bigint('storage_quota_bytes', { mode: 'number' }),
     /** No storage limit for this person, whatever the organization default. */
     storageUnlimited: boolean('storage_unlimited').notNull().default(false),
+    isPro: boolean('is_pro').notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),

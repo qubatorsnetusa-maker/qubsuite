@@ -65,6 +65,7 @@ export const UserRepository = {
       rootFolderId: rootFolderId!,
       platformRole: user.platformRole,
       hasPassword: user.passwordHash !== null,
+      isPro: user.isPro || user.storageUnlimited || user.platformRole === 'SUPERADMIN' || user.platformRole === 'ADMIN',
       kingschat: kc ? { username: kc.username } : null,
     };
   },

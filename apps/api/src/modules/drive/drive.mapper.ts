@@ -100,6 +100,7 @@ export async function toFileDtos(
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
     lastOpenedAt: extra.lastOpened?.get(r.id)?.toISOString() ?? null,
+    expiresAt: r.expiresAt?.toISOString() ?? null,
     capabilities: toCapabilities(access.get(r.id)!),
   }));
 }

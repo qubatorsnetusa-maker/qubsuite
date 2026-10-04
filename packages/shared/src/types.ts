@@ -31,6 +31,7 @@ export interface CurrentUser extends UserSummary {
   lastLoginAt: string | null;
   rootFolderId: string;
   platformRole: PlatformRole;
+  isPro?: boolean;
 }
 
 export interface AuthResult {
@@ -89,6 +90,7 @@ export interface DriveFileDto {
   createdAt: string;
   updatedAt: string;
   lastOpenedAt?: string | null;
+  expiresAt?: string | null;
   capabilities: Capabilities;
 }
 
@@ -559,7 +561,9 @@ export interface PublicShareDto {
   requiresPassword: boolean;
   /** Present once the password (if any) is satisfied. */
   accessToken: string | null;
-  file?: { id: string; fileType: FileType; mimeType: string; size: number; resourceId: string | null; updatedAt: string };
+  expiresAt?: string | null;
+  isPermanent?: boolean;
+  file?: { id: string; fileType: FileType; mimeType: string; size: number; resourceId: string | null; updatedAt: string; expiresAt?: string | null };
   folder?: { id: string; items: { kind: 'file' | 'folder'; id: string; name: string; fileType: FileType | 'FOLDER'; size: number }[] };
 }
 
