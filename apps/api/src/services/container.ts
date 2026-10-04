@@ -65,8 +65,8 @@ export function createServices(app: FastifyInstance, env: Env, db: Database, ove
   const search = new SearchService(db, permissions);
   const library = new LibraryService(db, drive);
   const spam = new SpamService(db, drive);
-  const sharing = new SharingService(db, env, permissions, notifications, activity, audit, mailer, policies);
   const auth = new AuthService(app, db, env, mailer, audit, policies);
+  const sharing = new SharingService(db, env, permissions, notifications, activity, audit, mailer, policies, auth);
   const docs = new DocumentService(db, files, permissions, notifications, sharing, storage, natives, usage);
   const comments = new CommentService(db, docs, sharing, notifications, activity);
   const sheets = new SpreadsheetService(db, files, permissions, natives);

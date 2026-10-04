@@ -14,6 +14,7 @@ import type { Env } from '../../config/env';
 import type { Database, Executor } from '../../db';
 import { driveFiles, driveFolders, filePermissions, fileShares, folderPermissions, shareLinks } from '../../db/schema';
 import type { Mailer } from '../../services/mailer';
+import type { AuthService } from '../auth/auth.service';
 import { hashPassword, randomToken } from '../../utils/crypto';
 import { AppError, badRequest, conflict, forbidden, notFound, policyViolation } from '../../utils/errors';
 import type { ActivityService, AuditContext, AuditService } from '../activity/activity.service';
@@ -54,6 +55,7 @@ export class SharingService {
     private readonly audit: AuditService,
     private readonly mailer: Mailer,
     private readonly policies: PolicyService,
+    private readonly auth: AuthService,
   ) {}
 
   private async resource(ref: ResourceRef, tx: Executor = this.db): Promise<ResourceInfo> {
@@ -271,7 +273,9 @@ export class SharingService {
     });
 
     if (input.notify) {
-      const url = `${this.env.APP_URL}${target ? this.linkFor(ref, info, resourceId) : `/register?email=${encodeURIComponent(input.email)}`}`;
+      const docTargetUrl = this.linkFor(ref, info, resourceId);
+      const inviteToken = await this.auth.createInviteToken(input.email, docTargetUrl);
+      const url = `${this.env.APP_URL}/invite/${inviteToken}`;
       const roleDisplay = input.role.charAt(0).toUpperCase() + input.role.slice(1).toLowerCase();
       const htmlBody = `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 32px 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">

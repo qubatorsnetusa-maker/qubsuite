@@ -71,3 +71,17 @@ export const passwordResetTokens = pgTable(
   },
   (t) => [uniqueIndex('password_reset_hash_unique').on(t.tokenHash), index('password_reset_user_idx').on(t.userId)],
 );
+
+export const inviteTokens = pgTable(
+  'invite_tokens',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    email: text('email').notNull(),
+    tokenHash: text('token_hash').notNull(),
+    targetUrl: text('target_url').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('invite_tokens_hash_unique').on(t.tokenHash), index('invite_tokens_email_idx').on(t.email)],
+);

@@ -4,6 +4,25 @@ import { createDb } from './db';
 
 async function main() {
   const db = createDb(env.DATABASE_URL, { max: env.DATABASE_POOL_MAX });
+
+  // Ensure invite_tokens table exists for frictionless one-click invitation links
+  try {
+    await db.sql.unsafe(`
+      CREATE TABLE IF NOT EXISTS invite_tokens (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        email TEXT NOT NULL,
+        token_hash TEXT NOT NULL UNIQUE,
+        target_url TEXT NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        used_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS invite_tokens_email_idx ON invite_tokens(email);
+    `);
+  } catch (err: any) {
+    console.warn('invite_tokens table init check:', err?.message);
+  }
+
   const app = await buildApp({ env, db });
 
   let shuttingDown = false;

@@ -10,6 +10,7 @@ import {
   fileShares,
   folderPermissions,
   passwordResetTokens,
+  inviteTokens,
   refreshTokens,
   sessions,
   users,
@@ -396,4 +397,41 @@ ${link}`,
       await this.audit.log({ ...ctx, actorId: userId }, 'auth.password_changed', { type: 'user', id: userId }, {}, tx);
     });
   }
+
+  /** Creates a direct access link for invited collaborators. Valid for 7 days. */
+  async createInviteToken(email: string, targetUrl: string): Promise<string> {
+    const token = randomToken(32);
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await this.db.insert(inviteTokens).values({
+      email,
+      tokenHash: this.hash(token),
+      targetUrl,
+      expiresAt,
+    });
+    return token;
+  }
+
+  /** Resolves the invite link: provisions account automatically if not registered, and issues active session. */
+  async redeemInvite(token: string, ctx: ClientContext): Promise<{ session: IssuedSession; targetUrl: string }> {
+    const tokenHash = this.hash(token);
+    const [row] = await this.db.select().from(inviteTokens).where(eq(inviteTokens.tokenHash, tokenHash)).limit(1);
+    if (!row || row.usedAt || row.expiresAt.getTime() < Date.now()) {
+      throw new AppError('BAD_REQUEST', 'This invitation link is invalid or has expired.');
+    }
+
+    let user = await UserRepository.findByEmail(this.db, row.email);
+    if (!user) {
+      // Auto-provision user account seamlessly from the invited email
+      const name = row.email.split('@')[0]!.replace(/[^a-zA-Z0-9]/g, ' ').trim() || 'Collaborator';
+      const passwordHash = await hashPassword(randomToken(24));
+      user = await this.db.transaction(async (tx) => {
+        return this.provisionUser(tx, { email: row.email, name, passwordHash });
+      });
+    }
+
+    await this.db.update(inviteTokens).set({ usedAt: new Date() }).where(eq(inviteTokens.id, row.id));
+    const session = await this.issueSession(user, ctx);
+    return { session, targetUrl: row.targetUrl };
+  }
+
 }

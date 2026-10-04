@@ -157,4 +157,11 @@ export async function authRoutes(app: FastifyInstance) {
     await auth.revokeOwnSession(requireAuth(request).userId, request.params.id, auditContext(request));
     return ok({ revoked: true });
   });
+
+  r.post('/redeem-invite', { config: authLimit, schema: { body: z.object({ token: z.string().min(20).max(200) }) } }, async (request, reply) => {
+    const { session, targetUrl } = await auth.redeemInvite(request.body.token, client(request));
+    setSessionCookies(reply, session);
+    return ok({ ...publicSession(session), targetUrl });
+  });
+
 }
