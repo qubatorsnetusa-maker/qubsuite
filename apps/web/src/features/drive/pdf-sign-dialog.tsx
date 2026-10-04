@@ -405,6 +405,7 @@ export function PdfSignDialog({
       for (const ann of annotations) {
         const pageIdx = Math.min(Math.max(0, ann.pageIndex), pages.length - 1);
         const page = pages[pageIdx];
+        if (!page) continue;
         const { width, height } = page.getSize();
 
         const x = (ann.xPercent / 100) * width;
@@ -450,7 +451,7 @@ export function PdfSignDialog({
       }
 
       const signedBytes = await pdfDoc.save();
-      const signedBlob = new Blob([signedBytes], { type: 'application/pdf' });
+      const signedBlob = new Blob([signedBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
       const signedFileName = fileName.replace(/\.pdf$/i, '') + '-edited.pdf';
 
       if (onSaveSigned) {

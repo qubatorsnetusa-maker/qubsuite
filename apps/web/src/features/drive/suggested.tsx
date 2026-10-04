@@ -1,3 +1,5 @@
+import { prefetchItemResource } from '@/services/prefetch';
+import { useQueryClient } from '@tanstack/react-query';
 import type { SuggestedItemDto } from '@qub/shared';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown } from 'lucide-react';
@@ -32,9 +34,12 @@ function reasonText(r: SuggestedItemDto['reason']): string {
 
 function Card({ item }: { item: SuggestedItemDto }) {
   const actions = useItemActions();
+  const qc = useQueryClient();
   return (
     <div
       role="listitem"
+      onMouseEnter={() => prefetchItemResource(qc, item)}
+      onFocus={() => prefetchItemResource(qc, item)}
       className="group flex min-w-0 flex-col rounded-xl bg-surface-2 p-2 pt-0 text-left transition-colors hover:bg-[#e1e5ea] focus-within:ring-2 focus-within:ring-primary"
       draggable={item.capabilities.canEdit}
       onDragStart={(e) => setDragItems(e, [{ kind: 'file', id: item.id, name: item.name }])}

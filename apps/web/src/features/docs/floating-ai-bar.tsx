@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import type { Editor } from '@tiptap/react';
 import {
   Loader2,
+  Sparkles,
   ArrowUp,
   MoreVertical,
   Check,

@@ -5,9 +5,11 @@ import { ApiError, errorMessage } from '@/lib/api';
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30_000,
-      gcTime: 5 * 60_000,
-      refetchOnWindowFocus: true,
+      // 60s stale time ensures repeated navigations and tab switches don't trigger disruptive loading spinners
+      staleTime: 60_000,
+      // Keep inactive queries in memory for 10 minutes so returning to files is instantaneous
+      gcTime: 10 * 60_000,
+      refetchOnWindowFocus: false,
       // Retry transient failures only; auth/permission/validation errors won't fix themselves.
       retry: (count, error) => {
         if (error instanceof ApiError && error.status > 0 && error.status < 500 && error.status !== 429) return false;

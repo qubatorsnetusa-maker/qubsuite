@@ -3,7 +3,7 @@ import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalList
 import { CSS } from '@dnd-kit/utilities';
 import type { FormDto, FormFieldDto, FormFieldType } from '@qub/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { addFieldTx, formSetTx, moveFieldTx, QUESTION_TYPES, validateDefinition, type DefinitionIssue } from '@qub/shared/forms';
+import { addFieldTx, fieldSetTx, formSetTx, moveFieldTx, QUESTION_TYPES, validateDefinition, type DefinitionIssue } from '@qub/shared/forms';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { Eye, FolderInput, GripVertical, Link2, PanelsTopLeft, Plus, Redo2, Settings2, Trash2, Undo2, Variable } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
@@ -277,18 +277,22 @@ function Builder() {
                   <FormAiGenerator
                     canEdit={canEdit}
                     onApplyGeneratedFields={(data) => {
-                      if (data.title && !form.title) ops.apply(formSetTx(form, { title: data.title }));
-                      if (data.description && !form.description) ops.apply(formSetTx(form, { description: data.description }));
+                      if (data.title && !form.title) ops.apply(formSetTx(ops.form, { title: data.title }));
+                      if (data.description && !form.description) ops.apply(formSetTx(ops.form, { description: data.description }));
+                      let lastId: string | null = active;
                       data.fields.forEach((field) => {
-                        const newField = {
-                          id: crypto.randomUUID(),
-                          type: field.type,
-                          label: field.label,
-                          required: field.required,
-                          options: field.options?.map((opt) => ({ id: crypto.randomUUID(), label: opt })),
-                        };
-                        ops.apply(addFieldTx(form, newField as any));
+                        const { tx, fieldId } = addFieldTx(ops.form, field.type, lastId, field.label);
+                        ops.apply(tx);
+                        if (field.required || field.options?.length) {
+                          const updateTx = fieldSetTx(ops.form, fieldId, {
+                            required: field.required,
+                            options: field.options?.map((opt, idx) => ({ id: crypto.randomUUID(), label: opt, kind: 'option', position: idx })),
+                          });
+                          if (updateTx) ops.apply(updateTx);
+                        }
+                        lastId = fieldId;
                       });
+                      if (lastId) setActive(lastId);
                     }}
                   />
                   <TypePicker

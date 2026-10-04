@@ -1,3 +1,5 @@
+import { prefetchItemResource } from '@/services/prefetch';
+import { useQueryClient } from '@tanstack/react-query';
 import { LIBRARY_SORTS, type LibraryItemDto, type LibrarySort, type NativeFileType } from '@qub/shared';
 import { FEATURED_TEMPLATES, findTemplate } from '@qub/shared/templates';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
@@ -257,9 +259,10 @@ function ItemMenu({ app, item }: { app: AppConfig; item: LibraryItemDto }) {
 
 function LibraryCard({ app, item }: { app: AppConfig; item: LibraryItemDto }) {
   const me = useCurrentUser();
+  const qc = useQueryClient();
   const open = useOpen(app);
   return (
-    <article className="group overflow-hidden rounded-lg border border-border bg-background transition-shadow hover:shadow-card">
+    <article onMouseEnter={() => prefetchItemResource(qc, item)} onFocus={() => prefetchItemResource(qc, item)} className="group overflow-hidden rounded-lg border border-border bg-background transition-shadow hover:shadow-card">
       <button onClick={() => open(item)} className="relative block h-44 w-full overflow-hidden bg-[#f1f3f4] px-5 pt-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary" aria-label={`Open ${item.name}`}>
         <div className="overflow-hidden rounded-t-sm shadow-[0_1px_3px_rgba(60,64,67,0.25)]">
           <PreviewThumbnail title={item.name} preview={item.preview} className={cn('w-full', app.tileAspect)} />
@@ -288,6 +291,7 @@ function LibraryCard({ app, item }: { app: AppConfig; item: LibraryItemDto }) {
 
 function LibraryList({ app, items, sort }: { app: AppConfig; items: LibraryItemDto[]; sort: LibrarySort }) {
   const me = useCurrentUser();
+  const qc = useQueryClient();
   const open = useOpen(app);
   return (
     <table className="mt-2 w-full table-fixed text-sm">
@@ -301,7 +305,7 @@ function LibraryList({ app, items, sort }: { app: AppConfig; items: LibraryItemD
       </thead>
       <tbody>
         {items.map((item) => (
-          <tr key={item.id} className="cursor-pointer border-t border-border hover:bg-hover" onClick={() => open(item)}>
+          <tr key={item.id} onMouseEnter={() => prefetchItemResource(qc, item)} onFocus={() => prefetchItemResource(qc, item)} className="cursor-pointer border-t border-border hover:bg-hover" onClick={() => open(item)}>
             <td className="py-2 pl-2">
               <button className="flex min-w-0 max-w-full items-center gap-3 text-left outline-none focus-visible:underline" onClick={(e) => (e.stopPropagation(), open(item))}>
                 <FileIcon type={app.type} size={20} />

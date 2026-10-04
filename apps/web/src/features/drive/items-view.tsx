@@ -1,3 +1,5 @@
+import { prefetchItemResource } from '@/services/prefetch';
+import { useQueryClient } from '@tanstack/react-query';
 import type { DriveItemDto } from '@qub/shared';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { MoreVertical, Star, Users, X } from 'lucide-react';
@@ -59,6 +61,7 @@ export function ItemsView(props: ItemsViewProps) {
   const { items, mode, isLoading, error, onRetry } = props;
   const me = useCurrentUser();
   const actions = useItemActions();
+  const qc = useQueryClient();
   const { density } = useDrivePrefs();
   const uploads = useTransfers();
   const move = useMoveItems();
@@ -253,6 +256,8 @@ export function ItemsView(props: ItemsViewProps) {
 
   const itemHandlers = (item: DriveItemDto, index: number) => ({
     'data-index': index,
+    onMouseEnter: () => prefetchItemResource(qc, item),
+    onFocus: () => prefetchItemResource(qc, item),
     tabIndex: index === focus ? 0 : -1,
     'aria-selected': selected.has(keyOf(item)),
     onClick: (e: MouseEvent) => {

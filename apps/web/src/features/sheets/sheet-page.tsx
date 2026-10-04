@@ -860,8 +860,8 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
               canEdit={canEdit}
               onApplyFormula={(formula) => {
                 setEditing({ value: formula, fromFormulaBar: true });
-                // Automatically commit into cell
-                applyOp({ type: 'set_cell', row: sel.active.row, col: sel.active.col, value: formula });
+                run([{ type: 'setCells', sheetId: sheet.id, cells: [{ row: sel.active.row, col: sel.active.col, input: formula }] }]);
+                fitRows([sel.active.row]);
               }}
             />
           </div>

@@ -18,7 +18,7 @@ export async function printDocument(editor: Editor, title: string): Promise<void
     const file = await documentFile(editor, title, 'html');
     toast.dismiss(loading);
     if (file.failedImages) toast.warning(file.failedImages === 1 ? '1 image couldn’t be loaded for printing.' : `${file.failedImages} images couldn’t be loaded for printing.`);
-    await printHtml(file.content);
+    await printHtml(typeof file.content === 'string' ? file.content : new TextDecoder().decode(file.content));
   } catch (e) {
     toast.dismiss(loading);
     toast.error(errorMessage(e));

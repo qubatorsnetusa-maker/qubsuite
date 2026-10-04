@@ -52,14 +52,14 @@ export function FormAiGenerator({ canEdit, onApplyGeneratedFields }: FormAiProps
 
     // Map AI types to valid FormFieldType
     const mappedFields = preview.fields.map((f) => {
-      let type: FormFieldType = 'SHORT_TEXT';
+      let type: FormFieldType = 'SHORT_ANSWER';
       const rawType = (f.type || '').toLowerCase();
       if (rawType.includes('email')) type = 'EMAIL';
       else if (rawType.includes('number')) type = 'NUMBER';
-      else if (rawType.includes('textarea') || rawType.includes('long')) type = 'LONG_TEXT';
+      else if (rawType.includes('textarea') || rawType.includes('long') || rawType.includes('paragraph')) type = 'PARAGRAPH';
       else if (rawType.includes('select') || rawType.includes('drop')) type = 'DROPDOWN';
-      else if (rawType.includes('radio') || rawType.includes('single')) type = 'SINGLE_CHOICE';
-      else if (rawType.includes('check') || rawType.includes('multi')) type = 'MULTIPLE_CHOICE';
+      else if (rawType.includes('check') || rawType.includes('multi')) type = 'CHECKBOXES';
+      else if (rawType.includes('radio') || rawType.includes('single') || rawType.includes('choice')) type = 'MULTIPLE_CHOICE';
       else if (rawType.includes('rating') || rawType.includes('star')) type = 'RATING';
       else if (rawType.includes('date')) type = 'DATE';
 

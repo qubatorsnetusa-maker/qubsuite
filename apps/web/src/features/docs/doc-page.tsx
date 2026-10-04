@@ -141,7 +141,7 @@ function DocEditor({ documentId }: { documentId: string }) {
         handleDrop: (view, event, slice, moved) => {
           if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
             const file = event.dataTransfer.files[0];
-            if (file.type.startsWith('image/')) {
+            if (file && file.type.startsWith('image/')) {
               event.preventDefault();
               const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
               if (coordinates) {
@@ -158,7 +158,7 @@ function DocEditor({ documentId }: { documentId: string }) {
         handlePaste: (view, event) => {
           if (event.clipboardData && event.clipboardData.files && event.clipboardData.files.length > 0) {
             const file = event.clipboardData.files[0];
-            if (file.type.startsWith('image/')) {
+            if (file && file.type.startsWith('image/')) {
               event.preventDefault();
               if (editor) {
                 void handleImageFile(file, editor, documentId);
