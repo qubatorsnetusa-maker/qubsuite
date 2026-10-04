@@ -1,0 +1,32 @@
+{
+  "name": "qubators",
+  "private": true,
+  "type": "module",
+  "description": "Qub platform — Drive, Docs, Sheets and Forms on one foundation",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @qub/api --filter @qub/web dev",
+    "dev:api": "pnpm --filter @qub/api dev",
+    "dev:web": "pnpm --filter @qub/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r --filter !@qub/e2e test",
+    "test:e2e": "pnpm --filter @qub/e2e test",
+    "db:generate": "pnpm --filter @qub/api db:generate",
+    "db:migrate": "pnpm --filter @qub/api db:migrate",
+    "db:seed": "pnpm --filter @qub/api db:seed",
+    "job:purge-trash": "pnpm --filter @qub/api job:purge-trash",
+    "admin:grant": "pnpm --filter @qub/api admin:grant"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  },
+  "dependencies": {
+    "@neon/config": "^1.8.3",
+    "@neon/env": "^1.4.8"
+  }
+}

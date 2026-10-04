@@ -1,0 +1,10 @@
+const fs = require('fs');
+let c = fs.readFileSync('C:/Users/Kelvin Odems/Downloads/QubSuite/Qubators/apps/web/src/features/docs/voice-typing-widget.tsx', 'utf8');
+c = c.replace(/onClose:\s*\(\)\s*=>\s*void;\s*[\r\n\x00-\x1f]+\}/g, 'onClose(): void;\n}');
+c = c.replace('className{', 'className={');
+c = c.replace('title{isListening', 'title={isListening');
+c = c.replace('-z-50, flex', 'z-50 flex');
+c = c.replace('backdrop-blur-md, dark', 'backdrop-blur-md dark');
+c = c.replace('min-w-[x140px] max-w-[x260px]', 'min-w-[140px] max-w-[260px]');
+fs.writeFileSync('C:/Users/Kelvin Odems/Downloads/QubSuite/Qubators/apps/web/src/features/docs/voice-typing-widget.tsx', c, 'utf8');
+console.log('Cleaned voice widget');

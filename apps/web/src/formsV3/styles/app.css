@@ -1,0 +1,257 @@
+@import "tailwindcss";
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * Design tokens carried over 1:1 from the original Stitch-exported mockup's
+ * inline `tailwind.config` (Tailwind v3 JS config) into Tailwind v4's
+ * CSS-first `@theme`, so every utility class used by the converted pages
+ * (bg-primary, text-headline-lg, font-code-sm, rounded-2xl, ...) resolves
+ * to the same values the mockups were designed with.
+ *
+ * These tokens (the "Studio" theme) are used ONLY by the public-facing
+ * surface: the marketing landing page (src/pages/home), auth pages
+ * (src/pages/auth/*), the SSO callback screen, and the legal/cookie
+ * components. The authenticated in-app product — Workspace, FormBuilder,
+ * Submissions, and everything under src/components/workspace/* — uses a
+ * separate, deliberately plainer black/zinc palette expressed directly in
+ * Tailwind utility classes (bg-zinc-900, border-zinc-200, ...), matching the
+ * neutral chrome a form-builder tool needs so a form's own theme colors
+ * (see src/data/defaultForms.ts's FORM_THEMES) stay the only accent color on
+ * screen. This is an intentional split between "selling/onboarding" and
+ * "daily-use tool" visual languages, not an inconsistency — don't merge them.
+ */
+@theme {
+  /* Colors */
+  --color-on-primary-fixed: #0f0069;
+  --color-status-error: #f43f5e;
+  --color-outline: #cbd5e1;
+  --color-surface-container: #f1f5f9;
+  --color-on-tertiary-fixed-variant: #92002a;
+  --color-surface-container-highest: #e2e8f0;
+  --color-on-secondary-container: #004666;
+  --color-on-primary-fixed-variant: #3323cc;
+  --color-outline-variant: #e2e8f0;
+  --color-surface-bright: #ffffff;
+  --color-surface-container-lowest: #ffffff;
+  --color-tertiary: #95002b;
+  --color-error: #ba1a1a;
+  --color-primary-fixed: #e2dfff;
+  --color-error-container: #ffdad6;
+  --color-on-tertiary: #ffffff;
+  --color-on-primary-container: #ffffff;
+  --color-accent-indigo-subtle: #eef2ff;
+  --color-on-tertiary-fixed: #40000d;
+  --color-on-secondary-fixed: #001e2f;
+  --color-on-secondary-fixed-variant: #004c6e;
+  --color-on-secondary: #ffffff;
+  --color-on-surface: #0f172a;
+  --color-primary: #4f46e5;
+  --color-surface: #ffffff;
+  --color-on-surface-variant: #475569;
+  --color-surface-container-high: #f8fafc;
+  --color-on-error-container: #93000a;
+  --color-tertiary-fixed: #ffdadb;
+  --color-inverse-on-surface: #eef0ff;
+  --color-tertiary-container: #e11d48;
+  --color-on-tertiary-container: #ffffff;
+  --color-accent-indigo-hover: #4338ca;
+  --color-on-primary: #ffffff;
+  --color-status-warning: #f59e0b;
+  --color-surface-variant: #f1f5f9;
+  --color-primary-fixed-dim: #c3c0ff;
+  --color-background: #f8fafc;
+  --color-surface-container-low: #ffffff;
+  --color-secondary-container: #0284c7;
+  --color-secondary: #0284c7;
+  --color-secondary-fixed-dim: #89ceff;
+  --color-surface-tint: #4f46e5;
+  --color-tertiary-fixed-dim: #ffb2b7;
+  --color-inverse-primary: #c3c0ff;
+  --color-inverse-surface: #283044;
+  --color-on-error: #ffffff;
+  --color-primary-container: #4f46e5;
+  --color-secondary-fixed: #c9e6ff;
+  --color-status-success: #10b981;
+  --color-on-background: #0f172a;
+  --color-surface-dim: #e2e8f0;
+
+  /* Radii */
+  --radius: 0.125rem;
+  --radius-lg: 0.375rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-full: 9999px;
+
+  /* Named spacing (in addition to the default numeric scale) */
+  --spacing-space-xl: 2rem;
+  --spacing-gutter-lg: 2rem;
+  --spacing-margin: 2rem;
+  --spacing-margin-lg: 4rem;
+  --spacing-space-2xl: 3rem;
+  --spacing-space-md: 1rem;
+  --spacing-space-xs: 0.25rem;
+  --spacing-space-lg: 1.5rem;
+  --spacing-space-3xl: 4.5rem;
+  --spacing-margin-sm: 1rem;
+  --spacing-gutter: 1.5rem;
+  --spacing-space-sm: 0.5rem;
+  --spacing-gutter-sm: 1rem;
+
+  /* Font families (mapped to the 3 underlying stacks used across roles) */
+  --font-headline-sm: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-body-sm: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-display-hero: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-code-sm: "JetBrains Mono", ui-monospace, monospace;
+  /* Used across the workspace/builder/submissions UI for stat labels, IDs,
+     and timestamps (e.g. `font-mono-code`) — the token itself was missing,
+     so every one of those usages was silently falling back to the default
+     sans stack instead of monospace. */
+  --font-mono-code: "JetBrains Mono", ui-monospace, monospace;
+  --font-body-lg: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-label-sm: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-headline-lg-mobile: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-headline-xl: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-label-md: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-headline-xl-mobile: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-headline-md: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-headline-lg: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-body-md: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-display-hero-mobile: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+
+  /* Font sizes (size + line-height + letter-spacing + weight, per role) */
+  --text-headline-sm: 1.125rem;
+  --text-headline-sm--line-height: 1.4;
+  --text-headline-sm--letter-spacing: -0.01em;
+  --text-headline-sm--font-weight: 500;
+
+  --text-body-sm: 0.875rem;
+  --text-body-sm--line-height: 1.5;
+  --text-body-sm--letter-spacing: 0.005em;
+  --text-body-sm--font-weight: 400;
+
+  --text-display-hero: 3.5rem;
+  --text-display-hero--line-height: 1.1;
+  --text-display-hero--letter-spacing: -0.03em;
+  --text-display-hero--font-weight: 700;
+
+  --text-code-sm: 0.8125rem;
+  --text-code-sm--line-height: 1.4;
+  --text-code-sm--letter-spacing: 0em;
+  --text-code-sm--font-weight: 400;
+
+  --text-body-lg: 1.125rem;
+  --text-body-lg--line-height: 1.6;
+  --text-body-lg--letter-spacing: -0.005em;
+  --text-body-lg--font-weight: 400;
+
+  --text-label-sm: 0.75rem;
+  --text-label-sm--line-height: 1.2;
+  --text-label-sm--letter-spacing: 0.04em;
+  --text-label-sm--font-weight: 600;
+
+  --text-headline-lg-mobile: 1.5rem;
+  --text-headline-lg-mobile--line-height: 1.3;
+  --text-headline-lg-mobile--letter-spacing: -0.015em;
+  --text-headline-lg-mobile--font-weight: 600;
+
+  --text-headline-xl: 2.5rem;
+  --text-headline-xl--line-height: 1.15;
+  --text-headline-xl--letter-spacing: -0.025em;
+  --text-headline-xl--font-weight: 600;
+
+  --text-label-md: 0.875rem;
+  --text-label-md--line-height: 1.25;
+  --text-label-md--letter-spacing: 0.02em;
+  --text-label-md--font-weight: 600;
+
+  --text-headline-xl-mobile: 1.75rem;
+  --text-headline-xl-mobile--line-height: 1.2;
+  --text-headline-xl-mobile--letter-spacing: -0.02em;
+  --text-headline-xl-mobile--font-weight: 600;
+
+  --text-headline-md: 1.375rem;
+  --text-headline-md--line-height: 1.35;
+  --text-headline-md--letter-spacing: -0.015em;
+  --text-headline-md--font-weight: 600;
+
+  --text-headline-lg: 2rem;
+  --text-headline-lg--line-height: 1.25;
+  --text-headline-lg--letter-spacing: -0.02em;
+  --text-headline-lg--font-weight: 600;
+
+  --text-body-md: 1rem;
+  --text-body-md--line-height: 1.55;
+  --text-body-md--letter-spacing: 0em;
+  --text-body-md--font-weight: 400;
+
+  --text-display-hero-mobile: 2.25rem;
+  --text-display-hero-mobile--line-height: 1.15;
+  --text-display-hero-mobile--letter-spacing: -0.02em;
+  --text-display-hero-mobile--font-weight: 700;
+}
+
+@layer components {
+  .glass-surface {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow:
+      0 1px 3px 0 rgba(0, 0, 0, 0.05),
+      0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  }
+  .ambient-glow {
+    box-shadow:
+      0 20px 35px -10px rgba(79, 70, 229, 0.08),
+      0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  }
+  .card-glow-active {
+    box-shadow:
+      0 0 0 2px #4f46e5,
+      0 8px 20px -4px rgba(79, 70, 229, 0.2);
+  }
+
+  /*
+   * The auth/Studio pages ship their own distinct sub-brand palette from
+   * the same Stitch export family. Tailwind v4 utilities read colors from
+   * CSS custom properties at runtime, so re-declaring just the tokens that
+   * differ inside this scope re-themes `bg-primary`, `text-on-surface`,
+   * etc. for anything nested under it, without touching the global theme.
+   */
+  .theme-auth {
+    --color-on-tertiary-container: #ffd0d2;
+    --color-surface-container-low: #f8fafc;
+    --color-surface-container-high: #e2e7ff;
+    --color-surface-dim: #d2d9f4;
+    --color-surface-container: #eaedff;
+    --color-surface-bright: #faf8ff;
+    --color-secondary-container: #39b8fd;
+    --color-surface-container-highest: #cbd5e1;
+    --color-secondary: #006591;
+    --color-surface-variant: #dae2fd;
+    --color-on-primary-container: #dad7ff;
+    --color-surface-tint: #4d44e3;
+    --color-on-surface-variant: #464555;
+    --color-tertiary-container: #bf0f3c;
+    --color-on-background: #131b2e;
+    --color-primary: #3525cd;
+    --color-background: #faf8ff;
+    --radius-lg: 0.25rem;
+    --radius-xl: 0.5rem;
+  }
+}
+
+@layer base {
+  .custom-ring-focus:focus-within {
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+  }
+}

@@ -1,0 +1,16 @@
+node_modules
+dist
+coverage
+.env
+.env.*
+!.env.example
+/storage/
+apps/api/storage/
+*.log
+.DS_Store
+playwright-report
+test-results
+*.tsbuildinfo
+.playwright-mcp
+.superpowers/
+.neon

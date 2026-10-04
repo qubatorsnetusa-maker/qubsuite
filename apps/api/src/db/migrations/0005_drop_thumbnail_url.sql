@@ -1,0 +1,1 @@
+ALTER TABLE "drive_files" DROP COLUMN "thumbnail_url";
