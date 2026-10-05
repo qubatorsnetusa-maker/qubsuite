@@ -245,7 +245,7 @@ export function PublicSharePage() {
           } bg-[#fcfbf9] rounded-2xl shadow-xl shadow-neutral-900/5 overflow-hidden border border-neutral-200/60 min-h-[500px]`}
         >
           <div className={`grid grid-cols-1 ${previewDevice === 'mobile' ? 'grid-cols-1' : 'md:grid-cols-2'} min-h-[500px]`}>
-            {/* Left Column: Video Thumbnail with Play Button Preview Overlay */}
+            {/* Left Column: Visual Area (Video thumbnail with play button ONLY for videos; clean still image for others) */}
             <div className="relative w-full h-72 md:h-auto min-h-[320px] overflow-hidden bg-neutral-900 flex items-center justify-center group">
               {/* If it's a video file, load video stream frame #t=1 as thumbnail preview */}
               {currentFile?.fileType === 'VIDEO' ? (
@@ -258,6 +258,28 @@ export function PublicSharePage() {
                     className="absolute inset-0 w-full h-full object-cover object-center brightness-90 transition-transform duration-500 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-black/25 transition-colors group-hover:bg-black/35" />
+              {/* Large Central Play Button for Video Preview */}
+              <button
+                type="button"
+                onClick={() => setShowInlinePreview(true)}
+                className="relative z-10 flex size-16 sm:size-20 items-center justify-center rounded-full bg-white/90 text-neutral-900 shadow-2xl backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-white active:scale-95 cursor-pointer group-hover:shadow-blue-500/30"
+                title="Play video preview"
+              >
+                <div className="ml-1 flex items-center justify-center text-[#7b5b53]">
+                  <svg className="size-8 sm:size-10 fill-current" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </div>
+              </button>
+
+              <div className="absolute bottom-3 left-4 right-4 z-10 flex items-center justify-between text-[11px] text-white/90 drop-shadow-md pointer-events-none">
+                <span className="font-medium bg-black/40 backdrop-blur-sm px-2.5 py-1 rounded-md">
+                  Click to preview
+                </span>
+                <span className="bg-black/40 backdrop-blur-sm px-2 py-1 rounded-md font-mono">
+                  {fileTypeLabel}
+                </span>
+              </div>
                 </>
               ) : currentFile?.fileType === 'IMAGE' ? (
                 <>
@@ -282,29 +304,6 @@ export function PublicSharePage() {
                   <div className="absolute inset-0 bg-black/20" />
                 </>
               )}
-
-              {/* Large Central Play Button for Video Preview */}
-              <button
-                type="button"
-                onClick={() => setShowInlinePreview(true)}
-                className="relative z-10 flex size-16 sm:size-20 items-center justify-center rounded-full bg-white/90 text-neutral-900 shadow-2xl backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-white active:scale-95 cursor-pointer group-hover:shadow-blue-500/30"
-                title="Play video preview"
-              >
-                <div className="ml-1 flex items-center justify-center text-[#7b5b53]">
-                  <svg className="size-8 sm:size-10 fill-current" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </div>
-              </button>
-
-              <div className="absolute bottom-3 left-4 right-4 z-10 flex items-center justify-between text-[11px] text-white/90 drop-shadow-md pointer-events-none">
-                <span className="font-medium bg-black/40 backdrop-blur-sm px-2.5 py-1 rounded-md">
-                  Click to preview
-                </span>
-                <span className="bg-black/40 backdrop-blur-sm px-2 py-1 rounded-md font-mono">
-                  {fileTypeLabel}
-                </span>
-              </div>
             </div>
 
             {/* Right Column: Clean Off-White Details & Actions */}
