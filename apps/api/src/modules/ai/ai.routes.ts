@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+﻿import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { requireAuth } from '../../plugins/auth';
@@ -28,6 +28,8 @@ const formGenSchema = z.object({
 });
 
 export async function aiRoutes(app: FastifyInstance) {
+  const r = app.withTypeProvider<ZodTypeProvider>();
+  const { ai } = app.services;
   // PDF: Document question answering & summary
   r.post(
     '/pdf/assist',
@@ -62,8 +64,6 @@ export async function aiRoutes(app: FastifyInstance) {
     }
   );
 
-  const r = app.withTypeProvider<ZodTypeProvider>();
-  const { ai } = app.services;
 
   // Status check to see if AI features are enabled/configured
   r.get('/status', { preHandler: [app.authenticate] }, async (req, reply) => {

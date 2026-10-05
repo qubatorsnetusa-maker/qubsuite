@@ -146,7 +146,11 @@ export function RegisterPage() {
         </>
       }
     >
-      <FormError error={register.error && !(register.error instanceof ApiError && register.error.status === 409) ? register.error : null} />
+      <FormError error={(register.error && !(register.error instanceof ApiError && register.error.status === 409) ? register.error : null) || kcError} />
+      <KingsChatButton
+        onSignedIn={() => void navigate({ href: safeRedirect(search.redirect), replace: true })}
+        onError={setKcError}
+      />
       <form onSubmit={onSubmit} noValidate className="space-y-5">
         <div>
           <Label htmlFor="name">Full name</Label>
