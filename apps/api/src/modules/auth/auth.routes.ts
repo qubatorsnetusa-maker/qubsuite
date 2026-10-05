@@ -33,7 +33,7 @@ export async function authRoutes(app: FastifyInstance) {
     reply.setCookie(REFRESH_COOKIE, session.refreshToken, {
       httpOnly: true,
       secure: env.cookieSecure,
-      sameSite: 'strict',
+      sameSite: (env.COOKIE_DOMAIN ? 'lax' : 'strict') as const,
       path: '/api/auth',
       expires: session.refreshTokenExpiresAt,
       ...domain,
