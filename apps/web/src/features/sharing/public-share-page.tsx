@@ -4,15 +4,18 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { EditorContent, useEditor } from '@tiptap/react';
 import {
-  ChevronRight,
   Download,
   Lock,
   Eye,
-  Shield,
   ArrowUpRight,
-  FileText,
   ChevronLeft,
   X,
+  ArrowLeft,
+  Monitor,
+  Smartphone,
+  Calendar,
+  Sparkles,
+  ExternalLink,
 } from 'lucide-react';
 import { useState } from 'react';
 import { FileIcon } from '@/components/file-icon';
@@ -48,44 +51,46 @@ function SheetView({ token, access, fileId }: { token: string; access: string; f
   const maxRow = Math.max(20, ...(cells.data?.cells ?? []).map((c) => c.row + 2));
   const maxCol = Math.max(8, ...(cells.data?.cells ?? []).map((c) => c.col + 2));
   return (
-    <div className="m-4 rounded-2xl bg-white p-4 shadow-2xl">
-      <div className="mb-2 flex gap-1" role="tablist">
-        {meta.data!.sheets.map((s) => (
-          <button key={s.id} role="tab" aria-selected={s.id === active} onClick={() => setSheetId(s.id)} className={`rounded px-3 py-1 text-sm ${s.id === active ? 'bg-blue-50 font-medium text-blue-600' : 'hover:bg-slate-100 text-slate-700'}`}>
+    <div className="mx-auto my-6 max-w-5xl rounded-2xl bg-white p-6 shadow-2xl">
+      <div className="flex gap-2 border-b border-slate-200 pb-2">
+        {meta.data?.sheets.map((s) => (
+          <button
+            key={s.id}
+            onClick={() => setSheetId(s.id)}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${s.id === active ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+          >
             {s.name}
           </button>
         ))}
       </div>
-      <div className="overflow-auto rounded border border-slate-200 bg-white">
-        <table className="border-collapse text-[13px]">
+      <div className="mt-4 overflow-auto max-h-[70vh] border border-slate-200 rounded-lg">
+        <table className="w-full border-collapse text-xs">
           <thead>
-            <tr>
-              <th className="sticky top-0 w-10 border border-[#c4c7c5] bg-[#f8f9fa]" />
-              {Array.from({ length: maxCol }, (_, c) => (
-                <th key={c} className="sticky top-0 min-w-[90px] border border-[#c4c7c5] bg-[#f8f9fa] font-normal text-slate-500">
-                  {String.fromCharCode(65 + (c % 26))}
+            <tr className="bg-slate-50 text-slate-500">
+              <th className="w-10 border border-slate-200 px-2 py-1 text-center font-normal">#</th>
+              {Array.from({ length: maxCol }).map((_, c) => (
+                <th key={c} className="border border-slate-200 px-3 py-1 font-semibold">
+                  {String.fromCharCode(65 + c)}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {Array.from({ length: maxRow }, (_, r) => (
-              <tr key={r}>
-                <td className="border border-[#c4c7c5] bg-[#f8f9fa] text-center text-slate-400">{r + 1}</td>
-                {Array.from({ length: maxCol }, (_, c) => {
-                  const cell = map.get(`${r}:${c}`);
-                  return (
-                    <td key={c} className="h-[21px] whitespace-nowrap border border-[#e2e3e3] px-1" style={{ textAlign: cell?.dataType === 'NUMBER' ? 'right' : undefined, fontWeight: cell?.style?.bold ? 600 : undefined, background: cell?.style?.background }}>
-                      {cell?.formattedValue}
-                    </td>
-                  );
-                })}
+            {Array.from({ length: maxRow }).map((_, r) => (
+              <tr key={r} className="hover:bg-slate-50/50">
+                <td className="border border-slate-200 bg-slate-50 px-2 py-1 text-center font-mono text-slate-400">
+                  {r + 1}
+                </td>
+                {Array.from({ length: maxCol }).map((_, c) => (
+                  <td key={c} className="border border-slate-200 px-3 py-1 text-slate-700 min-w-[80px]">
+                    {map.get(`${r}:${c}`)?.value ?? ''}
+                  </td>
+                ))}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-xs text-slate-400">Showing the first 200 rows and 26 columns.</p>
     </div>
   );
 }
@@ -99,6 +104,8 @@ export function PublicSharePage() {
   const [password, setPassword] = useState('');
   const [folderStack, setFolderStack] = useState<{ id: string; name: string }[]>([]);
   const [showInlinePreview, setShowInlinePreview] = useState(false);
+  const [previewDevice, setPreviewDevice] = useState<'computer' | 'mobile'>('computer');
+  const [leftTab, setLeftTab] = useState<'media' | 'qgc'>('media');
 
   const unlock = useMutation({ mutationFn: () => shareService.unlock(token, password), onSuccess: setUnlocked, meta: { silent: true } });
   const redeem = useMutation({
@@ -118,30 +125,19 @@ export function PublicSharePage() {
   // Password gate screen
   if (d.requiresPassword) {
     return (
-      <div className="relative flex h-screen w-screen items-center justify-center overflow-hidden bg-slate-900 select-none">
-        <img
-          src="/qubsuite/stitch/stitch_bg.jpg"
-          onError={(e) => {
-            (e.currentTarget as HTMLImageElement).src =
-              'https://lh3.googleusercontent.com/aida-public/AB6AXuAHGUiisTTbrcGOmnIPQ3ZUuulGBV3WA1PH-DP2ikGxer3I0-3kegbkJrBJ7fNdtmUVdomdrN2WupXisxpbxI8lzmigSMkxmP5tJkJ-EG7f-nW1d6JkvP0aqSTHCE32JY6vMErzuXI_e8zYmIJOv05brcHvzei6vl68IZLDPPF461CJgXAilkQhUmsYZJ00QZptyTNA2fXVnj9W_BWrTHdfKiY7uRgWZXVGJWx6Ns8JCbgr0eeKr2fj5Q';
-          }}
-          alt="Wallpaper background"
-          className="absolute inset-0 h-full w-full object-cover object-center"
-        />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/35 via-white/10 to-transparent" />
-
-        <div className="relative z-10 w-full max-w-md p-6">
+      <div className="min-h-screen w-full flex items-center justify-center bg-[#e8e2dc] p-4 text-neutral-800 selection:bg-[#7b5b53]/20">
+        <div className="w-full max-w-md rounded-2xl border border-neutral-200/60 bg-[#fcfbf9] p-8 shadow-xl shadow-neutral-900/5">
           <form
-            className="rounded-[32px] border border-white/80 bg-white/95 p-8 shadow-2xl backdrop-blur-xl"
             onSubmit={(e) => { e.preventDefault(); unlock.mutate(); }}
+            className="space-y-6"
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#7b5b53]/10 text-[#7b5b53]">
                 <Lock className="size-6" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-slate-900">Password Protected</h2>
-                <p className="text-xs text-slate-500">Enter the password shared by {d.owner.name}</p>
+                <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Password Protected</h2>
+                <p className="text-xs text-neutral-500">Enter the password shared by {d.owner.name}</p>
               </div>
             </div>
 
@@ -150,7 +146,7 @@ export function PublicSharePage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter transfer password"
-              className="mt-6 rounded-xl border-slate-200 bg-white text-slate-900 placeholder-slate-400 focus:border-blue-600 focus:ring-blue-600"
+              className="rounded-lg border-neutral-200 bg-white text-neutral-900 placeholder-neutral-400 focus:border-[#7b5b53] focus:ring-[#7b5b53]"
               autoFocus
               aria-label="Password"
             />
@@ -158,7 +154,7 @@ export function PublicSharePage() {
 
             <Button
               type="submit"
-              className="mt-6 w-full rounded-2xl bg-blue-600 py-6 text-sm font-bold text-white shadow-lg shadow-blue-600/30 transition-all hover:bg-blue-700"
+              className="w-full rounded-lg bg-[#7b5b53] py-3 text-sm font-medium text-white shadow-sm transition hover:bg-[#6b4e47] active:scale-[0.99]"
               loading={unlock.isPending}
             >
               Access Transfer
@@ -175,21 +171,34 @@ export function PublicSharePage() {
   const fileName = openFile ? (d.folder?.items?.find((i) => i.id === openFile.id)?.name ?? d.name) : d.name;
   const fileSize = currentFile?.size ?? (d.folder ? d.folder.items.reduce((acc, cur) => acc + (cur.size || 0), 0) : 0);
 
-  // Compute days remaining for 7-day retention vs Pro storage
+  // Expiration calculation: default 7 days retention
   const expiresAt = d.expiresAt || (d.file as any)?.expiresAt;
   const isPermanent = d.isPermanent;
-  let expiryLabel = '7-day storage';
+  let formattedExpiry = '7 days retention';
   if (isPermanent) {
-    expiryLabel = 'PRO Storage';
+    formattedExpiry = 'PRO Permanent Storage';
   } else if (expiresAt) {
-    const daysLeft = Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86_400_000));
-    expiryLabel = daysLeft <= 1 ? '< 24 hours left' : `${daysLeft} days left`;
+    const expDate = new Date(expiresAt);
+    formattedExpiry = `Available until ${expDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} • 7 days retention`;
+  } else {
+    const sevenDaysOut = new Date(Date.now() + 7 * 86400000);
+    formattedExpiry = `Available until ${sevenDaysOut.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} • 7 days retention`;
   }
+
+  const fileTypeLabel = currentFile ? (
+    currentFile.fileType === 'VIDEO' ? 'Video file' :
+    currentFile.fileType === 'IMAGE' ? 'Image file' :
+    currentFile.fileType === 'PDF' ? 'PDF document' :
+    currentFile.fileType === 'DOCUMENT' ? 'Document' :
+    currentFile.fileType === 'SPREADSHEET' ? 'Spreadsheet' :
+    currentFile.fileType === 'AUDIO' ? 'Audio file' :
+    'File'
+  ) : d.folder ? 'Folder archive' : 'File';
 
   const renderInlineViewer = (file: { id: string; fileType: string }) => {
     if (file.fileType === 'DOCUMENT') return <DocView token={token} access={access} fileId={file.id} />;
     if (file.fileType === 'SPREADSHEET') return <SheetView token={token} access={access} fileId={file.id} />;
-    if (file.fileType === 'FORM') return <p className="p-8 text-center text-slate-700">Forms are filled in through their respondent link.</p>;
+    if (file.fileType === 'FORM') return <p className="p-8 text-center text-neutral-700">Forms are filled in through their respondent link.</p>;
     const url = shareService.downloadUrl(token, access, file.id, true);
     if (file.fileType === 'IMAGE') return <img src={url} alt="" className="mx-auto max-h-[80vh] rounded-2xl shadow-2xl p-4 object-contain" />;
     if (file.fileType === 'PDF') return <iframe src={url} title="PDF" className="h-[82vh] w-full rounded-2xl border-none shadow-2xl bg-white" />;
@@ -199,171 +208,232 @@ export function PublicSharePage() {
   };
 
   return (
-    <div className="relative h-full min-h-screen w-full select-none overflow-x-hidden bg-slate-100 font-sans text-slate-800 antialiased">
-      {/* 1. PageBackground - Fullscreen wallpaper background image */}
-      <div className="fixed inset-0 z-0 h-full w-full">
-        <img
-          src="/qubsuite/stitch/stitch_bg.jpg"
-          onError={(e) => {
-            (e.currentTarget as HTMLImageElement).src =
-              'https://lh3.googleusercontent.com/aida-public/AB6AXuAHGUiisTTbrcGOmnIPQ3ZUuulGBV3WA1PH-DP2ikGxer3I0-3kegbkJrBJ7fNdtmUVdomdrN2WupXisxpbxI8lzmigSMkxmP5tJkJ-EG7f-nW1d6JkvP0aqSTHCE32JY6vMErzuXI_e8zYmIJOv05brcHvzei6vl68IZLDPPF461CJgXAilkQhUmsYZJ00QZptyTNA2fXVnj9W_BWrTHdfKiY7uRgWZXVGJWx6Ns8JCbgr0eeKr2fj5Q';
-          }}
-          alt="Minimalist contemporary interior overlooking serene landscape"
-          className="h-full w-full object-cover object-center"
-        />
-        {/* Subtle gradient overlay for refined text contrast */}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/35 via-white/10 to-transparent" />
-      </div>
+    <div className="min-h-screen flex flex-col justify-between bg-[#e8e2dc] text-neutral-800 antialiased selection:bg-[#7b5b53]/20 font-sans">
+      {/* BEGIN: TopBar matching stitch minimal concept */}
+      <header className="w-full px-6 py-4 flex items-center justify-between z-20 text-neutral-700 text-sm">
+        <div className="flex items-center gap-6">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 font-medium text-neutral-700 hover:text-neutral-900 transition-colors"
+          >
+            <ArrowLeft className="size-4" />
+            <span>Back</span>
+          </Link>
+        </div>
 
-      {/* 2. Main Container with TopHeader, ContentWorkspace, and MinimalFooter */}
-      <div className="relative z-10 flex min-h-screen flex-col justify-between p-6 md:p-8 lg:p-10">
-        {/* Top Header */}
-        <header className="flex w-full items-center justify-between" data-purpose="site-navigation">
-          {/* Brand Logo & Badge Container */}
-          <div className="flex items-center gap-3">
-            <Link to="/" aria-label="Qub Transfer Home" className="group flex items-center gap-2.5 transition-transform duration-200 active:scale-95">
-              <img
-                src="/qubsuite/stitch/stitch_logo.png"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src =
-                    'https://lh3.googleusercontent.com/aida/AEtjO1Ws4daFzTtfnLMZcIOmYRPLVz6IyHPvaOROCjLom7WqAJMgyNv_BLOHEZfyb_iCdLGkeqc2SrIfEkEcyyW5aOpLt7FEPbBV4hNNJb19xI9JEV8fN-JdUe_TYG-FrV63ask0MdkBn-WbcM-wK3mH86b5-LOVcXd_01morRk6MntXmUlKVu6Kq8DSCjvjgY-iMa63ZEeZIbkfx01C4is_eD7hvYRhVuSEnQnzpjbasqWphXoPKNrzpx-t_WHc';
-                }}
-                alt="Qub Transfer Logo"
-                className="h-10 w-auto object-contain transition-opacity hover:opacity-90"
-              />
-            </Link>
-            <span className="hidden sm:inline-flex items-center rounded-full bg-slate-900/5 px-2.5 py-1 text-xs font-semibold text-slate-600 backdrop-blur-md border border-slate-900/10">
-              Fast Cloud Sharing
-            </span>
+        {/* Device toggles & Auth Action */}
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-1 bg-black/5 p-1 rounded-lg text-xs font-medium text-neutral-600">
+            <button
+              type="button"
+              onClick={() => setPreviewDevice('computer')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded transition ${
+                previewDevice === 'computer' ? 'bg-white text-neutral-900 shadow-xs' : 'text-neutral-600 hover:text-neutral-900'
+              }`}
+            >
+              <Monitor className="size-3.5" />
+              <span>Computer</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreviewDevice('mobile')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded transition ${
+                previewDevice === 'mobile' ? 'bg-white text-neutral-900 shadow-xs' : 'text-neutral-600 hover:text-neutral-900'
+              }`}
+            >
+              <Smartphone className="size-3.5" />
+              <span>Mobile</span>
+            </button>
           </div>
 
-          {/* Right Navigation Actions (Removed Programs & Help as requested, keeping Sign in / Open in Qub) */}
-          <nav aria-label="Quick Navigation" className="flex items-center gap-2 sm:gap-4">
-            {auth.status === 'authenticated' ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => redeem.mutate()}
-                loading={redeem.isPending}
-                className="rounded-full border border-slate-300/80 bg-white/80 px-5 py-2 text-sm font-semibold text-slate-800 shadow-xs backdrop-blur-sm transition duration-200 hover:border-slate-400 hover:bg-white active:scale-95"
-              >
-                Open in Qub
-              </Button>
-            ) : (
-              <Button
-                asChild
-                variant="outline"
-                size="sm"
-                className="rounded-full border border-slate-300/80 bg-white/80 px-5 py-2 text-sm font-semibold text-slate-800 shadow-xs backdrop-blur-sm transition duration-200 hover:border-slate-400 hover:bg-white active:scale-95"
-              >
-                <Link to="/login" search={{ redirect: `/share/${token}` }}>
-                  Sign in
-                </Link>
-              </Button>
-            )}
-          </nav>
-        </header>
+          {auth.status === 'authenticated' ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              asChild
+              className="rounded-full border border-neutral-300/80 bg-white/90 text-xs font-semibold text-neutral-800 shadow-xs hover:bg-white"
+            >
+              <Link to="/drive">Open in Qub</Link>
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              className="rounded-full border border-neutral-300/80 bg-white/90 text-xs font-semibold text-neutral-800 shadow-xs hover:bg-white"
+            >
+              <Link to="/login">Sign in</Link>
+            </Button>
+          )}
+        </div>
+      </header>
+      {/* END: TopBar */}
 
-        {/* Content Workspace */}
-        <main className="my-auto grid grid-cols-1 items-center gap-8 py-8 lg:grid-cols-12" data-purpose="transfer-content">
-          {/* Floating Download Card - Iconic Left Floating Box */}
-          <section aria-labelledby="transfer-heading" className="lg:col-span-6 xl:col-span-5 2xl:col-span-4">
-            <div className="relative mx-auto w-full max-w-[440px] rounded-[32px] border border-white/80 bg-white/95 p-8 shadow-[0_25px_50px_-12px_rgba(15,23,42,0.08),0_0_1px_1px_rgba(15,23,42,0.04)] backdrop-blur-md transition-all duration-300 hover:shadow-2xl lg:mx-0">
-              {/* Transfer Header Status */}
-              <div className="mb-6 flex items-center justify-between border-b border-slate-100 pb-4">
-                <div className="flex items-center gap-2">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                  </span>
-                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500" id="transfer-heading">
+      {/* BEGIN: CentralWorkspace */}
+      <main className="flex-1 flex flex-col items-center justify-center px-4 py-6 md:py-8">
+        <div
+          className={`w-full transition-all duration-300 ${
+            previewDevice === 'mobile'
+              ? 'max-w-[420px]'
+              : 'max-w-[980px]'
+          } bg-[#fcfbf9] rounded-2xl shadow-xl shadow-neutral-900/5 overflow-hidden border border-neutral-200/60 min-h-[500px]`}
+        >
+          <div className={`grid grid-cols-1 ${previewDevice === 'mobile' ? 'grid-cols-1' : 'md:grid-cols-2'} min-h-[500px]`}>
+            {/* Left Column: Visual Story / QGC Ad Switcher */}
+            <div className="relative w-full h-72 md:h-auto min-h-[300px] overflow-hidden bg-neutral-200 flex flex-col justify-between group">
+              {leftTab === 'media' ? (
+                <>
+                  <img
+                    alt="Warm minimalist desk with vintage camera, notebooks, and ceramic mug"
+                    className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
+                    src="/stitch/stitch_still_desk.png"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src =
+                        'https://lh3.googleusercontent.com/aida-public/AB6AXuAc_97Brn-K964kBBetnBDrToqj2ZrmaXC-WpR6uEiri7GdAPPaXa_z1m4CrMsMGsK5k_grbTm0w8wwQTp2QEcBNqOL0jJ7uI86PbvzsmC1w2EMkwtBXgabVIf8KHiAPuEdA5fFyAkaUp6L4xdS_HFD_hsgvyETRP7xTURPvpUEddkeSfeaj2sTZfz55lPZwpIMIin0HLNtOh-A6ktePzlae3oJlxozRf0-LtG2hjn6iHopKknuyB8CRQ';
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
+                </>
+              ) : (
+                <div className="relative h-full w-full bg-slate-950 p-6 flex flex-col justify-between text-white overflow-hidden">
+                  <img
+                    src="/stitch/qgc_ecard.png"
+                    alt="Qubators Global Conference"
+                    className="absolute inset-0 w-full h-full object-cover object-center opacity-40 mix-blend-luminosity"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-slate-950/80 to-transparent pointer-events-none" />
+
+                  <div className="relative z-10 flex items-center justify-between">
+                    <span className="rounded-full bg-blue-500/20 border border-blue-400/30 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-300">
+                      Global Conference
+                    </span>
+                    <span className="text-xs text-slate-300 font-medium flex items-center gap-1">
+                      <Calendar className="size-3 text-blue-400" /> 2026
+                    </span>
+                  </div>
+
+                  <div className="relative z-10 space-y-2 mt-auto pt-6">
+                    <h3 className="text-xl font-bold tracking-tight text-white">
+                      Qubators Global Conference 2026
+                    </h3>
+                    <p className="text-xs leading-relaxed text-slate-300 line-clamp-3">
+                      A one-day global gathering of tech experts, builders, creators, founders, innovators, investors and emerging leaders shaping the future through technology.
+                    </p>
+                    <a
+                      href="https://www.qubators.org/qgc/register"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 text-xs font-semibold shadow-xs transition mt-2"
+                    >
+                      <span>Reserve Your Spot</span>
+                      <ArrowUpRight className="size-3.5" />
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Seamless Pill switcher on the image */}
+              <div className="relative z-10 m-3 w-fit flex items-center gap-1 bg-black/40 backdrop-blur-md p-1 rounded-full text-[11px] text-white shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setLeftTab('media')}
+                  className={`px-3 py-1 rounded-full font-medium transition ${
+                    leftTab === 'media' ? 'bg-white text-neutral-900 shadow-xs' : 'text-white/80 hover:text-white'
+                  }`}
+                >
+                  Still Life
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLeftTab('qgc')}
+                  className={`px-3 py-1 rounded-full font-medium flex items-center gap-1 transition ${
+                    leftTab === 'qgc' ? 'bg-blue-600 text-white shadow-xs' : 'text-white/80 hover:text-white'
+                  }`}
+                >
+                  <Sparkles className="size-3" />
+                  <span>QGC 2026 Ad</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Right Column: Clean Off-White Details & Actions */}
+            <div className="flex flex-col justify-between p-7 sm:p-10 lg:p-12 bg-[#fcfbf9]">
+              {/* Top Section: Status & Titles */}
+              <div className="space-y-6">
+                {/* Status Pill */}
+                <div className="inline-flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
                     Ready to download
                   </span>
                 </div>
 
-                {/* Pro / Expiry Badge */}
-                {isPermanent ? (
-                  <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-500/20">
-                    <svg className="h-3.5 w-3.5 fill-amber-500" fill="currentColor" viewBox="0 0 20 20">
-                      <path clipRule="evenodd" d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" fillRule="evenodd" />
-                    </svg>
-                    <span>PRO Storage</span>
-                  </div>
-                ) : (
-                  <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-500/20">
-                    <span>{expiryLabel}</span>
+                {/* Main File Title & Size */}
+                <div className="space-y-1.5">
+                  <h1 className="text-2xl sm:text-3xl font-semibold text-neutral-900 tracking-tight leading-snug break-all">
+                    {fileName}
+                  </h1>
+                  <p className="text-sm font-medium text-neutral-600 flex items-center gap-2">
+                    <span>{formatBytes(fileSize)}</span>
+                    <span className="text-neutral-300">•</span>
+                    <span>{fileTypeLabel}</span>
+                  </p>
+                </div>
+
+                {/* Sender & Expiry Details */}
+                <div className="pt-2 border-t border-neutral-100 space-y-2 text-sm text-neutral-500">
+                  <p className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-neutral-100 text-[11px] font-bold text-neutral-600">
+                      {d.owner.name.charAt(0).toUpperCase()}
+                    </span>
+                    <span className="text-neutral-700">By {d.owner.name}</span>
+                  </p>
+                  <p className="flex items-center gap-2 text-xs text-neutral-500">
+                    <Calendar className="size-3.5 text-neutral-400" />
+                    <span>{formattedExpiry}</span>
+                  </p>
+                </div>
+
+                {/* Folder items listing if folder */}
+                {d.folder && (
+                  <div className="max-h-36 overflow-y-auto rounded-xl border border-neutral-200/80 bg-neutral-50 p-2">
+                    <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+                      {d.folder.items.length} items included
+                    </p>
+                    <div className="divide-y divide-neutral-100">
+                      {d.folder.items.map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => item.kind === 'file' && setOpenFile({ id: item.id, fileType: item.fileType })}
+                          className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-white rounded transition"
+                        >
+                          <FileIcon type={item.fileType} size={14} />
+                          <span className="flex-1 truncate text-neutral-700">{item.name}</span>
+                          <span className="text-[10px] text-neutral-400">{formatBytes(item.size)}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* File Showcase Item */}
-              <div className="group mb-7 flex items-center gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 p-4 transition duration-200 hover:border-slate-200 hover:bg-slate-50" data-purpose="file-item">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-blue-100/70 text-blue-600 transition group-hover:scale-105">
-                  <FileIcon
-                    type={d.resourceType === 'FOLDER' ? (openFile ? (openFile.fileType as any) : 'FOLDER') : (d.file?.fileType ?? 'OTHER')}
-                    size={28}
-                  />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h2 className="truncate text-base font-bold text-slate-900 tracking-tight" title={fileName}>
-                    {fileName}
-                  </h2>
-                  <p className="mt-0.5 text-xs font-medium text-slate-500">
-                    {formatBytes(fileSize)} <span className="mx-1">•</span> By {d.owner.name}
-                  </p>
-                </div>
-              </div>
-
-              {/* Back button if deep into folder */}
-              {openFile && (
-                <button
-                  onClick={() => setOpenFile(null)}
-                  className="mb-4 flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
-                >
-                  <ChevronLeft className="size-3.5" />
-                  <span>Back to folder items</span>
-                </button>
-              )}
-
-              {/* Folder list when folder link is shared */}
-              {d.folder && !openFile && (
-                <div className="mb-6 max-h-48 overflow-y-auto rounded-xl border border-slate-100 bg-slate-50/50 p-2">
-                  <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                    {d.folder.items.length} files in folder
-                  </p>
-                  <div className="divide-y divide-slate-100">
-                    {d.folder.items.map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() => item.kind === 'file' && setOpenFile({ id: item.id, fileType: item.fileType })}
-                        className="flex w-full items-center gap-2.5 px-2 py-2 text-left text-xs hover:bg-white rounded-lg transition-colors group"
-                      >
-                        <FileIcon type={item.fileType} size={16} />
-                        <span className="flex-1 truncate text-slate-700 group-hover:text-slate-900">{item.name}</span>
-                        <span className="text-[11px] text-slate-400">{formatBytes(item.size)}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Action Buttons Group */}
-              <div className="space-y-3" data-purpose="card-actions">
-                {/* Primary Download Button */}
+              {/* Bottom Actions Section */}
+              <div className="pt-8 space-y-3">
+                {/* Primary CTA Button matching the stitch brown theme */}
                 {downloadUrl ? (
                   <a
                     href={downloadUrl}
                     download={fileName}
                     aria-label={`Download ${fileName}`}
-                    className="group relative flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#1d58fc] py-4 px-6 text-base font-bold text-white shadow-lg shadow-blue-600/30 transition-all duration-200 hover:bg-[#1648d4] hover:shadow-blue-600/40 active:scale-[0.99] focus:outline-hidden focus:ring-4 focus:ring-blue-500/20"
+                    className="w-fit min-w-[160px] px-8 py-3.5 bg-[#7b5b53] hover:bg-[#6b4e47] active:scale-[0.99] text-white text-sm font-medium rounded-lg shadow-sm transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <Download className="h-5 w-5 transition-transform duration-200 group-hover:translate-y-0.5" />
+                    <Download className="size-4.5" />
                     <span>Download File</span>
                   </a>
                 ) : (
                   <button
                     onClick={() => redeem.mutate()}
-                    className="group relative flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#1d58fc] py-4 px-6 text-base font-bold text-white shadow-lg shadow-blue-600/30 transition-all duration-200 hover:bg-[#1648d4] hover:shadow-blue-600/40 active:scale-[0.99]"
+                    className="w-fit min-w-[160px] px-8 py-3.5 bg-[#7b5b53] hover:bg-[#6b4e47] active:scale-[0.99] text-white text-sm font-medium rounded-lg shadow-sm transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <span>Save to Qub Drive</span>
                   </button>
@@ -373,85 +443,90 @@ export function PublicSharePage() {
                 {currentFile && ['IMAGE', 'PDF', 'VIDEO', 'AUDIO', 'DOCUMENT', 'SPREADSHEET'].includes(currentFile.fileType) && (
                   <button
                     onClick={() => setShowInlinePreview(true)}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100/80 hover:text-slate-900"
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-500 hover:text-neutral-800 transition-colors pt-1 px-1 cursor-pointer"
                     type="button"
                   >
-                    <Eye className="h-4 w-4 text-slate-500" />
-                    <span>Preview without downloading</span>
+                    <Eye className="size-3.5" />
+                    <span>Preview file</span>
                   </button>
                 )}
               </div>
-
-              {/* Retention & Upsell Notice Banner */}
-              <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50/60 p-3.5 text-xs leading-relaxed text-slate-600">
-                <div className="flex items-start gap-2.5">
-                  <Shield className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
-                  <div>
-                    <strong className="font-semibold text-slate-800">Temporary Free Cloud:</strong>{' '}
-                    Free files are stored for 7 days. Need permanent storage with custom branding?{' '}
-                    <Link to="/register" className="font-bold text-blue-600 underline underline-offset-2 hover:text-blue-700">
-                      Get Qub Pro
-                    </Link>
-                  </div>
-                </div>
-              </div>
             </div>
-          </section>
+          </div>
+        </div>
 
-          {/* Billboard Sponsor Section - Updated with Qubators Global Conference 2026 */}
-          <aside aria-label="Sponsored Billboard" className="hidden lg:col-span-6 lg:flex lg:justify-end xl:col-span-7 2xl:col-span-8">
-            <div className="max-w-md rounded-3xl border border-white/80 bg-white/85 p-7 shadow-[0_25px_50px_-12px_rgba(15,23,42,0.08),0_0_1px_1px_rgba(15,23,42,0.04)] backdrop-blur-xl transition-all duration-300 hover:shadow-xl">
-              <div className="mb-2.5 flex items-center justify-between">
-                <span className="rounded-md bg-slate-900/5 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Featured Event
+        {/* INTEGRATED AD SECTION: Qubators Global Conference 2026 Billboard Banner */}
+        <section
+          aria-label="Conference Billboard"
+          className="w-full max-w-[980px] mt-6 rounded-2xl border border-neutral-200/60 bg-[#fcfbf9] p-6 sm:p-7 shadow-lg shadow-neutral-900/5 backdrop-blur-xl transition hover:shadow-xl"
+        >
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-2 max-w-2xl">
+              <div className="flex items-center gap-2.5">
+                <span className="rounded-md bg-neutral-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+                  Featured Billboard
+                </span>
+                <span className="text-xs text-neutral-400 font-medium">
+                  Lagos &amp; Online • 2026
                 </span>
               </div>
-              <h3 className="text-2xl font-bold tracking-tight text-slate-900">
+              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900">
                 Qubators Global Conference 2026
-              </h3>
-              <p className="mt-3 text-sm font-medium leading-relaxed text-slate-700">
+              </h2>
+              <p className="text-sm leading-relaxed text-neutral-600">
                 A one-day global gathering of tech experts, builders, creators, founders, innovators, investors and emerging leaders shaping the future through technology.
               </p>
-              <p className="mt-2.5 text-xs leading-relaxed text-slate-500">
+              <p className="text-xs leading-relaxed text-neutral-500 pt-0.5">
                 We believe great tech skills and God's purpose go together. Join us in person in Lagos or online from anywhere. Reserve your spot today.
               </p>
-              <div className="mt-5 pt-1">
-                <a
-                  href="https://www.qubators.org/qgc/register"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-full bg-[#1d58fc] px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#1648d4] active:scale-95"
-                >
-                  <span>Learn More & Register</span>
-                  <ArrowUpRight className="h-3.5 w-3.5" />
-                </a>
-              </div>
             </div>
-          </aside>
-        </main>
 
-        {/* Minimal Footer (Removed bottom right copyright watermark as requested) */}
-        <footer className="flex flex-col items-center justify-between gap-4 pt-4 sm:flex-row sm:pt-0" data-purpose="page-footer">
-          <nav aria-label="Legal & Information" className="flex items-center gap-6 text-xs font-medium text-slate-600/90 drop-shadow-xs">
-            <a href="https://qubators.net" className="transition hover:text-slate-900 hover:underline">Terms</a>
-            <a href="https://qubators.net" className="transition hover:text-slate-900 hover:underline">Privacy</a>
-            <a href="https://qubators.net" className="transition hover:text-slate-900 hover:underline">Cookies</a>
-            <a href="https://qubators.net" className="transition hover:text-slate-900 hover:underline">About Qub</a>
-          </nav>
-        </footer>
-      </div>
+            <div className="shrink-0 flex items-center">
+              <a
+                href="https://www.qubators.org/qgc/register"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#7b5b53] hover:bg-[#6b4e47] text-white px-6 py-3.5 text-sm font-semibold shadow-sm transition active:scale-95"
+              >
+                <span>Learn More &amp; Register</span>
+                <ArrowUpRight className="size-4" />
+              </a>
+            </div>
+          </div>
+        </section>
+      </main>
+      {/* END: CentralWorkspace */}
+
+      {/* BEGIN: MinimalFooter */}
+      <footer className="w-full px-6 py-4 flex flex-col md:flex-row items-center justify-between text-xs text-neutral-500 gap-3 border-t border-neutral-300/40">
+        <div className="flex items-center gap-2.5">
+          {/* Minimal Brand Identity matching stitch design */}
+          <div className="flex items-center gap-1.5 font-semibold text-neutral-700">
+            <span className="w-3.5 h-3.5 rounded bg-blue-600 inline-block" />
+            <span>Qub Transfer</span>
+          </div>
+          <span className="text-neutral-300">•</span>
+          <span className="text-neutral-500">Fast Cloud Sharing</span>
+        </div>
+
+        {/* Security & Policy note mirroring reference screen */}
+        <div className="text-center md:text-right text-[11px] text-neutral-400 max-w-xl">
+          This file transfer is secured and encrypted. Transfer recipient is responsible for content downloaded in accordance with our terms of service.
+        </div>
+      </footer>
+      {/* END: MinimalFooter */}
 
       {/* Full-Screen Preview Drawer Modal */}
       {showInlinePreview && currentFile && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="flex h-16 items-center justify-between border-b border-white/10 bg-white/90 px-6 backdrop-blur-md">
+        <div className="fixed inset-0 z-50 flex flex-col bg-neutral-900/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="flex h-16 items-center justify-between border-b border-white/10 bg-white/95 px-6 backdrop-blur-md">
             <div className="flex items-center gap-3">
               <FileIcon type={currentFile.fileType as any} size={20} />
-              <span className="font-semibold text-slate-900 truncate max-w-md">{fileName}</span>
+              <span className="font-semibold text-neutral-900 truncate max-w-md">{fileName}</span>
             </div>
             <div className="flex items-center gap-3">
               {downloadUrl && (
-                <Button asChild size="sm" className="rounded-full bg-blue-600 hover:bg-blue-700 text-white">
+                <Button asChild size="sm" className="rounded-lg bg-[#7b5b53] hover:bg-[#6b4e47] text-white">
                   <a href={downloadUrl} download={fileName}>
                     <Download className="mr-1.5 size-4" /> Download
                   </a>
@@ -461,7 +536,7 @@ export function PublicSharePage() {
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowInlinePreview(false)}
-                className="rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                className="rounded-lg text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100"
               >
                 <X className="mr-1 size-4" /> Close preview
               </Button>
