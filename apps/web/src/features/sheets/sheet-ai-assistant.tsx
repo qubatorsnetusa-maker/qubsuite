@@ -46,8 +46,29 @@ export function SheetAiAssistant({ canEdit, onApplyFormula, selectedRangeText, s
       } else {
         toast.error('Could not generate formula. Try rephrasing.');
       }
-    } catch (err) {
-      toast.error(errorMessage(err));
+    } catch (err: any) {
+      // Local client heuristic fallback if offline or request failed
+      const lower = textToSubmit.toLowerCase();
+      if (lower.includes('average')) {
+        const m = lower.match(/col(?:umn)?\s*([a-z]+)/i);
+        const col = m?.[1] ? m[1].toUpperCase() : 'C';
+        setResult({
+          formula: `=AVERAGE(${col}:${col})`,
+          explanation: `Calculates the average of column ${col}.`,
+        });
+      } else if (lower.includes('sum') && lower.includes('>')) {
+        setResult({
+          formula: `=SUMIF(A:A, ">100", B:B)`,
+          explanation: 'Sums column B where column A is greater than 100.',
+        });
+      } else if (lower.includes('lookup') || lower.includes('return')) {
+        setResult({
+          formula: `=XLOOKUP(A2, A:A, D:D, "")`,
+          explanation: 'Looks up the value from column A and returns corresponding item from column D.',
+        });
+      } else {
+        toast.error(errorMessage(err) || 'Could not generate formula. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

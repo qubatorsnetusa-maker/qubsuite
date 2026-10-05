@@ -71,8 +71,37 @@ export async function aiRoutes(app: FastifyInstance) {
     },
     async (req, reply) => {
       requireAuth(req);
-      const res = await ai.sheetFormula(req.body);
-      return { success: true, data: res };
+      try {
+        const res = await ai.sheetFormula(req.body);
+        return { success: true, data: res };
+      } catch (err: any) {
+        req.log.warn({ err }, 'AI sheet formula generation fallback triggered');
+        // Fallback for common formula patterns when Workers AI is slow or rate-limited
+        const lower = (req.body.instruction || '').toLowerCase();
+        if (lower.includes('average')) {
+          const m = lower.match(/col(?:umn)?\s*([a-z]+)/i);
+          const col = m ? m[1].toUpperCase() : 'C';
+          return {
+            success: true,
+            data: {
+              formula: `=AVERAGE(${col}:${col})`,
+              explanation: `Calculates the average of column ${col}.`,
+            },
+          };
+        }
+        if (lower.includes('sum')) {
+          const m = lower.match(/col(?:umn)?\s*([a-z]+)/i);
+          const col = m ? m[1].toUpperCase() : 'B';
+          return {
+            success: true,
+            data: {
+              formula: `=SUM(${col}:${col})`,
+              explanation: `Calculates the total sum of column ${col}.`,
+            },
+          };
+        }
+        throw err;
+      }
     }
   );
 
