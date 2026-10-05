@@ -200,7 +200,7 @@ export function PublicSharePage() {
 
   return (
     <div className="relative h-full min-h-screen w-full select-none overflow-x-hidden bg-slate-100 font-sans text-slate-800 antialiased">
-      {/* 1. PageBackground - Fullscreen wallpaper background image matching stitch_minimal_file_transfer_page */}
+      {/* 1. PageBackground - Fullscreen wallpaper background image */}
       <div className="fixed inset-0 z-0 h-full w-full">
         <img
           src="/qubsuite/stitch/stitch_bg.jpg"
@@ -237,24 +237,8 @@ export function PublicSharePage() {
             </span>
           </div>
 
-          {/* Right Navigation Actions */}
+          {/* Right Navigation Actions (Removed Programs & Help as requested, keeping Sign in / Open in Qub) */}
           <nav aria-label="Quick Navigation" className="flex items-center gap-2 sm:gap-4">
-            <a
-              href="https://qubators.net"
-              target="_blank"
-              rel="noreferrer"
-              className="hidden sm:block rounded-full px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white/60 hover:text-slate-900"
-            >
-              Programs
-            </a>
-            <a
-              href="https://qubators.net"
-              target="_blank"
-              rel="noreferrer"
-              className="hidden sm:block rounded-full px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white/60 hover:text-slate-900"
-            >
-              Help
-            </a>
             {auth.status === 'authenticated' ? (
               <Button
                 variant="secondary"
@@ -414,36 +398,39 @@ export function PublicSharePage() {
             </div>
           </section>
 
-          {/* Billboard Sponsor Section - Right Floating Sponsored Showcase */}
+          {/* Billboard Sponsor Section - Updated with Qubators Global Conference 2026 */}
           <aside aria-label="Sponsored Billboard" className="hidden lg:col-span-6 lg:flex lg:justify-end xl:col-span-7 2xl:col-span-8">
-            <div className="max-w-sm rounded-3xl border border-white/80 bg-white/85 p-6 shadow-[0_25px_50px_-12px_rgba(15,23,42,0.08),0_0_1px_1px_rgba(15,23,42,0.04)] backdrop-blur-xl transition-all duration-300 hover:shadow-xl">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="rounded-md bg-slate-900/5 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Sponsored Billboard
+            <div className="max-w-md rounded-3xl border border-white/80 bg-white/85 p-7 shadow-[0_25px_50px_-12px_rgba(15,23,42,0.08),0_0_1px_1px_rgba(15,23,42,0.04)] backdrop-blur-xl transition-all duration-300 hover:shadow-xl">
+              <div className="mb-2.5 flex items-center justify-between">
+                <span className="rounded-md bg-slate-900/5 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Featured Event
                 </span>
               </div>
-              <h3 className="text-xl font-bold tracking-tight text-slate-900">
-                Next-Gen Global Builders
+              <h3 className="text-2xl font-bold tracking-tight text-slate-900">
+                Qubators Global Conference 2026
               </h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                Join thousands of innovators transforming enterprise digital tools and high-velocity cloud systems.
+              <p className="mt-3 text-sm font-medium leading-relaxed text-slate-700">
+                A one-day global gathering of tech experts, builders, creators, founders, innovators, investors and emerging leaders shaping the future through technology.
               </p>
-              <div className="mt-4 pt-1">
+              <p className="mt-2.5 text-xs leading-relaxed text-slate-500">
+                We believe great tech skills and God's purpose go together. Join us in person in Lagos or online from anywhere. Reserve your spot today.
+              </p>
+              <div className="mt-5 pt-1">
                 <a
-                  href="https://qubators.net"
+                  href="https://www.qubators.org/qgc/register"
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/90 px-4 py-2 text-xs font-bold text-slate-800 shadow-xs transition hover:border-slate-300 hover:bg-white active:scale-95"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[#1d58fc] px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#1648d4] active:scale-95"
                 >
-                  <span>Learn More</span>
-                  <ArrowUpRight className="h-3.5 w-3.5 text-slate-500" />
+                  <span>Learn More & Register</span>
+                  <ArrowUpRight className="h-3.5 w-3.5" />
                 </a>
               </div>
             </div>
           </aside>
         </main>
 
-        {/* Minimal Footer */}
+        {/* Minimal Footer (Removed bottom right copyright watermark as requested) */}
         <footer className="flex flex-col items-center justify-between gap-4 pt-4 sm:flex-row sm:pt-0" data-purpose="page-footer">
           <nav aria-label="Legal & Information" className="flex items-center gap-6 text-xs font-medium text-slate-600/90 drop-shadow-xs">
             <a href="https://qubators.net" className="transition hover:text-slate-900 hover:underline">Terms</a>
@@ -451,9 +438,6 @@ export function PublicSharePage() {
             <a href="https://qubators.net" className="transition hover:text-slate-900 hover:underline">Cookies</a>
             <a href="https://qubators.net" className="transition hover:text-slate-900 hover:underline">About Qub</a>
           </nav>
-          <div className="text-xs text-slate-500/80 drop-shadow-xs">
-            © {new Date().getFullYear()} Qub Transfer. All rights reserved.
-          </div>
         </footer>
       </div>
 
