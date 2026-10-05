@@ -1,6 +1,6 @@
 import type { DriveFileDto, FileType } from '@qub/shared';
 import { useQuery } from '@tanstack/react-query';
-import { FileCheck2, ArrowLeft, ChevronLeft, ChevronRight, Download, ExternalLink, Info, Maximize, Minus, Plus, Printer, UserPlus } from 'lucide-react';
+import { FileCheck2, ArrowLeft, ChevronLeft, ChevronRight, Download, ExternalLink, Info, Maximize, Minus, Plus, Printer, UserPlus, Sparkles, Send } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { FileIcon, FILE_TYPE_LABEL } from '@/components/file-icon';
 import { Tooltip } from '@/components/ui/misc';
@@ -198,15 +198,17 @@ export function FileViewer({
         </div>
         {position && <span className="hidden text-xs text-white/60 md:inline">{position}</span>}
         {file.fileType === 'PDF' && (
-          <button
-            type="button"
-            onClick={() => setSignOpen(true)}
-            className="flex items-center gap-1.5 rounded-full bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-blue-500 transition-colors"
-            title="Fill and sign this PDF"
-          >
-            <FileCheck2 className="size-4" />
-            <span>Sign & Fill</span>
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => setSignOpen(true)}
+              className="flex items-center gap-1.5 rounded-full bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-blue-500 transition-colors"
+              title="Fill and sign this PDF"
+            >
+              <FileCheck2 className="size-4" />
+              <span>Sign & Fill</span>
+            </button>
+          </>
         )}
         <IconButton label="Open in new tab" href={url}>
           <ExternalLink />

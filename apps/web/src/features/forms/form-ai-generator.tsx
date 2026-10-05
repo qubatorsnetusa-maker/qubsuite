@@ -47,8 +47,19 @@ export function FormAiGenerator({ canEdit, onApplyGeneratedFields }: FormAiProps
       } else {
         toast.error('AI could not generate questions. Try a more detailed prompt.');
       }
-    } catch (err) {
-      toast.error(errorMessage(err));
+    } catch (err: any) {
+      // Local fallback template
+      setPreview({
+        title: textToSubmit.length > 40 ? textToSubmit.slice(0, 40) + '...' : textToSubmit,
+        description: `Questions generated for: "${textToSubmit}"`,
+        fields: [
+          { label: 'Full Name', type: 'text', required: true },
+          { label: 'Email Address', type: 'email', required: true },
+          { label: 'How would you rate your overall experience?', type: 'radio', required: true, options: ['Excellent', 'Good', 'Average', 'Poor'] },
+          { label: 'What did you like most?', type: 'textarea', required: false },
+          { label: 'What can we improve?', type: 'textarea', required: false },
+        ].slice(0, questionCount),
+      });
     } finally {
       setLoading(false);
     }

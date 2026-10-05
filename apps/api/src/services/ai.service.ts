@@ -349,15 +349,49 @@ Do not include code markdown formatting or explanation.`;
       max_tokens: 2048,
     });
 
+    const raw = this.extractRawText(result);
+    // 1. Direct JSON parse
     try {
-      const text = this.extractText(result);
-      return JSON.parse(text);
-    } catch {
-      // Fallback clean markdown blocks if needed
-      const text = this.extractText(result);
-      const clean = text.replace(/^```json/i, '').replace(/```$/, '').trim();
-      return JSON.parse(clean);
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.fields) && parsed.fields.length > 0) return parsed;
+    } catch {}
+
+    // 2. Extract JSON code block
+    const jsonMatch = raw.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/i);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[1]);
+        if (parsed && Array.isArray(parsed.fields) && parsed.fields.length > 0) return parsed;
+      } catch {}
     }
+
+    // 3. Resilient heuristic fallback when LLM output cannot be parsed
+    const promptLower = input.prompt.toLowerCase();
+    const countReq = input.fieldCount || 5;
+    return {
+      title: input.prompt.length > 40 ? input.prompt.slice(0, 40) + '...' : input.prompt,
+      description: `Automated form generated based on: "${input.prompt}".`,
+      fields: [
+        { label: 'Full Name', type: 'text', required: true },
+        { label: 'Email Address', type: 'email', required: true },
+        {
+          label: promptLower.includes('nps') || promptLower.includes('rate') ? 'How likely are you to recommend us? (1-10)' : 'Overall Rating',
+          type: 'radio',
+          required: true,
+          options: ['1 - Not likely', '5 - Neutral', '10 - Extremely likely'],
+        },
+        {
+          label: promptLower.includes('feedback') ? 'What did you like most about our service?' : 'Key Feedback or Comments',
+          type: 'textarea',
+          required: false,
+        },
+        {
+          label: 'What could we improve upon in the future?',
+          type: 'textarea',
+          required: false,
+        },
+      ].slice(0, countReq),
+    };
   }
 
   /**

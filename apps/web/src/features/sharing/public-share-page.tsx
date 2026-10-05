@@ -209,43 +209,9 @@ export function PublicSharePage() {
 
   return (
     <div className="min-h-screen flex flex-col justify-between bg-[#e8e2dc] text-neutral-800 antialiased selection:bg-[#7b5b53]/20 font-sans">
-      {/* BEGIN: TopBar matching stitch minimal concept */}
-      <header className="w-full px-6 py-4 flex items-center justify-between z-20 text-neutral-700 text-sm">
-        <div className="flex items-center gap-6">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 font-medium text-neutral-700 hover:text-neutral-900 transition-colors"
-          >
-            <ArrowLeft className="size-4" />
-            <span>Back</span>
-          </Link>
-        </div>
-
-        {/* Device toggles & Auth Action */}
-        <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-1 bg-black/5 p-1 rounded-lg text-xs font-medium text-neutral-600">
-            <button
-              type="button"
-              onClick={() => setPreviewDevice('computer')}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded transition ${
-                previewDevice === 'computer' ? 'bg-white text-neutral-900 shadow-xs' : 'text-neutral-600 hover:text-neutral-900'
-              }`}
-            >
-              <Monitor className="size-3.5" />
-              <span>Computer</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setPreviewDevice('mobile')}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded transition ${
-                previewDevice === 'mobile' ? 'bg-white text-neutral-900 shadow-xs' : 'text-neutral-600 hover:text-neutral-900'
-              }`}
-            >
-              <Smartphone className="size-3.5" />
-              <span>Mobile</span>
-            </button>
-          </div>
-
+      {/* BEGIN: TopBar (Back and device toggles removed as requested) */}
+      <header className="w-full px-6 py-4 flex items-center justify-end z-20 text-neutral-700 text-sm">
+        <div>
           {auth.status === 'authenticated' ? (
             <Button
               variant="secondary"
@@ -279,80 +245,65 @@ export function PublicSharePage() {
           } bg-[#fcfbf9] rounded-2xl shadow-xl shadow-neutral-900/5 overflow-hidden border border-neutral-200/60 min-h-[500px]`}
         >
           <div className={`grid grid-cols-1 ${previewDevice === 'mobile' ? 'grid-cols-1' : 'md:grid-cols-2'} min-h-[500px]`}>
-            {/* Left Column: Visual Story / QGC Ad Switcher */}
-            <div className="relative w-full h-72 md:h-auto min-h-[300px] overflow-hidden bg-neutral-200 flex flex-col justify-between group">
-              {leftTab === 'media' ? (
+            {/* Left Column: Video Thumbnail with Play Button Preview Overlay */}
+            <div className="relative w-full h-72 md:h-auto min-h-[320px] overflow-hidden bg-neutral-900 flex items-center justify-center group">
+              {/* If it's a video file, load video stream frame #t=1 as thumbnail preview */}
+              {currentFile?.fileType === 'VIDEO' ? (
+                <>
+                  <video
+                    src={`${shareService.downloadUrl(token, access, currentFile.id, true)}#t=1`}
+                    preload="metadata"
+                    muted
+                    playsInline
+                    className="absolute inset-0 w-full h-full object-cover object-center brightness-90 transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-black/25 transition-colors group-hover:bg-black/35" />
+                </>
+              ) : currentFile?.fileType === 'IMAGE' ? (
                 <>
                   <img
-                    alt="Warm minimalist desk with vintage camera, notebooks, and ceramic mug"
-                    className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
+                    src={shareService.downloadUrl(token, access, currentFile.id, true)}
+                    alt={fileName}
+                    className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-black/20" />
+                </>
+              ) : (
+                <>
+                  <img
+                    alt="Still Life Studio"
+                    className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
                     src="/stitch/stitch_still_desk.png"
                     onError={(e) => {
                       (e.currentTarget as HTMLImageElement).src =
                         'https://lh3.googleusercontent.com/aida-public/AB6AXuAc_97Brn-K964kBBetnBDrToqj2ZrmaXC-WpR6uEiri7GdAPPaXa_z1m4CrMsMGsK5k_grbTm0w8wwQTp2QEcBNqOL0jJ7uI86PbvzsmC1w2EMkwtBXgabVIf8KHiAPuEdA5fFyAkaUp6L4xdS_HFD_hsgvyETRP7xTURPvpUEddkeSfeaj2sTZfz55lPZwpIMIin0HLNtOh-A6ktePzlae3oJlxozRf0-LtG2hjn6iHopKknuyB8CRQ';
                     }}
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
+                  <div className="absolute inset-0 bg-black/20" />
                 </>
-              ) : (
-                <div className="relative h-full w-full bg-slate-950 p-6 flex flex-col justify-between text-white overflow-hidden">
-                  <img
-                    src="/stitch/qgc_ecard.png"
-                    alt="Qubators Global Conference"
-                    className="absolute inset-0 w-full h-full object-cover object-center opacity-40 mix-blend-luminosity"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-slate-950/80 to-transparent pointer-events-none" />
-
-                  <div className="relative z-10 flex items-center justify-between">
-                    <span className="rounded-full bg-blue-500/20 border border-blue-400/30 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-300">
-                      Global Conference
-                    </span>
-                    <span className="text-xs text-slate-300 font-medium flex items-center gap-1">
-                      <Calendar className="size-3 text-blue-400" /> 2026
-                    </span>
-                  </div>
-
-                  <div className="relative z-10 space-y-2 mt-auto pt-6">
-                    <h3 className="text-xl font-bold tracking-tight text-white">
-                      Qubators Global Conference 2026
-                    </h3>
-                    <p className="text-xs leading-relaxed text-slate-300 line-clamp-3">
-                      A one-day global gathering of tech experts, builders, creators, founders, innovators, investors and emerging leaders shaping the future through technology.
-                    </p>
-                    <a
-                      href="https://www.qubators.org/qgc/register"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 text-xs font-semibold shadow-xs transition mt-2"
-                    >
-                      <span>Reserve Your Spot</span>
-                      <ArrowUpRight className="size-3.5" />
-                    </a>
-                  </div>
-                </div>
               )}
 
-              {/* Seamless Pill switcher on the image */}
-              <div className="relative z-10 m-3 w-fit flex items-center gap-1 bg-black/40 backdrop-blur-md p-1 rounded-full text-[11px] text-white shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setLeftTab('media')}
-                  className={`px-3 py-1 rounded-full font-medium transition ${
-                    leftTab === 'media' ? 'bg-white text-neutral-900 shadow-xs' : 'text-white/80 hover:text-white'
-                  }`}
-                >
-                  Still Life
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLeftTab('qgc')}
-                  className={`px-3 py-1 rounded-full font-medium flex items-center gap-1 transition ${
-                    leftTab === 'qgc' ? 'bg-blue-600 text-white shadow-xs' : 'text-white/80 hover:text-white'
-                  }`}
-                >
-                  <Sparkles className="size-3" />
-                  <span>QGC 2026 Ad</span>
-                </button>
+              {/* Large Central Play Button for Video Preview */}
+              <button
+                type="button"
+                onClick={() => setShowInlinePreview(true)}
+                className="relative z-10 flex size-16 sm:size-20 items-center justify-center rounded-full bg-white/90 text-neutral-900 shadow-2xl backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-white active:scale-95 cursor-pointer group-hover:shadow-blue-500/30"
+                title="Play video preview"
+              >
+                <div className="ml-1 flex items-center justify-center text-[#7b5b53]">
+                  <svg className="size-8 sm:size-10 fill-current" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </div>
+              </button>
+
+              <div className="absolute bottom-3 left-4 right-4 z-10 flex items-center justify-between text-[11px] text-white/90 drop-shadow-md pointer-events-none">
+                <span className="font-medium bg-black/40 backdrop-blur-sm px-2.5 py-1 rounded-md">
+                  Click to preview
+                </span>
+                <span className="bg-black/40 backdrop-blur-sm px-2 py-1 rounded-md font-mono">
+                  {fileTypeLabel}
+                </span>
               </div>
             </div>
 
