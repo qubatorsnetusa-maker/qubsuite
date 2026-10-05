@@ -1,3 +1,4 @@
+import { authStore } from '@/lib/auth-store';
 import type { FieldAnalyticsDto, FormDto, FormResponseDto } from '@qub/shared';
 import { displayAnswer, QUESTION_TYPES } from '@qub/shared/forms';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -45,10 +46,32 @@ function Responses({ form }: { form: FormDto }) {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h1 className="text-2xl">{a ? `${a.totalResponses} response${a.totalResponses === 1 ? '' : 's'}` : 'Responses'}</h1>
               <div className="flex items-center gap-3">
-                <Button asChild variant="outline" size="sm">
-                  <a href={formsService.exportUrl(form.id)} download>
-                    <Download /> Export CSV
-                  </a>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      const token = await authStore.validToken();
+                      const res = await fetch(formsService.exportUrl(form.id), {
+                        credentials: 'include',
+                        headers: token ? { Authorization: `Bearer ${token}`} : {},
+                      });
+                      if (!res.ok) throw new Error('Export failed');
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `${form.title || 'form'} (responses).csv`;
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    } catch (err) {
+                      console.error('Export error:', err);
+                    }
+                  }}
+                >
+                  <Download /> Export CSV
                 </Button>
                 <label className="flex items-center gap-2 text-sm">
                   Accepting responses <Switch checked={form.acceptingResponses} onCheckedChange={(v) => accepting.mutate(v)} disabled={!form.capabilities.canEdit} />

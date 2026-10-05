@@ -37,13 +37,26 @@ function FormError({ error }: { error: unknown }) {
 }
 
 /** Only allow same-origin, relative redirect targets (prevents open redirects). */
+function defaultDestination(): string {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname.toLowerCase();
+    if (host.startsWith('docs.')) return '/docs';
+    if (host.startsWith('sheets.')) return '/sheets';
+    if (host.startsWith('forms.')) return '/forms';
+    if (host.startsWith('drive.')) return '/drive';
+    if (host.startsWith('pdf.')) return '/drive?filter=pdf';
+  }
+  return '/drive';
+}
+
+/** Only allow same-origin, relative redirect targets (prevents open redirects). */
 function safeRedirect(target: string | undefined): string {
-  if (!target) return '/drive';
+  if (!target) return defaultDestination();
   try {
     const url = new URL(target, window.location.origin);
-    return url.origin === window.location.origin ? url.pathname + url.search + url.hash : '/drive';
+    return url.origin === window.location.origin ? url.pathname + url.search + url.hash : defaultDestination();
   } catch {
-    return '/drive';
+    return defaultDestination();
   }
 }
 

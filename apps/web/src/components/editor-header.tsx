@@ -85,6 +85,19 @@ export function PresenceAvatars({ users }: { users: PresenceUser[] }) {
   );
 }
 
+function serviceHomePath(fileType: FileType): string {
+  switch (fileType) {
+    case 'DOCUMENT':
+      return '/docs';
+    case 'SPREADSHEET':
+      return '/sheets';
+    case 'FORM':
+      return '/forms';
+    default:
+      return '/drive';
+  }
+}
+
 export function EditorHeader({
   fileType,
   title,
@@ -110,7 +123,7 @@ export function EditorHeader({
 }) {
   return (
     <header className="flex items-center gap-2 px-3 pb-1 pt-2">
-      <Link to="/drive" aria-label="Back to Drive" className="shrink-0 rounded-lg p-1 hover:bg-hover">
+      <Link to={serviceHomePath(fileType) as any} aria-label="Back to home" className="shrink-0 rounded-lg p-1 hover:bg-hover">
         <FileIcon type={fileType} size={36} />
       </Link>
       <div className="min-w-0 flex-1">

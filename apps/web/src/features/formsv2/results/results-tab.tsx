@@ -1,3 +1,4 @@
+import { authStore } from '@/lib/auth-store';
 import type { FormDto, FormFieldDto, FormResponseDto } from '@qub/shared';
 import { QUESTION_TYPES } from '@qub/shared/forms';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -48,10 +49,32 @@ export function ResultsTab() {
     <div className="mx-auto max-w-4xl space-y-4 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl">Results</h2>
-        <Button asChild variant="outline" size="sm">
-          <a href={formsService.exportUrl(form.id)} download>
-            <Download /> Export CSV
-          </a>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={async () => {
+            try {
+              const token = await authStore.validToken();
+              const res = await fetch(formsService.exportUrl(form.id), {
+                credentials: 'include',
+                headers: token ? { Authorization: `Bearer ${token}`} : {},
+              });
+              if (!res.ok) throw new Error('Export failed');
+              const blob = await res.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `${form.title || 'form'} (responses).csv`;
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              setTimeout(() => URL.revokeObjectURL(url), 1000);
+            } catch (err) {
+              console.error('Export error:', err);
+            }
+          }}
+        >
+          <Download /> Export CSV
         </Button>
       </div>
 

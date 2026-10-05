@@ -6,6 +6,7 @@ function resolveSubdomainDestination(): string {
     const host = window.location.hostname.toLowerCase();
     if (host.startsWith('docs.')) return '/docs';
     if (host.startsWith('sheets.')) return '/sheets';
+    if (host.startsWith('forms.')) return '/forms';
     if (host.startsWith('drive.')) return '/drive';
     if (host.startsWith('pdf.')) return '/drive?filter=pdf';
   }
