@@ -7,25 +7,21 @@ import {
   ChevronRight,
   Download,
   Lock,
-  Clock,
-  HardDrive,
-  FileText,
-  Sparkles,
-  ShieldCheck,
-  Crown,
   Eye,
-  ExternalLink,
+  Shield,
+  ArrowUpRight,
+  FileText,
   ChevronLeft,
+  X,
 } from 'lucide-react';
 import { useState } from 'react';
 import { FileIcon } from '@/components/file-icon';
-import { QubLogo } from '@/components/logo';
 import { ErrorState, FullPageSpinner } from '@/components/states';
 import { Button } from '@/components/ui/button';
 import { FieldError, Input } from '@/components/ui/form-controls';
 import { useAuth } from '@/hooks/use-auth';
 import { errorMessage } from '@/lib/api';
-import { formatBytes, formatRelative } from '@/lib/utils';
+import { formatBytes } from '@/lib/utils';
 import { openPath } from '@/services/drive';
 import { shareService } from '@/services/notifications';
 
@@ -35,7 +31,7 @@ function DocView({ token, access, fileId }: { token: string; access: string; fil
   if (doc.isLoading) return <FullPageSpinner />;
   if (doc.error) return <ErrorState error={doc.error} />;
   return (
-    <div className="mx-auto my-6 max-w-[816px] bg-background px-6 py-10 shadow-card sm:px-[96px] sm:py-[96px] rounded-2xl">
+    <div className="mx-auto my-6 max-w-[816px] rounded-2xl bg-white px-6 py-10 shadow-2xl sm:px-[96px] sm:py-[96px]">
       <EditorContent editor={editor} />
     </div>
   );
@@ -52,21 +48,21 @@ function SheetView({ token, access, fileId }: { token: string; access: string; f
   const maxRow = Math.max(20, ...(cells.data?.cells ?? []).map((c) => c.row + 2));
   const maxCol = Math.max(8, ...(cells.data?.cells ?? []).map((c) => c.col + 2));
   return (
-    <div className="p-4 bg-background rounded-2xl shadow-card m-4">
+    <div className="m-4 rounded-2xl bg-white p-4 shadow-2xl">
       <div className="mb-2 flex gap-1" role="tablist">
         {meta.data!.sheets.map((s) => (
-          <button key={s.id} role="tab" aria-selected={s.id === active} onClick={() => setSheetId(s.id)} className={`rounded px-3 py-1 text-sm ${s.id === active ? 'bg-primary-soft font-medium' : 'hover:bg-hover'}`}>
+          <button key={s.id} role="tab" aria-selected={s.id === active} onClick={() => setSheetId(s.id)} className={`rounded px-3 py-1 text-sm ${s.id === active ? 'bg-blue-50 font-medium text-blue-600' : 'hover:bg-slate-100 text-slate-700'}`}>
             {s.name}
           </button>
         ))}
       </div>
-      <div className="overflow-auto rounded border border-border bg-background">
+      <div className="overflow-auto rounded border border-slate-200 bg-white">
         <table className="border-collapse text-[13px]">
           <thead>
             <tr>
               <th className="sticky top-0 w-10 border border-[#c4c7c5] bg-[#f8f9fa]" />
               {Array.from({ length: maxCol }, (_, c) => (
-                <th key={c} className="sticky top-0 min-w-[90px] border border-[#c4c7c5] bg-[#f8f9fa] font-normal text-muted">
+                <th key={c} className="sticky top-0 min-w-[90px] border border-[#c4c7c5] bg-[#f8f9fa] font-normal text-slate-500">
                   {String.fromCharCode(65 + (c % 26))}
                 </th>
               ))}
@@ -75,7 +71,7 @@ function SheetView({ token, access, fileId }: { token: string; access: string; f
           <tbody>
             {Array.from({ length: maxRow }, (_, r) => (
               <tr key={r}>
-                <td className="border border-[#c4c7c5] bg-[#f8f9fa] text-center text-muted">{r + 1}</td>
+                <td className="border border-[#c4c7c5] bg-[#f8f9fa] text-center text-slate-400">{r + 1}</td>
                 {Array.from({ length: maxCol }, (_, c) => {
                   const cell = map.get(`${r}:${c}`);
                   return (
@@ -89,38 +85,10 @@ function SheetView({ token, access, fileId }: { token: string; access: string; f
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-xs text-muted">Showing the first 200 rows and 26 columns.</p>
+      <p className="mt-2 text-xs text-slate-400">Showing the first 200 rows and 26 columns.</p>
     </div>
   );
 }
-
-// Curated high-impact background campaigns for WeTransfer advertising experience
-const AD_CAMPAIGNS = [
-  {
-    image: '/qubsuite/ads/welcome-bg-1.png',
-    fallback: '/ads/welcome-bg-1.png',
-    title: 'Qubators AI Foundry',
-    tagline: 'Empowering kingdom entrepreneurs to build world-changing tech innovations.',
-    actionText: 'Explore Programs',
-    actionHref: 'https://qubators.net',
-  },
-  {
-    image: '/qubsuite/ads/campus-spotlight.jpg',
-    fallback: '/ads/campus-spotlight.jpg',
-    title: 'Next-Gen Global Builders',
-    tagline: 'Join thousands of innovators transforming enterprise digital tools.',
-    actionText: 'Learn More',
-    actionHref: 'https://qubators.net',
-  },
-  {
-    image: '/qubsuite/ads/aifoundryheader.jpg',
-    fallback: '/ads/aifoundryheader.jpg',
-    title: 'Experience QubSuite Pro',
-    tagline: 'Permanent cloud storage, unlimited file sizes, and private workspaces.',
-    actionText: 'Upgrade to Pro',
-    actionHref: '/qubsuite/settings',
-  },
-];
 
 export function PublicSharePage() {
   const { token } = useParams({ from: '/share/$token' });
@@ -143,38 +111,37 @@ export function PublicSharePage() {
   const currentFolder = folderStack.at(-1);
   const sub = useQuery({ queryKey: ['share', token, 'folder', currentFolder?.id], queryFn: () => shareService.folder(token, data!.accessToken!, currentFolder!.id), enabled: !!currentFolder && !!data?.accessToken });
 
-  // Pick ad campaign deterministically based on share token
-  const adIndex = (token.charCodeAt(0) || 0) % AD_CAMPAIGNS.length;
-  const ad = AD_CAMPAIGNS[adIndex] ?? AD_CAMPAIGNS[0]!;
-
   if (initial.isLoading) return <FullPageSpinner />;
-  if (initial.error) return <ErrorState error={initial.error} title="This link isn’t available" />;
+  if (initial.error) return <ErrorState error={initial.error} title="This link isn't available" />;
   const d = data!;
 
   // Password gate screen
   if (d.requiresPassword) {
     return (
-      <div className="relative flex h-screen w-screen items-center justify-center overflow-hidden bg-slate-950">
+      <div className="relative flex h-screen w-screen items-center justify-center overflow-hidden bg-slate-900 select-none">
         <img
-          src={ad.image}
-          onError={(e) => { (e.currentTarget as HTMLImageElement).src = ad.fallback; }}
-          alt="Campaign background"
-          className="absolute inset-0 h-full w-full object-cover opacity-40 blur-xs"
+          src="/qubsuite/stitch/stitch_bg.jpg"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src =
+              'https://lh3.googleusercontent.com/aida-public/AB6AXuAHGUiisTTbrcGOmnIPQ3ZUuulGBV3WA1PH-DP2ikGxer3I0-3kegbkJrBJ7fNdtmUVdomdrN2WupXisxpbxI8lzmigSMkxmP5tJkJ-EG7f-nW1d6JkvP0aqSTHCE32JY6vMErzuXI_e8zYmIJOv05brcHvzei6vl68IZLDPPF461CJgXAilkQhUmsYZJ00QZptyTNA2fXVnj9W_BWrTHdfKiY7uRgWZXVGJWx6Ns8JCbgr0eeKr2fj5Q';
+          }}
+          alt="Wallpaper background"
+          className="absolute inset-0 h-full w-full object-cover object-center"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-transparent" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/35 via-white/10 to-transparent" />
 
         <div className="relative z-10 w-full max-w-md p-6">
           <form
-            className="rounded-3xl border border-white/10 bg-slate-900/90 p-8 shadow-2xl backdrop-blur-xl"
+            className="rounded-[32px] border border-white/80 bg-white/95 p-8 shadow-2xl backdrop-blur-xl"
             onSubmit={(e) => { e.preventDefault(); unlock.mutate(); }}
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600/20 text-blue-400">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
                 <Lock className="size-6" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-white">Password Protected</h2>
-                <p className="text-xs text-slate-400">Enter the passphrase shared by {d.owner.name}</p>
+                <h2 className="text-xl font-bold text-slate-900">Password Protected</h2>
+                <p className="text-xs text-slate-500">Enter the password shared by {d.owner.name}</p>
               </div>
             </div>
 
@@ -183,7 +150,7 @@ export function PublicSharePage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter transfer password"
-              className="mt-6 border-white/10 bg-white/5 text-white placeholder-slate-500 focus:border-blue-500"
+              className="mt-6 rounded-xl border-slate-200 bg-white text-slate-900 placeholder-slate-400 focus:border-blue-600 focus:ring-blue-600"
               autoFocus
               aria-label="Password"
             />
@@ -191,10 +158,10 @@ export function PublicSharePage() {
 
             <Button
               type="submit"
-              className="mt-6 w-full rounded-xl bg-blue-600 py-6 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-500 hover:shadow-blue-600/40"
+              className="mt-6 w-full rounded-2xl bg-blue-600 py-6 text-sm font-bold text-white shadow-lg shadow-blue-600/30 transition-all hover:bg-blue-700"
               loading={unlock.isPending}
             >
-              Access Files
+              Access Transfer
             </Button>
           </form>
         </div>
@@ -208,21 +175,21 @@ export function PublicSharePage() {
   const fileName = openFile ? (d.folder?.items?.find((i) => i.id === openFile.id)?.name ?? d.name) : d.name;
   const fileSize = currentFile?.size ?? (d.folder ? d.folder.items.reduce((acc, cur) => acc + (cur.size || 0), 0) : 0);
 
-  // Compute days remaining for WeTransfer 7-day policy
+  // Compute days remaining for 7-day retention vs Pro storage
   const expiresAt = d.expiresAt || (d.file as any)?.expiresAt;
   const isPermanent = d.isPermanent;
-  let expiryLabel = 'Available for 7 days';
+  let expiryLabel = '7-day storage';
   if (isPermanent) {
-    expiryLabel = 'Permanent storage (Pro)';
+    expiryLabel = 'PRO Storage';
   } else if (expiresAt) {
     const daysLeft = Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86_400_000));
-    expiryLabel = daysLeft <= 1 ? 'Expires in less than 24 hours' : `Expires in ${daysLeft} days`;
+    expiryLabel = daysLeft <= 1 ? '< 24 hours left' : `${daysLeft} days left`;
   }
 
   const renderInlineViewer = (file: { id: string; fileType: string }) => {
     if (file.fileType === 'DOCUMENT') return <DocView token={token} access={access} fileId={file.id} />;
     if (file.fileType === 'SPREADSHEET') return <SheetView token={token} access={access} fileId={file.id} />;
-    if (file.fileType === 'FORM') return <p className="p-8 text-center text-white/80">Forms are filled in through their respondent link.</p>;
+    if (file.fileType === 'FORM') return <p className="p-8 text-center text-slate-700">Forms are filled in through their respondent link.</p>;
     const url = shareService.downloadUrl(token, access, file.id, true);
     if (file.fileType === 'IMAGE') return <img src={url} alt="" className="mx-auto max-h-[80vh] rounded-2xl shadow-2xl p-4 object-contain" />;
     if (file.fileType === 'PDF') return <iframe src={url} title="PDF" className="h-[82vh] w-full rounded-2xl border-none shadow-2xl bg-white" />;
@@ -232,224 +199,275 @@ export function PublicSharePage() {
   };
 
   return (
-    <div className="relative min-h-screen w-screen overflow-x-hidden bg-slate-950 font-sans text-slate-100 select-none">
-      {/* 1. Large High-Resolution Still Ad Backdrop */}
-      <div className="fixed inset-0 z-0">
+    <div className="relative h-full min-h-screen w-full select-none overflow-x-hidden bg-slate-100 font-sans text-slate-800 antialiased">
+      {/* 1. PageBackground - Fullscreen wallpaper background image matching stitch_minimal_file_transfer_page */}
+      <div className="fixed inset-0 z-0 h-full w-full">
         <img
-          src={ad.image}
-          onError={(e) => { (e.currentTarget as HTMLImageElement).src = ad.fallback; }}
-          alt="Ad presentation backdrop"
-          className="h-full w-full object-cover transition-transform duration-1000 ease-out"
+          src="/qubsuite/stitch/stitch_bg.jpg"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src =
+              'https://lh3.googleusercontent.com/aida-public/AB6AXuAHGUiisTTbrcGOmnIPQ3ZUuulGBV3WA1PH-DP2ikGxer3I0-3kegbkJrBJ7fNdtmUVdomdrN2WupXisxpbxI8lzmigSMkxmP5tJkJ-EG7f-nW1d6JkvP0aqSTHCE32JY6vMErzuXI_e8zYmIJOv05brcHvzei6vl68IZLDPPF461CJgXAilkQhUmsYZJ00QZptyTNA2fXVnj9W_BWrTHdfKiY7uRgWZXVGJWx6Ns8JCbgr0eeKr2fj5Q';
+          }}
+          alt="Minimalist contemporary interior overlooking serene landscape"
+          className="h-full w-full object-cover object-center"
         />
-        {/* Soft vignette and overlay for high readability */}
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-slate-950/40 to-slate-950/60 backdrop-blur-[1px]" />
-        <div className="absolute inset-0 bg-radial-[at_top_right] from-transparent via-slate-950/30 to-slate-950/80" />
+        {/* Subtle gradient overlay for refined text contrast */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/35 via-white/10 to-transparent" />
       </div>
 
-      {/* 2. Top Header Bar with Minimalist Brand & Auth */}
-      <header className="relative z-20 flex h-20 items-center justify-between px-6 sm:px-10">
-        <div className="flex items-center gap-3">
-          <Link to="/" className="flex items-center gap-2.5 transition-opacity hover:opacity-90">
-            <QubLogo />
-            <span className="text-xl font-bold tracking-tight text-white drop-shadow-md">Qub Transfer</span>
-          </Link>
-          <span className="hidden rounded-full border border-white/15 bg-white/10 px-2.5 py-0.5 text-[11px] font-medium text-white/90 backdrop-blur-md sm:inline-block">
-            Fast Cloud Sharing
-          </span>
-        </div>
+      {/* 2. Main Container with TopHeader, ContentWorkspace, and MinimalFooter */}
+      <div className="relative z-10 flex min-h-screen flex-col justify-between p-6 md:p-8 lg:p-10">
+        {/* Top Header */}
+        <header className="flex w-full items-center justify-between" data-purpose="site-navigation">
+          {/* Brand Logo & Badge Container */}
+          <div className="flex items-center gap-3">
+            <Link to="/" aria-label="Qub Transfer Home" className="group flex items-center gap-2.5 transition-transform duration-200 active:scale-95">
+              <img
+                src="/qubsuite/stitch/stitch_logo.png"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src =
+                    'https://lh3.googleusercontent.com/aida/AEtjO1Ws4daFzTtfnLMZcIOmYRPLVz6IyHPvaOROCjLom7WqAJMgyNv_BLOHEZfyb_iCdLGkeqc2SrIfEkEcyyW5aOpLt7FEPbBV4hNNJb19xI9JEV8fN-JdUe_TYG-FrV63ask0MdkBn-WbcM-wK3mH86b5-LOVcXd_01morRk6MntXmUlKVu6Kq8DSCjvjgY-iMa63ZEeZIbkfx01C4is_eD7hvYRhVuSEnQnzpjbasqWphXoPKNrzpx-t_WHc';
+                }}
+                alt="Qub Transfer Logo"
+                className="h-10 w-auto object-contain transition-opacity hover:opacity-90"
+              />
+            </Link>
+            <span className="hidden sm:inline-flex items-center rounded-full bg-slate-900/5 px-2.5 py-1 text-xs font-semibold text-slate-600 backdrop-blur-md border border-slate-900/10">
+              Fast Cloud Sharing
+            </span>
+          </div>
 
-        <div className="flex items-center gap-3">
-          {auth.status === 'authenticated' ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => redeem.mutate()}
-              loading={redeem.isPending}
-              className="rounded-full bg-white/15 text-white backdrop-blur-md hover:bg-white/25 border border-white/20"
+          {/* Right Navigation Actions */}
+          <nav aria-label="Quick Navigation" className="flex items-center gap-2 sm:gap-4">
+            <a
+              href="https://qubators.net"
+              target="_blank"
+              rel="noreferrer"
+              className="hidden sm:block rounded-full px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white/60 hover:text-slate-900"
             >
-              Open in Qub Drive
-            </Button>
-          ) : (
-            <Button
-              asChild
-              variant="outline"
-              size="sm"
-              className="rounded-full border-white/20 bg-white/10 text-white backdrop-blur-md hover:bg-white/20"
+              Programs
+            </a>
+            <a
+              href="https://qubators.net"
+              target="_blank"
+              rel="noreferrer"
+              className="hidden sm:block rounded-full px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white/60 hover:text-slate-900"
             >
-              <Link to="/login" search={{ redirect: `/share/${token}` }}>
-                Sign in
-              </Link>
-            </Button>
-          )}
-        </div>
-      </header>
+              Help
+            </a>
+            {auth.status === 'authenticated' ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => redeem.mutate()}
+                loading={redeem.isPending}
+                className="rounded-full border border-slate-300/80 bg-white/80 px-5 py-2 text-sm font-semibold text-slate-800 shadow-xs backdrop-blur-sm transition duration-200 hover:border-slate-400 hover:bg-white active:scale-95"
+              >
+                Open in Qub
+              </Button>
+            ) : (
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="rounded-full border border-slate-300/80 bg-white/80 px-5 py-2 text-sm font-semibold text-slate-800 shadow-xs backdrop-blur-sm transition duration-200 hover:border-slate-400 hover:bg-white active:scale-95"
+              >
+                <Link to="/login" search={{ redirect: `/share/${token}` }}>
+                  Sign in
+                </Link>
+              </Button>
+            )}
+          </nav>
+        </header>
 
-      {/* 3. Main Content: WeTransfer Style Layout */}
-      <main className="relative z-10 flex min-h-[calc(100vh-5rem)] flex-col lg:flex-row items-center lg:items-start justify-between px-6 py-6 sm:px-12 sm:py-8 gap-8">
-        {/* Left Column: WeTransfer Style Download Dialogue Card */}
-        <div className="w-full max-w-[430px] shrink-0">
-          <div className="relative overflow-hidden rounded-[28px] border border-white/15 bg-slate-900/85 p-7 shadow-2xl backdrop-blur-2xl transition-all duration-300 hover:border-white/25">
-            {/* Ambient decorative glow */}
-            <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-blue-500/15 blur-3xl" />
-            <div className="pointer-events-none absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-purple-500/10 blur-3xl" />
+        {/* Content Workspace */}
+        <main className="my-auto grid grid-cols-1 items-center gap-8 py-8 lg:grid-cols-12" data-purpose="transfer-content">
+          {/* Floating Download Card - Iconic Left Floating Box */}
+          <section aria-labelledby="transfer-heading" className="lg:col-span-6 xl:col-span-5 2xl:col-span-4">
+            <div className="relative mx-auto w-full max-w-[440px] rounded-[32px] border border-white/80 bg-white/95 p-8 shadow-[0_25px_50px_-12px_rgba(15,23,42,0.08),0_0_1px_1px_rgba(15,23,42,0.04)] backdrop-blur-md transition-all duration-300 hover:shadow-2xl lg:mx-0">
+              {/* Transfer Header Status */}
+              <div className="mb-6 flex items-center justify-between border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                  </span>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500" id="transfer-heading">
+                    Ready to download
+                  </span>
+                </div>
 
-            {/* Top Info Badge */}
-            <div className="flex items-center justify-between pb-5 border-b border-white/10">
-              <div className="flex items-center gap-2 text-xs font-medium text-slate-300">
-                <Clock className="size-3.5 text-blue-400" />
-                <span>{expiryLabel}</span>
+                {/* Pro / Expiry Badge */}
+                {isPermanent ? (
+                  <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-500/20">
+                    <svg className="h-3.5 w-3.5 fill-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path clipRule="evenodd" d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" fillRule="evenodd" />
+                    </svg>
+                    <span>PRO Storage</span>
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-500/20">
+                    <span>{expiryLabel}</span>
+                  </div>
+                )}
               </div>
-              {isPermanent ? (
-                <span className="flex items-center gap-1 rounded-full bg-amber-400/20 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
-                  <Crown className="size-3" /> PRO
-                </span>
-              ) : (
-                <span className="rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] font-medium text-blue-300">
-                  Temporary 7d
-                </span>
-              )}
-            </div>
 
-            {/* File Presentation */}
-            <div className="my-6">
-              <div className="flex items-start gap-4">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-white shadow-inner border border-white/10">
+              {/* File Showcase Item */}
+              <div className="group mb-7 flex items-center gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 p-4 transition duration-200 hover:border-slate-200 hover:bg-slate-50" data-purpose="file-item">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-blue-100/70 text-blue-600 transition group-hover:scale-105">
                   <FileIcon
                     type={d.resourceType === 'FOLDER' ? (openFile ? (openFile.fileType as any) : 'FOLDER') : (d.file?.fileType ?? 'OTHER')}
                     size={28}
                   />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h1 className="truncate text-lg font-bold text-white tracking-tight" title={fileName}>
+                  <h2 className="truncate text-base font-bold text-slate-900 tracking-tight" title={fileName}>
                     {fileName}
-                  </h1>
-                  <p className="mt-1 flex items-center gap-2 text-xs text-slate-400">
-                    <span>{formatBytes(fileSize)}</span>
-                    <span>•</span>
-                    <span className="truncate">By {d.owner.name}</span>
+                  </h2>
+                  <p className="mt-0.5 text-xs font-medium text-slate-500">
+                    {formatBytes(fileSize)} <span className="mx-1">•</span> By {d.owner.name}
                   </p>
                 </div>
               </div>
 
-              {/* Folder Breadcrumb or back button if viewing inner item */}
+              {/* Back button if deep into folder */}
               {openFile && (
                 <button
                   onClick={() => setOpenFile(null)}
-                  className="mt-4 flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                  className="mb-4 flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
                 >
                   <ChevronLeft className="size-3.5" />
-                  <span>Back to folder files</span>
+                  <span>Back to folder items</span>
                 </button>
               )}
-            </div>
 
-            {/* Folder Items List (if folder shared and no file opened) */}
-            {d.folder && !openFile && (
-              <div className="mb-6 max-h-56 overflow-y-auto rounded-xl border border-white/10 bg-black/20 p-2">
-                <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                  {d.folder.items.length} files included
-                </p>
-                <div className="divide-y divide-white/5">
-                  {d.folder.items.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => item.kind === 'file' && setOpenFile({ id: item.id, fileType: item.fileType })}
-                      className="flex w-full items-center gap-2.5 px-2 py-2 text-left text-xs hover:bg-white/5 rounded-lg transition-colors group"
-                    >
-                      <FileIcon type={item.fileType} size={16} />
-                      <span className="flex-1 truncate text-slate-300 group-hover:text-white">{item.name}</span>
-                      <span className="text-[11px] text-slate-500">{formatBytes(item.size)}</span>
-                    </button>
-                  ))}
+              {/* Folder list when folder link is shared */}
+              {d.folder && !openFile && (
+                <div className="mb-6 max-h-48 overflow-y-auto rounded-xl border border-slate-100 bg-slate-50/50 p-2">
+                  <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                    {d.folder.items.length} files in folder
+                  </p>
+                  <div className="divide-y divide-slate-100">
+                    {d.folder.items.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => item.kind === 'file' && setOpenFile({ id: item.id, fileType: item.fileType })}
+                        className="flex w-full items-center gap-2.5 px-2 py-2 text-left text-xs hover:bg-white rounded-lg transition-colors group"
+                      >
+                        <FileIcon type={item.fileType} size={16} />
+                        <span className="flex-1 truncate text-slate-700 group-hover:text-slate-900">{item.name}</span>
+                        <span className="text-[11px] text-slate-400">{formatBytes(item.size)}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-
-            {/* Main Action: Primary Download Button */}
-            {downloadUrl ? (
-              <a
-                href={downloadUrl}
-                download={fileName}
-                className="flex w-full items-center justify-center gap-2.5 rounded-2xl bg-blue-600 px-6 py-4 text-base font-semibold text-white shadow-xl shadow-blue-600/30 transition-all hover:bg-blue-500 hover:shadow-blue-600/50 hover:scale-[1.01] active:scale-[0.99]"
-              >
-                <Download className="size-5" />
-                <span>Download File</span>
-              </a>
-            ) : (
-              <Button
-                variant="primary"
-                size="lg"
-                onClick={() => redeem.mutate()}
-                loading={redeem.isPending}
-                className="w-full rounded-2xl py-6 text-base font-semibold shadow-xl shadow-blue-600/30"
-              >
-                <span>Save all to Qub Drive</span>
-              </Button>
-            )}
-
-            {/* Secondary actions: Inline preview toggle & Pro storage notice */}
-            <div className="mt-4 flex flex-col gap-2.5">
-              {currentFile && ['IMAGE', 'PDF', 'VIDEO', 'AUDIO', 'DOCUMENT', 'SPREADSHEET'].includes(currentFile.fileType) && (
-                <button
-                  type="button"
-                  onClick={() => setShowInlinePreview(!showInlinePreview)}
-                  className="flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-slate-300 hover:text-white transition-colors"
-                >
-                  <Eye className="size-3.5 text-slate-400" />
-                  <span>{showInlinePreview ? 'Hide preview' : 'Preview without downloading'}</span>
-                </button>
               )}
 
-              {/* Free vs Pro Storage Clarification */}
-              <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-[11px] leading-relaxed text-slate-300">
-                <div className="flex items-start gap-2">
-                  <ShieldCheck className="mt-0.5 size-4 text-emerald-400 shrink-0" />
+              {/* Action Buttons Group */}
+              <div className="space-y-3" data-purpose="card-actions">
+                {/* Primary Download Button */}
+                {downloadUrl ? (
+                  <a
+                    href={downloadUrl}
+                    download={fileName}
+                    aria-label={`Download ${fileName}`}
+                    className="group relative flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#1d58fc] py-4 px-6 text-base font-bold text-white shadow-lg shadow-blue-600/30 transition-all duration-200 hover:bg-[#1648d4] hover:shadow-blue-600/40 active:scale-[0.99] focus:outline-hidden focus:ring-4 focus:ring-blue-500/20"
+                  >
+                    <Download className="h-5 w-5 transition-transform duration-200 group-hover:translate-y-0.5" />
+                    <span>Download File</span>
+                  </a>
+                ) : (
+                  <button
+                    onClick={() => redeem.mutate()}
+                    className="group relative flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#1d58fc] py-4 px-6 text-base font-bold text-white shadow-lg shadow-blue-600/30 transition-all duration-200 hover:bg-[#1648d4] hover:shadow-blue-600/40 active:scale-[0.99]"
+                  >
+                    <span>Save to Qub Drive</span>
+                  </button>
+                )}
+
+                {/* Secondary Preview Link */}
+                {currentFile && ['IMAGE', 'PDF', 'VIDEO', 'AUDIO', 'DOCUMENT', 'SPREADSHEET'].includes(currentFile.fileType) && (
+                  <button
+                    onClick={() => setShowInlinePreview(true)}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100/80 hover:text-slate-900"
+                    type="button"
+                  >
+                    <Eye className="h-4 w-4 text-slate-500" />
+                    <span>Preview without downloading</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Retention & Upsell Notice Banner */}
+              <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50/60 p-3.5 text-xs leading-relaxed text-slate-600">
+                <div className="flex items-start gap-2.5">
+                  <Shield className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
                   <div>
-                    <span className="font-semibold text-white">Temporary Free Cloud:</span> Free files are stored for 7 days. Need permanent storage with custom branding?{' '}
-                    <Link to="/register" className="text-blue-400 underline hover:text-blue-300">
+                    <strong className="font-semibold text-slate-800">Temporary Free Cloud:</strong>{' '}
+                    Free files are stored for 7 days. Need permanent storage with custom branding?{' '}
+                    <Link to="/register" className="font-bold text-blue-600 underline underline-offset-2 hover:text-blue-700">
                       Get Qub Pro
                     </Link>
                   </div>
                 </div>
               </div>
             </div>
+          </section>
+
+          {/* Billboard Sponsor Section - Right Floating Sponsored Showcase */}
+          <aside aria-label="Sponsored Billboard" className="hidden lg:col-span-6 lg:flex lg:justify-end xl:col-span-7 2xl:col-span-8">
+            <div className="max-w-sm rounded-3xl border border-white/80 bg-white/85 p-6 shadow-[0_25px_50px_-12px_rgba(15,23,42,0.08),0_0_1px_1px_rgba(15,23,42,0.04)] backdrop-blur-xl transition-all duration-300 hover:shadow-xl">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="rounded-md bg-slate-900/5 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Sponsored Billboard
+                </span>
+              </div>
+              <h3 className="text-xl font-bold tracking-tight text-slate-900">
+                Next-Gen Global Builders
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                Join thousands of innovators transforming enterprise digital tools and high-velocity cloud systems.
+              </p>
+              <div className="mt-4 pt-1">
+                <a
+                  href="https://qubators.net"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/90 px-4 py-2 text-xs font-bold text-slate-800 shadow-xs transition hover:border-slate-300 hover:bg-white active:scale-95"
+                >
+                  <span>Learn More</span>
+                  <ArrowUpRight className="h-3.5 w-3.5 text-slate-500" />
+                </a>
+              </div>
+            </div>
+          </aside>
+        </main>
+
+        {/* Minimal Footer */}
+        <footer className="flex flex-col items-center justify-between gap-4 pt-4 sm:flex-row sm:pt-0" data-purpose="page-footer">
+          <nav aria-label="Legal & Information" className="flex items-center gap-6 text-xs font-medium text-slate-600/90 drop-shadow-xs">
+            <a href="https://qubators.net" className="transition hover:text-slate-900 hover:underline">Terms</a>
+            <a href="https://qubators.net" className="transition hover:text-slate-900 hover:underline">Privacy</a>
+            <a href="https://qubators.net" className="transition hover:text-slate-900 hover:underline">Cookies</a>
+            <a href="https://qubators.net" className="transition hover:text-slate-900 hover:underline">About Qub</a>
+          </nav>
+          <div className="text-xs text-slate-500/80 drop-shadow-xs">
+            © {new Date().getFullYear()} Qub Transfer. All rights reserved.
           </div>
-        </div>
+        </footer>
+      </div>
 
-        {/* Right Column: High-Impact Billboard Ad Callout */}
-        <div className="relative z-10 hidden lg:flex flex-1 flex-col items-end justify-end self-end pb-8 pr-4 max-w-xl text-right">
-          <span className="rounded-full border border-white/20 bg-slate-900/60 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-white backdrop-blur-md">
-            Sponsored Billboard
-          </span>
-          <h2 className="mt-3 text-3xl xl:text-4xl font-extrabold tracking-tight text-white drop-shadow-lg">
-            {ad.title}
-          </h2>
-          <p className="mt-2 text-sm xl:text-base text-slate-200/90 drop-shadow-md leading-relaxed">
-            {ad.tagline}
-          </p>
-          <a
-            href={ad.actionHref}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/15 px-6 py-2.5 text-sm font-semibold text-white backdrop-blur-md transition-all hover:bg-white/30 hover:shadow-lg"
-          >
-            <span>{ad.actionText}</span>
-            <ExternalLink className="size-4" />
-          </a>
-        </div>
-      </main>
-
-      {/* 4. Full-Screen / Modal Inline Preview Drawer (When toggled on) */}
+      {/* Full-Screen Preview Drawer Modal */}
       {showInlinePreview && currentFile && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-slate-950/90 backdrop-blur-xl animate-in fade-in duration-200">
-          <div className="flex h-16 items-center justify-between border-b border-white/10 px-6">
+        <div className="fixed inset-0 z-50 flex flex-col bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="flex h-16 items-center justify-between border-b border-white/10 bg-white/90 px-6 backdrop-blur-md">
             <div className="flex items-center gap-3">
               <FileIcon type={currentFile.fileType as any} size={20} />
-              <span className="font-semibold text-white truncate max-w-md">{fileName}</span>
+              <span className="font-semibold text-slate-900 truncate max-w-md">{fileName}</span>
             </div>
             <div className="flex items-center gap-3">
               {downloadUrl && (
-                <Button asChild size="sm" className="rounded-full bg-blue-600 hover:bg-blue-500">
+                <Button asChild size="sm" className="rounded-full bg-blue-600 hover:bg-blue-700 text-white">
                   <a href={downloadUrl} download={fileName}>
                     <Download className="mr-1.5 size-4" /> Download
                   </a>
@@ -459,9 +477,9 @@ export function PublicSharePage() {
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowInlinePreview(false)}
-                className="rounded-full text-slate-300 hover:text-white hover:bg-white/10"
+                className="rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100"
               >
-                Close preview
+                <X className="mr-1 size-4" /> Close preview
               </Button>
             </div>
           </div>
