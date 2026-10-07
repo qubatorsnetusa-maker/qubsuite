@@ -17,6 +17,7 @@ import { MEDIA_COOKIE, MEDIA_TOKEN_TTL_SECONDS, REFRESH_COOKIE, requireAuth } fr
 import { AppError, forbidden } from '../../utils/errors';
 import { UserRepository } from '../users/user.repository';
 import type { IssuedSession } from './auth.service';
+import { isAllowedOrigin } from '../../config/env';
 
 export async function authRoutes(app: FastifyInstance) {
   const r = app.withTypeProvider<ZodTypeProvider>();
@@ -55,12 +56,14 @@ export async function authRoutes(app: FastifyInstance) {
   function clearCookies(reply: FastifyReply) {
     reply.clearCookie(REFRESH_COOKIE, { path: '/api/auth', ...domain });
     reply.clearCookie(MEDIA_COOKIE, { path: '/api/', ...domain });
+    reply.clearCookie(REFRESH_COOKIE, { path: '/api/auth' });
+    reply.clearCookie(MEDIA_COOKIE, { path: '/api/' });
   }
 
   /** CSRF defence for cookie-authenticated endpoints: the Origin (when sent) must be an allowed app origin. */
   function assertSameOrigin(request: FastifyRequest) {
     const origin = request.headers.origin;
-    if (origin && !env.corsOrigins.includes(origin)) throw forbidden('Cross-site request rejected.');
+    if (origin && !isAllowedOrigin(origin, env)) throw forbidden('Cross-site request rejected.');
   }
 
   const publicSession = (s: IssuedSession) => ({

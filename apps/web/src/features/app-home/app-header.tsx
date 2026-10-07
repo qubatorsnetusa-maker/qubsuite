@@ -1,3 +1,4 @@
+import { getServiceUrl, type EcosystemService } from '@/lib/ecosystem-urls';
 import { Link } from '@tanstack/react-router';
 import { ArrowLeft, HardDrive, LayoutGrid, Menu, Search, Settings, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -12,16 +13,19 @@ function AppLinks({ onNavigate, layout }: { onNavigate?: () => void; layout: 'li
   const item = layout === 'grid' ? 'flex flex-col items-center gap-1.5 rounded-xl p-3 text-xs hover:bg-hover' : 'flex h-11 items-center gap-4 rounded-r-full pl-6 pr-4 text-sm hover:bg-hover';
   return (
     <>
-      {LAUNCHER_APPS.map((a) => (
-        <Link key={a.home} to={a.home} onClick={onNavigate} className={item} activeOptions={{ exact: true }} activeProps={{ className: layout === 'list' ? 'bg-primary-soft font-medium' : 'bg-hover' }}>
-          <FileIcon type={a.type} size={layout === 'grid' ? 36 : 22} />
-          Qub {a.product}
-        </Link>
-      ))}
-      <Link to="/drive" onClick={onNavigate} className={item}>
+      {LAUNCHER_APPS.map((a) => {
+        const service: EcosystemService = a.type === 'DOCUMENT' ? 'docs' : a.type === 'SPREADSHEET' ? 'sheets' : 'forms';
+        return (
+          <a key={a.home} href={getServiceUrl(service, a.home)} onClick={onNavigate} className={item}>
+            <FileIcon type={a.type} size={layout === 'grid' ? 36 : 22} />
+            Qub {a.product}
+          </a>
+        );
+      })}
+      <a href={getServiceUrl('drive', '/drive')} onClick={onNavigate} className={item}>
         {layout === 'grid' ? <HardDrive className="size-9 text-[#1a56db]" /> : <HardDrive className="size-5 text-[#1a56db]" />}
         Qub Drive
-      </Link>
+      </a>
     </>
   );
 }

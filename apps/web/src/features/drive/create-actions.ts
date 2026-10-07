@@ -1,3 +1,4 @@
+import { getServiceUrl, type EcosystemService } from '@/lib/ecosystem-urls';
 import { templateIdSchema, type NativeFileType } from '@qub/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
@@ -11,14 +12,20 @@ export const newNativeSearch = z.object({ folder: z.uuid().optional(), template:
 export const appHomeSearch = z.object({ folder: z.uuid().optional() });
 
 const HOME_PATHS: Record<NativeFileType, string> = { DOCUMENT: '/docs', SPREADSHEET: '/sheets', FORM: '/forms' };
+const SERVICE_BY_TYPE: Record<NativeFileType, EcosystemService> = {
+  DOCUMENT: 'docs',
+  SPREADSHEET: 'sheets',
+  FORM: 'forms',
+};
 
 /**
- * "New → Qub Docs/Sheets/Forms": opens the app's home page (blank + templates + recent files) in a new tab.
- * Anything created from there lands in `folderId`. The tab is opened synchronously from the click, so popup
- * blockers allow it.
+ * "New ? Qub Docs/Sheets/Forms": opens the app's home page (blank + templates + recent files) in a new tab
+ * at its canonical subdomain (docs.qubdocs.online, sheet.qubdocs.online, forms.qubdocs.online).
+ * Anything created from there lands in olderId.
  */
 export function openAppHome(type: NativeFileType, folderId?: string) {
-  const url = new URL(HOME_PATHS[type], window.location.origin);
+  const service = SERVICE_BY_TYPE[type];
+  const url = new URL(getServiceUrl(service, HOME_PATHS[type]));
   if (folderId) url.searchParams.set('folder', folderId);
   window.open(url.href, '_blank', 'noopener');
 }

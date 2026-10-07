@@ -12,7 +12,7 @@ import { UserMenu } from '@/components/user-menu';
 import { NotificationsBell } from '@/features/notifications/notifications';
 import { useCurrentUser } from '@/hooks/use-auth';
 import { cn, formatBytes, formatRelative } from '@/lib/utils';
-import { driveService, openPath } from '@/services/drive';
+import { driveService, openPath, openServiceUrl } from '@/services/drive';
 import { qk } from '@/services/query-keys';
 import { ActivityPanel } from './activity-panel';
 import { openAppHome, useDriveChangesFromOtherTabs } from './create-actions';
@@ -74,7 +74,11 @@ function SearchBox() {
   const items = results.data?.items ?? [];
   const go = async (r: SearchResultDto) => {
     setOpen(false);
-    await navigate({ href: openPath({ kind: r.kind, id: r.id, fileType: r.fileType, resourceId: r.resourceId }) });
+    if (r.kind === 'file' && (r.fileType === 'DOCUMENT' || r.fileType === 'SPREADSHEET' || r.fileType === 'FORM')) {
+      window.open(openServiceUrl(r), '_blank', 'noopener');
+    } else {
+      await navigate({ href: openPath({ kind: r.kind, id: r.id, fileType: r.fileType, resourceId: r.resourceId }) });
+    }
   };
   return (
     <div ref={ref} className="relative w-full max-w-[720px]">

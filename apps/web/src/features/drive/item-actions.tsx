@@ -3,7 +3,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { CircleMinus, Copy, Download, ExternalLink, Eye, FolderInput, Info, OctagonAlert, Pencil, RotateCcw, ShieldCheck, Star, StarOff, Trash, Trash2, UserPlus } from 'lucide-react';
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { ConfirmDialog } from '@/components/ui/dialog';
-import { driveService, openPath } from '@/services/drive';
+import { driveService, openPath, openServiceUrl } from '@/services/drive';
 import { ShareDialog, type ShareTarget } from '../sharing/share-dialog';
 import { MoveDialog, RenameDialog } from './dialogs';
 import { useCopyItem, useDeleteForever, useNotSpam, useRemoveAccess, useRestoreItems, useStarItem, useTrashItems } from './queries';
@@ -81,6 +81,10 @@ export function ItemActionsProvider({ children, inlinePreview = false }: { child
         return;
       }
       if (inlinePreview && item.kind === 'file' && !NATIVE.includes(item.fileType)) return preview(item);
+      if (item.kind === 'file' && NATIVE.includes(item.fileType)) {
+        window.open(openServiceUrl({ kind: item.kind, id: item.id, fileType: item.fileType, resourceId: item.resourceId }), '_blank', 'noopener');
+        return;
+      }
       void navigate({ href: openPath({ kind: item.kind, id: item.id, fileType: item.kind === 'file' ? item.fileType : undefined, resourceId: item.kind === 'file' ? item.resourceId : undefined }) });
     },
     preview,

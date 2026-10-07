@@ -113,3 +113,16 @@ function load(): Env {
 }
 
 export const env = load();
+
+export function isAllowedOrigin(origin: string | undefined, currentEnv: Env = env): boolean {
+  if (!origin) return true;
+  if (currentEnv.corsOrigins.includes(origin)) return true;
+  try {
+    const u = new URL(origin);
+    if (currentEnv.COOKIE_DOMAIN) {
+      const baseDomain = currentEnv.COOKIE_DOMAIN.startsWith('.') ? currentEnv.COOKIE_DOMAIN.slice(1) : currentEnv.COOKIE_DOMAIN;
+      if (u.hostname === baseDomain || u.hostname.endsWith('.' + baseDomain)) return true;
+    }
+  } catch {}
+  return false;
+}

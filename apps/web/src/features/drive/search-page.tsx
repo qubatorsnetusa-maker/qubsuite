@@ -9,7 +9,7 @@ import { NativeSelect } from '@/components/ui/form-controls';
 import { Avatar, Skeleton } from '@/components/ui/misc';
 import { useCurrentUser } from '@/hooks/use-auth';
 import { formatRelative } from '@/lib/utils';
-import { driveService, openPath } from '@/services/drive';
+import { driveService, openPath, openServiceUrl } from '@/services/drive';
 import { qk } from '@/services/query-keys';
 
 const MODIFIED_DAYS = { today: 1, week: 7, month: 30, year: 365 } as const;
@@ -33,7 +33,13 @@ export function SearchPage() {
   });
   const set = (patch: Record<string, string | undefined>) => void navigate({ to: '/drive/search', search: { ...search, ...patch }, replace: true });
   const items = q.data?.pages.flatMap((p) => p.items) ?? [];
-  const open = (r: SearchResultDto) => void navigate({ href: openPath({ kind: r.kind, id: r.id, fileType: r.fileType, resourceId: r.resourceId }) });
+  const open = (r: SearchResultDto) => {
+    if (r.kind === 'file' && (r.fileType === 'DOCUMENT' || r.fileType === 'SPREADSHEET' || r.fileType === 'FORM')) {
+      window.open(openServiceUrl(r), '_blank', 'noopener');
+    } else {
+      void navigate({ href: openPath({ kind: r.kind, id: r.id, fileType: r.fileType, resourceId: r.resourceId }) });
+    }
+  };
 
   return (
     <div className="flex h-full flex-col">

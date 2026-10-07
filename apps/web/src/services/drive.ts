@@ -1,3 +1,4 @@
+import { getServiceUrl } from '@/lib/ecosystem-urls';
 import type {
   ActivityDto,
   BlockedUserDto,
@@ -137,5 +138,20 @@ export function openPath(item: { kind: 'file' | 'folder'; id: string; fileType?:
       return `/forms/${item.resourceId}/edit`;
     default:
       return `/drive/file/${item.id}`;
+  }
+}
+
+/** Canonical ecosystem URL for opening an item at its dedicated subdomain. */
+export function openServiceUrl(item: { kind: 'file' | 'folder'; id: string; fileType?: string; resourceId?: string | null }): string {
+  if (item.kind === 'folder') return getServiceUrl('drive', '/drive/folder/' + item.id);
+  switch (item.fileType) {
+    case 'DOCUMENT':
+      return getServiceUrl('docs', '/docs/' + item.resourceId);
+    case 'SPREADSHEET':
+      return getServiceUrl('sheets', '/sheets/' + item.resourceId);
+    case 'FORM':
+      return getServiceUrl('forms', '/forms/' + item.resourceId + '/edit');
+    default:
+      return getServiceUrl('drive', '/drive/file/' + item.id);
   }
 }

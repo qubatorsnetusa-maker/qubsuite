@@ -4,7 +4,7 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import type { FastifyInstance } from 'fastify';
 import fp from 'fastify-plugin';
-import type { Env } from '../config/env';
+import { isAllowedOrigin, type Env } from '../config/env';
 
 export const securityPlugin = fp(async (app: FastifyInstance, opts: { env: Env }) => {
   const { env } = opts;
@@ -27,7 +27,7 @@ export const securityPlugin = fp(async (app: FastifyInstance, opts: { env: Env }
   await app.register(cors, {
     origin: (origin, cb) => {
       // Same-origin and non-browser requests have no Origin header.
-      if (!origin || env.corsOrigins.includes(origin)) cb(null, true);
+      if (isAllowedOrigin(origin, env)) cb(null, true);
       else cb(null, false);
     },
     credentials: true,

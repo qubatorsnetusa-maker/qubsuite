@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { NativeSelect } from '@/components/ui/form-controls';
 import { Avatar, Skeleton, Tooltip } from '@/components/ui/misc';
 import { cn, formatDate } from '@/lib/utils';
-import { driveService, openPath } from '@/services/drive';
+import { driveService, openPath, openServiceUrl } from '@/services/drive';
 import { qk } from '@/services/query-keys';
 import { describeActivity } from './activity-text';
 
@@ -95,7 +95,11 @@ export function ActivityPanel({ onClose }: { onClose(): void }) {
   const open = (a: DriveActivityItemDto) => {
     const i = a.item;
     if (!i?.available) return;
-    void navigate({ href: openPath({ kind: i.kind, id: i.id, fileType: i.fileType === 'FOLDER' ? undefined : i.fileType, resourceId: i.resourceId }) });
+    if (i.kind === 'file' && (i.fileType === 'DOCUMENT' || i.fileType === 'SPREADSHEET' || i.fileType === 'FORM')) {
+      window.open(openServiceUrl({ kind: i.kind, id: i.id, fileType: i.fileType, resourceId: i.resourceId }), '_blank', 'noopener');
+    } else {
+      void navigate({ href: openPath({ kind: i.kind, id: i.id, fileType: i.fileType === 'FOLDER' ? undefined : i.fileType, resourceId: i.resourceId }) });
+    }
   };
 
   return (
