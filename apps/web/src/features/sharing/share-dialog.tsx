@@ -227,8 +227,7 @@ function GeneralAccess({ state, target, onChange, canManage }: { state: SharingS
     try {
       const parsed = new URL(url);
       const token = parsed.pathname.split('/share/')[1] || state.link?.token;
-      const basePath = window.location.pathname.startsWith('/qubsuite') ? '/qubsuite' : '';
-      url = window.location.origin + basePath + '/share/' + (token || '');
+      url = window.location.origin + '/share/' + (token || '');
     } catch {
       // fallback to original url if parsing fails
     }

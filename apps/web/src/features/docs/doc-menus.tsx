@@ -114,7 +114,7 @@ export function DocMenus(p: DocMenusProps) {
             icon={<FilePlus />}
             shortcut="Ctrl+Alt+N"
             onSelect={() => {
-              window.open('/qubsuite/docs', '_blank');
+              window.open('/docs', '_blank');
             }}
           >
             New document
@@ -160,7 +160,7 @@ export function DocMenus(p: DocMenusProps) {
                     }
                   } else if (ext === 'pdf') {
                     // Open in QubDocs PDF Sign & Edit dialog
-                    window.open(`/qubsuite/drive?preview=${encodeURIComponent(file.name)}`, '_blank');
+                    window.open(`/drive?preview=${encodeURIComponent(file.name)}`, '_blank');
                     toast.info(`Opening ${file.name} in QubDocs PDF Editor.`);
                   } else {
                     const content = await file.text();

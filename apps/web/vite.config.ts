@@ -8,7 +8,7 @@ import { defineConfig } from 'vite';
 const API = process.env.QUB_API_URL ?? 'http://localhost:4100';
 
 export default defineConfig({
-  base: process.env.BASE_PATH || '/qubsuite/',
+  base: process.env.BASE_PATH || '/',
   plugins: [
     // File-based routes from src/routes -> src/routeTree.gen.ts; each route's component is split into its own chunk.
     tanstackRouter({ target: 'react', autoCodeSplitting: true, quoteStyle: 'single' }),

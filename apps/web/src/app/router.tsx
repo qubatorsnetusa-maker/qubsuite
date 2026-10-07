@@ -4,7 +4,7 @@ import { queryClient } from './query-client';
 
 /** Routes are file-based (src/routes); the Vite plugin generates src/routeTree.gen.ts. */
 export const router = createRouter({
-  basepath: '/qubsuite',
+  // basepath: '/qubsuite',
   routeTree,
   context: { queryClient },
   defaultPreload: 'intent',
