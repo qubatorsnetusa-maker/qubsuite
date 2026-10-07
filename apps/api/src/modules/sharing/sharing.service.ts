@@ -14,7 +14,6 @@ import type { Env } from '../../config/env';
 import type { Database, Executor } from '../../db';
 import { driveFiles, driveFolders, filePermissions, fileShares, folderPermissions, shareLinks } from '../../db/schema';
 import type { Mailer } from '../../services/mailer';
-import type { AuthService } from '../auth/auth.service';
 import { hashPassword, randomToken } from '../../utils/crypto';
 import { AppError, badRequest, conflict, forbidden, notFound, policyViolation } from '../../utils/errors';
 import type { ActivityService, AuditContext, AuditService } from '../activity/activity.service';
@@ -55,7 +54,6 @@ export class SharingService {
     private readonly audit: AuditService,
     private readonly mailer: Mailer,
     private readonly policies: PolicyService,
-    private readonly auth: AuthService,
   ) {}
 
   private async resource(ref: ResourceRef, tx: Executor = this.db): Promise<ResourceInfo> {
@@ -273,39 +271,41 @@ export class SharingService {
     });
 
     if (input.notify) {
-      const docTargetUrl = this.linkFor(ref, info, resourceId);
-      const inviteToken = await this.auth.createInviteToken(input.email, docTargetUrl);
-      const url = `${this.env.APP_URL}/invite/${inviteToken}`;
-      const roleDisplay = input.role.charAt(0).toUpperCase() + input.role.slice(1).toLowerCase();
-      const htmlBody = `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 32px 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
-          <div style="margin-bottom: 24px;">
-            <span style="font-size: 20px; font-weight: 700; color: #1a56db; letter-spacing: -0.5px;">QubDocs</span>
+      try {
+        const itemUrl = `${this.env.APP_URL}${target ? this.linkFor(ref, info, resourceId) : `/register?email=${encodeURIComponent(input.email)}`}`;
+        const roleDisplay = input.role.charAt(0).toUpperCase() + input.role.slice(1).toLowerCase();
+        const htmlBody = `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 32px 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+            <div style="margin-bottom: 24px;">
+              <span style="font-size: 20px; font-weight: 700; color: #1a56db; letter-spacing: -0.5px;">QubDocs</span>
+            </div>
+            <h2 style="font-size: 20px; font-weight: 600; color: #0f172a; margin: 0 0 16px;">
+              ${actor?.name ?? 'A collaborator'} shared an item with you
+            </h2>
+            <p style="font-size: 14px; color: #334155; line-height: 1.6; margin: 0 0 20px;">
+              <strong>${actor?.name ?? 'Someone'}</strong> (${actor?.email}) invited you to collaborate on <strong>"${info.name}"</strong> as an <strong>${roleDisplay}</strong>.
+            </p>
+            ${input.message ? `<div style="background: #f8fafc; border-left: 4px solid #3b82f6; padding: 12px 16px; margin-bottom: 24px; border-radius: 0 8px 8px 0; font-size: 14px; color: #475569; font-style: italic;">"${input.message}"</div>` : ''}
+            <div style="margin: 28px 0;">
+              <a href="${itemUrl}" style="display: inline-block; background: #1a56db; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 12px 24px; border-radius: 8px; box-shadow: 0 2px 4px rgba(26, 86, 219, 0.2);">
+                Open ${info.name}
+              </a>
+            </div>
+            <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 28px 0;" />
+            <p style="font-size: 12px; color: #94a3b8; margin: 0;">
+              You received this email because someone shared a document, spreadsheet, or folder with you on QubDocs.
+            </p>
           </div>
-          <h2 style="font-size: 20px; font-weight: 600; color: #0f172a; margin: 0 0 16px;">
-            ${actor?.name ?? 'A collaborator'} shared an item with you
-          </h2>
-          <p style="font-size: 14px; color: #334155; line-height: 1.6; margin: 0 0 20px;">
-            <strong>${actor?.name ?? 'Someone'}</strong> (${actor?.email}) invited you to collaborate on <strong>"${info.name}"</strong> as an <strong>${roleDisplay}</strong>.
-          </p>
-          ${input.message ? `<div style="background: #f8fafc; border-left: 4px solid #3b82f6; padding: 12px 16px; margin-bottom: 24px; border-radius: 0 8px 8px 0; font-size: 14px; color: #475569; font-style: italic;">"${input.message}"</div>` : ''}
-          <div style="margin: 28px 0;">
-            <a href="${url}" style="display: inline-block; background: #1a56db; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 12px 24px; border-radius: 8px; box-shadow: 0 2px 4px rgba(26, 86, 219, 0.2);">
-              Open ${info.name}
-            </a>
-          </div>
-          <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 28px 0;" />
-          <p style="font-size: 12px; color: #94a3b8; margin: 0;">
-            You received this email because someone shared a document, spreadsheet, or folder with you on QubDocs.
-          </p>
-        </div>
-      `;
-      await this.mailer.send({
-        to: input.email,
-        subject: `${actor?.name ?? 'Someone'} shared "${info.name}" with you`,
-        text: `${actor?.name ?? 'Someone'} (${actor?.email}) shared "${info.name}" with you as ${input.role.toLowerCase()}.${input.message ? `\n\n"${input.message}"` : ''}\n\nOpen: ${url}`,
-        html: htmlBody,
-      });
+        `;
+        await this.mailer.send({
+          to: input.email,
+          subject: `${actor?.name ?? 'Someone'} shared "${info.name}" with you`,
+          text: `${actor?.name ?? 'Someone'} (${actor?.email}) shared "${info.name}" with you as ${input.role.toLowerCase()}.${input.message ? `\n\n"${input.message}"` : ''}\n\nOpen: ${itemUrl}`,
+          html: htmlBody,
+        });
+      } catch (err) {
+        // Mail delivery failure must never break sharing permissions
+      }
     }
     return this.getState(userId, ref);
   }

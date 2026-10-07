@@ -18,7 +18,8 @@ const HOME_PATHS: Record<NativeFileType, string> = { DOCUMENT: '/docs', SPREADSH
  * blockers allow it.
  */
 export function openAppHome(type: NativeFileType, folderId?: string) {
-  const url = new URL(HOME_PATHS[type], window.location.origin);
+  const base = window.location.pathname.startsWith('/qubsuite') ? '/qubsuite' : '';
+  const url = new URL(base + HOME_PATHS[type], window.location.origin);
   if (folderId) url.searchParams.set('folder', folderId);
   window.open(url.href, '_blank', 'noopener');
 }

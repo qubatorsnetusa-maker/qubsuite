@@ -222,8 +222,16 @@ function GeneralAccess({ state, target, onChange, canManage }: { state: SharingS
   const roleAllowed = (r: GrantableRole) => ROLE_RANK[r] <= ROLE_RANK[maxLinkRole];
 
   const copy = async () => {
-    const url = state.link?.url;
+    let url = state.link?.url;
     if (!url) return;
+    try {
+      const parsed = new URL(url);
+      const token = parsed.pathname.split('/share/')[1] || state.link?.token;
+      const basePath = window.location.pathname.startsWith('/qubsuite') ? '/qubsuite' : '';
+      url = window.location.origin + basePath + '/share/' + (token || '');
+    } catch {
+      // fallback to original url if parsing fails
+    }
     await navigator.clipboard.writeText(url);
     toast.success('Link copied');
   };
