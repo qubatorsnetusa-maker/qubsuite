@@ -1,3 +1,4 @@
+import { checkContentSafety, lookupDictionary } from '../../services/ai-rag-truth';
 ﻿import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -91,16 +92,59 @@ export async function aiRoutes(app: FastifyInstance) {
     },
     async (req, reply) => {
       requireAuth(req);
+      const prompt = (req.body.instruction || req.body.text || '').trim();
+      const safetyCheck = checkContentSafety(prompt);
+      if (!safetyCheck.safe) {
+        if (safetyCheck.reason === 'suicide') {
+          return {
+            success: true,
+            data: {
+              result: '<p>If you or someone you know is going through distress or thoughts of self-harm, please know that your life is precious and sacred. Please reach out immediately to pastoral support, a trusted loved one, or call/text your local emergency crisis lifeline (such as 988 in the US/Canada). Every human life is created by God with divine purpose.</p>',
+            },
+          };
+        }
+        return {
+          success: true,
+          data: {
+            result: '<p>I cannot fulfill requests that involve pornographic, sexually explicit, or adult entertainment themes. Content must adhere to biblical and organizational purity standards.</p>',
+          },
+        };
+      }
+
+      // Check dictionary definitions as PRIMARY source first
+      const dictHits = lookupDictionary(prompt);
+      const isDefQuery = dictHits.length > 0 && (/^(?:define|what is|meaning of)/i.test(prompt) || prompt.split(' ').length <= 4);
+      if (isDefQuery) {
+        const top = dictHits[0];
+        let html = `<p><strong>${top.term}</strong>: ${top.def}</p>`;
+        if (dictHits.length > 1) {
+          html += '<p><strong>Related entries:</strong></p><ul>';
+          for (const d of dictHits.slice(1, 4)) {
+            html += `<li><strong>${d.term}</strong>: ${d.def}</li>`;
+          }
+          html += '</ul>';
+        }
+        return { success: true, data: { result: html } };
+      }
+
       try {
         const res = await ai.documentAssist(req.body);
         return { success: true, data: res };
       } catch (err: any) {
         req.log.warn({ err }, 'AI doc assist fallback triggered');
-        const prompt = (req.body.instruction || req.body.text || '').trim();
+        if (dictHits.length > 0) {
+          const top = dictHits[0];
+          return {
+            success: true,
+            data: {
+              result: `<p><strong>${top.term}</strong>: ${top.def}</p>`,
+            },
+          };
+        }
         return {
           success: true,
           data: {
-            result: `<p><strong>Overview:</strong> ${prompt}</p><p>Artificial intelligence models running on-device provide enhanced privacy, zero-latency inference, and offline availability without sending sensitive telemetry to central cloud infrastructure.</p><ul><li><strong>Ultra-Low Latency:</strong> Executes real-time tasks locally without network overhead.</li><li><strong>Enterprise Privacy:</strong> Eliminates third-party data transmission risks.</li><li><strong>Offline Resilience:</strong> Functions seamlessly without internet connectivity.</li></ul>`,
+            result: `<p><strong>${prompt}</strong></p><p>Loveworld Exceptionalism is the foundational ideology and conviction that the ministry has been called uniquely with a divine and definite message for the world and the church of Christ, excelling in doctrine, music, arts, and innovation.</p>`,
           },
         };
       }

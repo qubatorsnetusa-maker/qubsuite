@@ -1,3 +1,4 @@
+import { UNDERLYING_TRUTH_RAG, checkContentSafety, lookupDictionary } from './ai-rag-truth';
 import type { FastifyBaseLogger } from 'fastify';
 import type { Env } from '../config/env';
 
@@ -191,8 +192,54 @@ export class AIService {
    * Generate or assist document writing (Docs).
    */
   async documentAssist(input: DocumentAssistInput): Promise<{ result: string }> {
+    const promptText = (input.instruction || input.text || '').trim();
+
+    // Safety guardrails: Suicide and Pornography filters
+    const safetyCheck = checkContentSafety(promptText);
+    if (!safetyCheck.safe) {
+      if (safetyCheck.reason === 'suicide') {
+        return {
+          result: '<p>If you or someone you know is going through distress or thoughts of self-harm, please know that your life is precious and sacred. Please reach out immediately to a trusted pastor, counselor, or call/text your local crisis helpline (such as 988 in the US/Canada or your national emergency services) for compassionate support and care.</p>',
+        };
+      }
+      return {
+        result: '<p>I cannot fulfill requests that involve pornographic, sexually explicit, or inappropriate adult content. In accordance with biblical and organizational purity standards, our AI assistance is restricted to wholesome, professional, and constructive content.</p>',
+      };
+    }
+
+    // PRIMARY SOURCE LOOKUP: Check Pastor Chris Dictionary first for term definitions
+    const dictEntries = lookupDictionary(promptText);
+    const isDefinitionQuery =
+      dictEntries.length > 0 &&
+      (/(?:define|meaning|what is|explanation of|who is|significance of)/i.test(promptText) ||
+        promptText.split(' ').length <= 4);
+
+    if (isDefinitionQuery && dictEntries.length > 0) {
+      const primary = dictEntries[0];
+      let defHtml = `<div style="margin-bottom:1em;"><p><strong>${primary.term}</strong>: ${primary.def}</p></div>`;
+      if (dictEntries.length > 1) {
+        defHtml += '<p><strong>Related definitions:</strong></p><ul>';
+        for (const entry of dictEntries.slice(1, 4)) {
+          defHtml += `<li><strong>${entry.term}</strong>: ${entry.def}</li>`;
+        }
+        defHtml += '</ul>';
+      }
+      // If user specifically wanted just definition, return dictionary match directly as primary source
+      if (/^(?:define|what is|meaning of)/i.test(promptText) || promptText.split(' ').length <= 3) {
+        return { result: defHtml };
+      }
+    }
     const tone = input.tone ?? 'professional';
     let systemPrompt = `You are an expert co-author and editor in an enterprise document suite. Maintain an ${tone} tone.
+
+UNDERLYING TRUTH & THEOLOGICAL/PHILOSOPHICAL ANCHOR:
+${UNDERLYING_TRUTH_RAG}
+
+CRITICAL INSTRUCTIONS:
+- You must always align with and uphold the underlying truth and doctrinal foundation above.
+- Never produce pornographic, sexually explicit, or suicide/self-harm content.
+- For definitions and terms, prioritize the biblical, doctrinal, and ministry definitions established in the underlying truth and Pastor Chris teachings.
+
 FORMATTING RULES:
 1. If the user asks for a table, list, or formatted structure, respond using clean semantic HTML (<table>, <thead>, <tbody>, <tr>, <th>, <td>, <p>, <ul>, <ol>, <li>).
 2. Never output markdown asterisks (**bold** or *italic*), markdown tables with pipes (|---|), or markdown hashtags (#). Use <strong>, <em>, or headings.
@@ -238,7 +285,14 @@ FORMATTING RULES:
       max_tokens: 2048,
     });
 
-    return { result: this.extractText(result) };
+    const extracted = this.extractText(result);
+    const outputSafety = checkContentSafety(extracted);
+    if (!outputSafety.safe) {
+      return {
+        result: '<p>The requested output was restricted in accordance with content safety and purity standards.</p>',
+      };
+    }
+    return { result: extracted };
   }
 
   /**
@@ -324,6 +378,14 @@ FORMATTING RULES:
    * Prompt to Form Schema (Forms).
    */
   async generateForm(input: FormGenInput): Promise<{ title: string; description: string; fields: any[] }> {
+    const safetyCheck = checkContentSafety(input.prompt);
+    if (!safetyCheck.safe) {
+      return {
+        title: 'Safety Restriction',
+        description: 'Form generation request contains restricted or sensitive themes (pornography or self-harm) and cannot be processed.',
+        fields: [{ label: 'Notice', type: 'text', required: false }],
+      };
+    }
     const count = input.fieldCount || 5;
     const systemPrompt = `You are a form generation assistant. Given a prompt, create a schema with exactly ${count} questions.
 Respond strictly in JSON format matching this structure:

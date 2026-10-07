@@ -1,3 +1,4 @@
+import { AIService } from './ai.service';
 import type { FastifyInstance } from 'fastify';
 import type { Env } from '../config/env';
 import type { Database } from '../db';
@@ -78,6 +79,7 @@ export function createServices(app: FastifyInstance, env: Env, db: Database, ove
   const publicShare = new PublicShareService(app, db, permissions, sheets, activity, policies);
   const adminUsers = new AdminUserService(db, auth, audit, activity, policies, storage, natives, notifications);
   const adminInsights = new AdminInsightsService(db, env, policies, audit, activity, adminUsers);
+  const ai = new AIService(env, log);
 
   const realtime = {
     docs: new DocRoomHub(docs, permissions, log),
@@ -125,6 +127,7 @@ export function createServices(app: FastifyInstance, env: Env, db: Database, ove
     ops,
     responses,
     realtime,
+    ai,
     async shutdown() {
       await realtime.docs.closeAll();
       realtime.sheets.closeAll();
