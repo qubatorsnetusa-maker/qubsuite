@@ -297,7 +297,7 @@ export class SharingService {
             </p>
           </div>
         `;
-        await this.mailer.send({
+        void this.mailer.send({
           to: input.email,
           subject: `${actor?.name ?? 'Someone'} shared "${info.name}" with you`,
           text: `${actor?.name ?? 'Someone'} (${actor?.email}) shared "${info.name}" with you as ${input.role.toLowerCase()}.${input.message ? `\n\n"${input.message}"` : ''}\n\nOpen: ${itemUrl}`,
