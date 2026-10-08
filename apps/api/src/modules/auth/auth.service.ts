@@ -200,6 +200,132 @@ ${link}`,
     return row?.user;
   }
 
+  /**
+   * Sends a magic link via Neon Managed Better Auth.
+   */
+  async sendMagicLink(email: string, callbackUrl?: string): Promise<{ success: boolean; message: string }> {
+    const neonAuthUrl = this.env.NEON_AUTH_BASE_URL || 'https://ep-small-unit-b1bvawbw.neonauth.c-5.eu-central-1.aws.neon.tech/qubsuite/auth';
+    const targetCallback = callbackUrl || `${this.env.APP_URL}/auth/callback`;
+    try {
+      const res = await fetch(`${neonAuthUrl}/sign-in/magic-link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, callbackURL: targetCallback }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { message?: string };
+        throw new AppError('BAD_REQUEST', data.message || 'Failed to send magic link. Please check the email.');
+      }
+      return { success: true, message: 'Magic link sent! Please check your email inbox.' };
+    } catch (err) {
+      if (err instanceof AppError) throw err;
+      throw new AppError('BAD_REQUEST', (err as Error).message || 'Failed to send magic link.');
+    }
+  }
+
+  /**
+   * Completes sign-in with Neon Managed Better Auth.
+   * Verifies the session from neon_auth.session in Postgres, provisions or resolves
+   * the user in public.users, and issues the official QubDocs session.
+   */
+  async neonAuthSignIn(
+    input: { sessionToken?: string; email?: string; name?: string; neonUserId?: string },
+    ctx: ClientContext,
+  ): Promise<IssuedSession> {
+    let verifiedEmail: string | null = null;
+    let verifiedName: string | null = null;
+    let verifiedNeonUserId: string | null = null;
+
+    if (input.sessionToken) {
+      const rows = (await this.db.execute(sql`
+        SELECT s.id, s.token, s."expiresAt", u.id as "neonUserId", u.email, u.name
+        FROM neon_auth.session s
+        JOIN neon_auth.user u ON u.id = s."userId"
+        WHERE s.token = ${input.sessionToken} AND s."expiresAt" > now()
+        LIMIT 1
+      `)) as unknown as { id: string; token: string; neonUserId: string; email: string; name: string | null }[];
+
+      if (rows && rows.length > 0) {
+        verifiedEmail = rows[0].email;
+        verifiedName = rows[0].name;
+        verifiedNeonUserId = rows[0].neonUserId;
+      }
+    }
+
+    if (!verifiedEmail && input.email) {
+      const rows = (await this.db.execute(sql`
+        SELECT s.id, s.token, s."expiresAt", u.id as "neonUserId", u.email, u.name
+        FROM neon_auth.session s
+        JOIN neon_auth.user u ON u.id = s."userId"
+        WHERE lower(u.email) = lower(${input.email}) AND s."createdAt" > now() - interval '5 minutes' AND s."expiresAt" > now()
+        ORDER BY s."createdAt" DESC
+        LIMIT 1
+      `)) as unknown as { id: string; token: string; neonUserId: string; email: string; name: string | null }[];
+
+      if (rows && rows.length > 0) {
+        verifiedEmail = rows[0].email;
+        verifiedName = rows[0].name;
+        verifiedNeonUserId = rows[0].neonUserId;
+      }
+    }
+
+    if (!verifiedEmail) {
+      throw new AppError('UNAUTHENTICATED', 'No active Neon Auth session found. Please request a new magic link.');
+    }
+
+    let user = await UserRepository.findByEmail(this.db, verifiedEmail);
+    if (!user) {
+      user = await this.provisionUser(this.db, {
+        email: verifiedEmail,
+        name: (verifiedName || input.name || verifiedEmail.split('@')[0]).slice(0, 100),
+        passwordHash: null,
+        emailVerified: true,
+      });
+    } else if (!user.emailVerified) {
+      await UserRepository.update(this.db, user.id, { emailVerified: true });
+    }
+
+    if (verifiedNeonUserId) {
+      await this.db
+        .insert(userIdentities)
+        .values({
+          userId: user.id,
+          provider: 'neon_auth',
+          providerUserId: verifiedNeonUserId,
+          email: verifiedEmail,
+          lastLoginAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: [userIdentities.provider, userIdentities.providerUserId],
+          set: { email: verifiedEmail, lastLoginAt: new Date() },
+        })
+        .catch(() => {});
+    }
+
+    if (user.status !== 'ACTIVE') throw new AppError('FORBIDDEN', 'This account is not active.');
+    const now = new Date();
+    await UserRepository.update(this.db, user.id, { lastLoginAt: now });
+    await this.audit.log({ ...ctx, actorId: user.id }, 'auth.login', { type: 'user', id: user.id }, { method: 'neon_magic_link' });
+    return this.issueSession({ ...user, lastLoginAt: now }, ctx);
+  }
+
+  /**
+   * Polls for a recently completed magic link verification for an email address.
+   */
+  async pollMagicLink(email: string, since: Date, ctx: ClientContext): Promise<IssuedSession | null> {
+    const rows = (await this.db.execute(sql`
+      SELECT s.id, s.token, s."expiresAt", u.id as "neonUserId", u.email, u.name
+      FROM neon_auth.session s
+      JOIN neon_auth.user u ON u.id = s."userId"
+      WHERE lower(u.email) = lower(${email}) AND s."createdAt" >= ${since} AND s."expiresAt" > now()
+      ORDER BY s."createdAt" DESC
+      LIMIT 1
+    `)) as unknown as { id: string; token: string; neonUserId: string; email: string; name: string | null }[];
+
+    if (!rows || !rows.length) return null;
+    return this.neonAuthSignIn({ sessionToken: rows[0].token, email: rows[0].email }, ctx);
+  }
+
   private async resolveKingsChatUser(tx: Executor, profile: KingsChatProfile, ctx: ClientContext): Promise<UserRow> {
     const seen = { username: profile.username, email: profile.email, lastLoginAt: new Date() };
     const known = await this.findKingsChatUser(tx, profile.userId);

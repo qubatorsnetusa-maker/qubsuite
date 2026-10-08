@@ -63,52 +63,204 @@ function safeRedirect(target: string | undefined): string {
 export function LoginPage() {
   const search = useSearch({ from: '/login' });
   const navigate = useNavigate();
-  const form = useForm<LoginInput>({ resolver: zodResolver(loginSchema), defaultValues: { email: search.email ?? '', password: '' } });
-  const login = useMutation({ mutationFn: authService.login, meta: { silent: true } });
-
+  const [email, setEmail] = useState(search.email ?? '');
+  const [sentEmail, setSentEmail] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(search.error ? `Sign-in error: ${search.error}` : null);
   const [kcError, setKcError] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [verifying, setVerifying] = useState(search.callback === '1');
 
-  const onSubmit = form.handleSubmit(async (values) => {
-    await login.mutateAsync(values);
-    await navigate({ href: safeRedirect(search.redirect), replace: true });
-  });
+  // Handle redirect callback from Neon Auth magic link email verification
+  useEffect(() => {
+    if (search.callback !== '1') return;
+
+    let active = true;
+    async function resolveCallback() {
+      try {
+        let sessionToken: string | undefined = undefined;
+        let neonEmail: string | undefined = search.email;
+        let neonName: string | undefined = undefined;
+        let neonUserId: string | undefined = undefined;
+
+        try {
+          const NEON_AUTH_URL = 'https://ep-small-unit-b1bvawbw.neonauth.c-5.eu-central-1.aws.neon.tech/qubsuite/auth';
+          const res = await fetch(`${NEON_AUTH_URL}/get-session`, {
+            credentials: 'include',
+            headers: { Accept: 'application/json' },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.session?.token) {
+              sessionToken = data.session.token;
+              neonEmail = data.user?.email || neonEmail;
+              neonName = data.user?.name;
+              neonUserId = data.user?.id;
+            }
+          }
+        } catch {
+          // Fallback to database lookup
+        }
+
+        await authService.neonSession({
+          sessionToken,
+          email: neonEmail,
+          name: neonName,
+          neonUserId,
+        });
+
+        if (!active) return;
+        void navigate({ href: safeRedirect(search.redirect), replace: true });
+      } catch (err: any) {
+        if (!active) return;
+        setVerifying(false);
+        setError(errorMessage(err) || 'Sign-in link expired or invalid. Please request a new one.');
+      }
+    }
+
+    void resolveCallback();
+    return () => {
+      active = false;
+    };
+  }, [search, navigate]);
+
+  // Background polling: if the user clicks the magic link on their phone or another tab,
+  // this active login tab will automatically detect it and log in!
+  useEffect(() => {
+    if (!sentEmail || verifying) return;
+    const since = new Date().toISOString();
+    const interval = setInterval(async () => {
+      try {
+        const res = await authService.pollMagicLink(sentEmail, since);
+        if (res.authenticated) {
+          clearInterval(interval);
+          void navigate({ href: safeRedirect(search.redirect), replace: true });
+        }
+      } catch {
+        // ignore poll errors
+      }
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [sentEmail, verifying, search.redirect, navigate]);
+
+  // Resend cooldown timer
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
+
+  const handleSendLink = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed || !trimmed.includes('@')) {
+      setError('Please enter a valid email address');
+      return;
+    }
+    setError(null);
+    setLoading(true);
+    try {
+      const callbackUrl = `${window.location.origin}/login?callback=1${search.redirect ? `&redirect=${encodeURIComponent(search.redirect)}` : ''}`;
+      await authService.sendMagicLink(trimmed, callbackUrl);
+      setSentEmail(trimmed);
+      setResendCooldown(30);
+    } catch (err: any) {
+      setError(errorMessage(err) || 'Failed to send magic link. Please check your email.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (verifying) {
+    return (
+      <AuthCard title="Signing you in..." subtitle="Verifying your magic link with QubDocs">
+        <div className="flex flex-col items-center justify-center py-8">
+          <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <p className="mt-4 text-xs text-muted">Just a moment while we set up your session...</p>
+        </div>
+      </AuthCard>
+    );
+  }
+
+  if (sentEmail) {
+    return (
+      <AuthCard
+        title="Check your email"
+        subtitle={<>We sent a magic sign-in link to <strong className="text-foreground">{sentEmail}</strong>.</>}
+        footer={
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => { setSentEmail(null); setError(null); }}
+              className="text-sm font-medium text-primary hover:underline"
+            >
+              Use a different email
+            </button>
+          </div>
+        }
+      >
+        <div className="flex flex-col items-center justify-center py-6 text-center">
+          <div className="flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <MailCheck className="size-8" />
+          </div>
+          <p className="mt-4 text-sm text-muted">
+            Click the link in the email to sign in instantly. You can close this page, or keep it open to sign in automatically once verified.
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <Button
+            variant="outline"
+            size="lg"
+            className="w-full"
+            disabled={resendCooldown > 0 || loading}
+            onClick={() => void handleSendLink()}
+          >
+            {resendCooldown > 0 ? `Resend link in ${resendCooldown}s` : 'Resend magic link'}
+          </Button>
+        </div>
+      </AuthCard>
+    );
+  }
 
   return (
     <AuthCard
       title="Sign in"
-      subtitle="to continue to Qub"
+      subtitle="Sign in passwordlessly to continue to QubDocs"
       footer={
         <>
-          New to Qub?{' '}
+          New to QubDocs?{' '}
           <Link to="/register" search={{ redirect: search.redirect }} className="font-medium text-primary hover:underline">
             Create an account
           </Link>
         </>
       }
     >
-      <FormError error={login.error || kcError} />
+      <FormError error={error || kcError} />
       <KingsChatButton
         onSignedIn={() => void navigate({ href: safeRedirect(search.redirect), replace: true })}
         onError={setKcError}
       />
-      <form onSubmit={onSubmit} noValidate className="space-y-5">
+      <form onSubmit={handleSendLink} noValidate className="space-y-5">
         <div>
           <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" autoComplete="email" autoFocus className="mt-1.5" invalid={!!form.formState.errors.email} aria-describedby="email-error" {...form.register('email')} />
-          <FieldError id="email-error" message={form.formState.errors.email?.message} />
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            autoFocus
+            className="mt-1.5"
+            placeholder="name@example.com"
+            value={email}
+            onChange={(e) => { setEmail(e.target.value); setError(null); }}
+            invalid={!!error}
+          />
+          <p className="mt-1.5 text-xs text-muted">
+            We will email you a secure magic link for 1-click passwordless sign in.
+          </p>
         </div>
-        <div>
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
-            <Link to="/forgot-password" className="text-[13px] font-medium text-primary hover:underline">
-              Forgot password?
-            </Link>
-          </div>
-          <Input id="password" type="password" autoComplete="current-password" className="mt-1.5" invalid={!!form.formState.errors.password} aria-describedby="password-error" {...form.register('password')} />
-          <FieldError id="password-error" message={form.formState.errors.password?.message} />
-        </div>
-        <Button type="submit" size="lg" className="w-full" loading={form.formState.isSubmitting}>
-          Sign in
+        <Button type="submit" size="lg" className="w-full" loading={loading}>
+          Send Magic Link
         </Button>
       </form>
     </AuthCard>
@@ -118,38 +270,62 @@ export function LoginPage() {
 export function RegisterPage() {
   const search = useSearch({ from: '/register' });
   const navigate = useNavigate();
-  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [email, setEmail] = useState(search.email ?? '');
+  const [name, setName] = useState('');
+  const [sentEmail, setSentEmail] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [kcError, setKcError] = useState<string | null>(null);
-  const form = useForm<RegisterInput>({ resolver: zodResolver(registerSchema), defaultValues: { name: '', email: search.email ?? '', password: '' } });
-  const register = useMutation({ mutationFn: authService.register, meta: { silent: true } });
 
-  const onSubmit = form.handleSubmit(async (values) => {
-    try {
-      const result = await register.mutateAsync(values);
-      if ('requiresVerification' in result) setPendingEmail(result.email);
-      else await navigate({ href: safeRedirect(search.redirect), replace: true });
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 409) form.setError('email', { message: err.message });
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed || !trimmed.includes('@')) {
+      setError('Please enter a valid email address');
+      return;
     }
-  });
+    setError(null);
+    setLoading(true);
+    try {
+      const callbackUrl = `${window.location.origin}/auth/callback${search.redirect ? `?redirect=${encodeURIComponent(search.redirect)}` : ''}`;
+      await authService.sendMagicLink(trimmed, callbackUrl);
+      setSentEmail(trimmed);
+    } catch (err: any) {
+      setError(errorMessage(err) || 'Failed to send magic link.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  if (pendingEmail) {
+  if (sentEmail) {
     return (
-      <AuthCard title="Check your email" subtitle={<>We sent a verification link to <b>{pendingEmail}</b>.</>}>
-        <div className="flex justify-center py-6 text-primary">
-          <MailCheck className="size-16" />
+      <AuthCard
+        title="Check your email"
+        subtitle={<>We sent a magic sign-up link to <strong className="text-foreground">{sentEmail}</strong>.</>}
+        footer={
+          <div className="text-center">
+            <Link to="/login" className="text-sm font-medium text-primary hover:underline">
+              Back to sign in
+            </Link>
+          </div>
+        }
+      >
+        <div className="flex flex-col items-center justify-center py-6 text-center">
+          <div className="flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <MailCheck className="size-8" />
+          </div>
+          <p className="mt-4 text-sm text-muted">
+            Click the link in the email to activate your account and start using QubDocs.
+          </p>
         </div>
-        <Button asChild variant="outline" className="w-full">
-          <Link to="/login">Back to sign in</Link>
-        </Button>
       </AuthCard>
     );
   }
 
   return (
     <AuthCard
-      title="Create your Qub account"
-      subtitle="One account for Drive, Docs, Sheets and Forms"
+      title="Create your account"
+      subtitle="Passwordless access to Drive, Docs, Sheets, and Forms"
       footer={
         <>
           Already have an account?{' '}
@@ -159,34 +335,38 @@ export function RegisterPage() {
         </>
       }
     >
-      <FormError error={(register.error && !(register.error instanceof ApiError && register.error.status === 409) ? register.error : null) || kcError} />
+      <FormError error={error || kcError} />
       <KingsChatButton
         onSignedIn={() => void navigate({ href: safeRedirect(search.redirect), replace: true })}
         onError={setKcError}
       />
-      <form onSubmit={onSubmit} noValidate className="space-y-5">
+      <form onSubmit={handleRegister} noValidate className="space-y-5">
         <div>
-          <Label htmlFor="name">Full name</Label>
-          <Input id="name" autoComplete="name" autoFocus className="mt-1.5" invalid={!!form.formState.errors.name} {...form.register('name')} />
-          <FieldError message={form.formState.errors.name?.message} />
+          <Label htmlFor="name">Full name (optional)</Label>
+          <Input
+            id="name"
+            autoComplete="name"
+            className="mt-1.5"
+            placeholder="Your name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
         </div>
         <div>
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" autoComplete="email" className="mt-1.5" invalid={!!form.formState.errors.email} {...form.register('email')} />
-          <FieldError message={form.formState.errors.email?.message} />
+          <Label htmlFor="email">Email address</Label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            className="mt-1.5"
+            placeholder="name@example.com"
+            value={email}
+            onChange={(e) => { setEmail(e.target.value); setError(null); }}
+            invalid={!!error}
+          />
         </div>
-        <div>
-          <Label htmlFor="password">Password</Label>
-          <Input id="password" type="password" autoComplete="new-password" className="mt-1.5" invalid={!!form.formState.errors.password} aria-describedby="password-hint" {...form.register('password')} />
-          <FieldError message={form.formState.errors.password?.message} />
-          {!form.formState.errors.password && (
-            <p id="password-hint" className="mt-1 text-[13px] text-muted">
-              At least 8 characters, with a letter and a number.
-            </p>
-          )}
-        </div>
-        <Button type="submit" size="lg" className="w-full" loading={form.formState.isSubmitting}>
-          Create account
+        <Button type="submit" size="lg" className="w-full" loading={loading}>
+          Create account with Magic Link
         </Button>
       </form>
     </AuthCard>
@@ -194,35 +374,32 @@ export function RegisterPage() {
 }
 
 export function ForgotPasswordPage() {
-  const form = useForm<{ email: string }>({ resolver: zodResolver(forgotPasswordSchema), defaultValues: { email: '' } });
-  const mutation = useMutation({ mutationFn: (email: string) => authService.forgotPassword(email), meta: { silent: true } });
+  const navigate = useNavigate();
   return (
-    <AuthCard title="Reset your password" subtitle="Enter your email and we’ll send you a reset link." footer={<Link to="/login" className="font-medium text-primary hover:underline">Back to sign in</Link>}>
-      {mutation.isSuccess ? (
-        <div className="flex items-start gap-3 rounded-lg bg-[#e6f4ea] p-4 text-sm text-success" role="status">
-          <CheckCircle2 className="mt-0.5 size-5 shrink-0" />
-          {mutation.data.message}
-        </div>
-      ) : (
-        <form onSubmit={form.handleSubmit((v) => mutation.mutateAsync(v.email))} noValidate className="space-y-5">
-          <FormError error={mutation.error} />
-          <div>
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" autoComplete="email" autoFocus className="mt-1.5" invalid={!!form.formState.errors.email} {...form.register('email')} />
-            <FieldError message={form.formState.errors.email?.message} />
-          </div>
-          <Button type="submit" size="lg" className="w-full" loading={mutation.isPending}>
-            Send reset link
-          </Button>
-        </form>
-      )}
+    <AuthCard
+      title="Passwordless Sign In"
+      subtitle="QubDocs uses secure magic links instead of passwords."
+      footer={
+        <Link to="/login" className="font-medium text-primary hover:underline">
+          Back to sign in
+        </Link>
+      }
+    >
+      <p className="text-sm text-muted">
+        You do not need a password to access your account! Simply enter your email address on the sign-in page, and we will send you a 1-click magic link.
+      </p>
+      <div className="mt-6">
+        <Button className="w-full" size="lg" onClick={() => void navigate({ to: '/login' })}>
+          Go to Sign In
+        </Button>
+      </div>
     </AuthCard>
   );
 }
 
 const resetFormSchema = z
   .object({ password: passwordSchema, confirm: z.string() })
-  .refine((v) => v.password === v.confirm, { message: 'Passwords don’t match', path: ['confirm'] });
+  .refine((d) => d.password === d.confirm, { message: 'Passwords must match', path: ['confirm'] });
 
 export function ResetPasswordPage() {
   const { token } = useSearch({ from: '/reset-password' });

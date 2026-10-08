@@ -4,6 +4,7 @@ import type {
   ChangePasswordInput,
   CurrentUser,
   LoginInput,
+  NeonSessionInput,
   RegisterInput,
   SessionInfo,
   UpdateProfileInput,
@@ -12,6 +13,35 @@ import { api, uploadFile } from '@/lib/api';
 import { authStore } from '@/lib/auth-store';
 
 export const authService = {
+  async sendMagicLink(email: string, callbackUrl?: string) {
+    return api<{ success: boolean; message: string }>('/auth/magic-link', {
+      method: 'POST',
+      body: { email, callbackUrl },
+      anonymous: true,
+    });
+  },
+
+  async neonSession(input: NeonSessionInput) {
+    const result = await api<AuthResult>('/auth/neon-session', {
+      method: 'POST',
+      body: input,
+      anonymous: true,
+    });
+    authStore.setSession(result);
+    return result;
+  },
+
+  async pollMagicLink(email: string, since?: string) {
+    const result = await api<{ authenticated: boolean; session?: AuthResult }>('/auth/magic-link-poll', {
+      method: 'GET',
+      query: { email, since },
+      anonymous: true,
+    });
+    if (result.authenticated && result.session) {
+      authStore.setSession(result.session);
+    }
+    return result;
+  },
   async login(input: LoginInput) {
     const result = await api<AuthResult>('/auth/login', { method: 'POST', body: input, anonymous: true });
     authStore.setSession(result);

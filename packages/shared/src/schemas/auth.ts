@@ -59,3 +59,17 @@ export const addEmailSchema = z.object({
   email: emailSchema,
 });
 export type AddEmailInput = z.infer<typeof addEmailSchema>;
+
+export const magicLinkSchema = z.object({
+  email: emailSchema,
+  callbackUrl: z.string().optional(),
+});
+export type MagicLinkInput = z.infer<typeof magicLinkSchema>;
+
+export const neonSessionSchema = z.object({
+  sessionToken: z.string().optional(),
+  email: emailSchema.optional(),
+  name: z.string().optional(),
+  neonUserId: z.string().optional(),
+});
+export type NeonSessionInput = z.infer<typeof neonSessionSchema>;

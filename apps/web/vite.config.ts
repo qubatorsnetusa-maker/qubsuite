@@ -28,6 +28,13 @@ export default defineConfig({
     sourcemap: true,
     // The editor (Tiptap/Yjs) and chart chunks are large but only load on the routes that need them.
     chunkSizeWarningLimit: 800,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) return 'vendor';
+        },
+      },
+    },
   },
   test: {
     environment: 'jsdom',

@@ -1,5 +1,7 @@
 import {
   addEmailSchema,
+  magicLinkSchema,
+  neonSessionSchema,
   changePasswordSchema,
   forgotPasswordSchema,
   kingschatLoginSchema,
@@ -97,6 +99,33 @@ export async function authRoutes(app: FastifyInstance) {
     const session = await auth.kingschatSignIn(request.body.accessToken, client(request));
     setSessionCookies(reply, session);
     return ok(publicSession(session));
+  });
+
+  r.post('/magic-link', { config: authLimit, schema: { body: magicLinkSchema } }, async (request) => {
+    const result = await auth.sendMagicLink(request.body.email, request.body.callbackUrl);
+    return ok(result);
+  });
+
+  r.post('/neon-session', { config: authLimit, schema: { body: neonSessionSchema } }, async (request, reply) => {
+    const session = await auth.neonAuthSignIn(request.body, client(request));
+    setSessionCookies(reply, session);
+    return ok(publicSession(session));
+  });
+
+  r.get('/magic-link-poll', {
+    config: authLimit,
+    schema: {
+      querystring: z.object({
+        email: z.string().email(),
+        since: z.string().optional(),
+      }),
+    },
+  }, async (request, reply) => {
+    const sinceDate = request.query.since ? new Date(request.query.since) : new Date(Date.now() - 3 * 60_000);
+    const session = await auth.pollMagicLink(request.query.email, sinceDate, client(request));
+    if (!session) return ok({ authenticated: false });
+    setSessionCookies(reply, session);
+    return ok({ authenticated: true, session: publicSession(session) });
   });
 
   r.post('/refresh', { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (request, reply) => {

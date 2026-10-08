@@ -67,7 +67,8 @@ const envSchema = z
     RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(600),
     AUTH_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(20),
 
-        KINGSCHAT_CLIENT_ID: z.string().min(1).optional(),
+        NEON_AUTH_BASE_URL: z.string().url().default('https://ep-small-unit-b1bvawbw.neonauth.c-5.eu-central-1.aws.neon.tech/qubsuite/auth'),
+    KINGSCHAT_CLIENT_ID: z.string().min(1).optional(),
     KINGSCHAT_ENV: z.enum(KINGSCHAT_ENVIRONMENTS).default('prod'),
     SERVE_WEB_DIST: z.string().optional(),
 

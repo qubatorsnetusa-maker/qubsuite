@@ -20,6 +20,6 @@ export async function guestOnly() {
   if (s.status === 'authenticated') throw redirect({ to: defaultDestination() as any });
 }
 
-export const redirectSearch = z.object({ redirect: z.string().optional(), email: z.string().optional() });
+export const redirectSearch = z.object({ redirect: z.string().optional(), email: z.string().optional(), callback: z.string().optional(), error: z.string().optional(), token: z.string().optional() });
 
 export const tokenSearch = z.object({ token: z.string().default('') });
