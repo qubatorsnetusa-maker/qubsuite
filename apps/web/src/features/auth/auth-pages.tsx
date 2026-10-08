@@ -165,7 +165,7 @@ export function LoginPage() {
       setSentEmail(trimmed);
       setResendCooldown(30);
     } catch (err: any) {
-      setError(errorMessage(err) || 'Failed to send magic link. Please check your email.');
+      setError(errorMessage(err) || 'Failed to send sign-in link. Please check your email.');
     } finally {
       setLoading(false);
     }
@@ -173,7 +173,7 @@ export function LoginPage() {
 
   if (verifying) {
     return (
-      <AuthCard title="Signing you in..." subtitle="Verifying your magic link with QubDocs">
+      <AuthCard title="Signing you in..." subtitle="Verifying your sign-in with QubDocs">
         <div className="flex flex-col items-center justify-center py-8">
           <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           <p className="mt-4 text-xs text-muted">Just a moment while we set up your session...</p>
@@ -186,7 +186,7 @@ export function LoginPage() {
     return (
       <AuthCard
         title="Check your email"
-        subtitle={<>We sent a magic sign-in link to <strong className="text-foreground">{sentEmail}</strong>.</>}
+        subtitle={<>We sent a sign-in link to <strong className="text-foreground">{sentEmail}</strong>.</>}
         footer={
           <div className="text-center">
             <button
@@ -216,7 +216,7 @@ export function LoginPage() {
             disabled={resendCooldown > 0 || loading}
             onClick={() => void handleSendLink()}
           >
-            {resendCooldown > 0 ? `Resend link in ${resendCooldown}s` : 'Resend magic link'}
+            {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend sign-in link'}
           </Button>
         </div>
       </AuthCard>
@@ -226,7 +226,7 @@ export function LoginPage() {
   return (
     <AuthCard
       title="Sign in"
-      subtitle="Sign in passwordlessly to continue to QubDocs"
+      subtitle="Sign in with your email to continue to QubDocs"
       footer={
         <>
           New to QubDocs?{' '}
@@ -256,11 +256,11 @@ export function LoginPage() {
             invalid={!!error}
           />
           <p className="mt-1.5 text-xs text-muted">
-            We will email you a secure magic link for 1-click passwordless sign in.
+            We'll email you a secure sign-in link. No password required.
           </p>
         </div>
         <Button type="submit" size="lg" className="w-full" loading={loading}>
-          Send Magic Link
+          Send sign-in link
         </Button>
       </form>
     </AuthCard>
@@ -291,7 +291,7 @@ export function RegisterPage() {
       await authService.sendMagicLink(trimmed, callbackUrl);
       setSentEmail(trimmed);
     } catch (err: any) {
-      setError(errorMessage(err) || 'Failed to send magic link.');
+      setError(errorMessage(err) || 'Failed to send sign-in link.');
     } finally {
       setLoading(false);
     }
@@ -301,7 +301,7 @@ export function RegisterPage() {
     return (
       <AuthCard
         title="Check your email"
-        subtitle={<>We sent a magic sign-up link to <strong className="text-foreground">{sentEmail}</strong>.</>}
+        subtitle={<>We sent a sign-up link to <strong className="text-foreground">{sentEmail}</strong>.</>}
         footer={
           <div className="text-center">
             <Link to="/login" className="text-sm font-medium text-primary hover:underline">
@@ -366,7 +366,7 @@ export function RegisterPage() {
           />
         </div>
         <Button type="submit" size="lg" className="w-full" loading={loading}>
-          Create account with Magic Link
+          Create account
         </Button>
       </form>
     </AuthCard>
@@ -378,7 +378,7 @@ export function ForgotPasswordPage() {
   return (
     <AuthCard
       title="Passwordless Sign In"
-      subtitle="QubDocs uses secure magic links instead of passwords."
+      subtitle="QubDocs uses secure sign-in links instead of passwords."
       footer={
         <Link to="/login" className="font-medium text-primary hover:underline">
           Back to sign in
@@ -386,7 +386,7 @@ export function ForgotPasswordPage() {
       }
     >
       <p className="text-sm text-muted">
-        You do not need a password to access your account! Simply enter your email address on the sign-in page, and we will send you a 1-click magic link.
+        You do not need a password to access your account. Simply enter your email address on the sign-in page, and we will send you a secure sign-in link.
       </p>
       <div className="mt-6">
         <Button className="w-full" size="lg" onClick={() => void navigate({ to: '/login' })}>

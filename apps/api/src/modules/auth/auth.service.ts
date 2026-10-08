@@ -8,6 +8,7 @@ import {
   emailVerifications,
   filePermissions,
   fileShares,
+  inviteTokens,
   folderPermissions,
   passwordResetTokens,
   refreshTokens,
@@ -203,6 +204,64 @@ ${link}`,
   /**
    * Sends a magic link via Neon Managed Better Auth.
    */
+  /**
+   * Redeems an invitation link from an email.
+   * Authenticates the user (auto-registering new users with verified email),
+   * claims all pending file/folder collaborator shares, and returns their target document URL.
+   */
+  async redeemInvite(rawToken: string, ctx: ClientContext): Promise<IssuedSession & { targetUrl?: string }> {
+    const tokenHash = this.hash(rawToken);
+    const [row] = await this.db
+      .select()
+      .from(inviteTokens)
+      .where(eq(inviteTokens.tokenHash, tokenHash))
+      .limit(1);
+
+    if (!row) {
+      throw new AppError('BAD_REQUEST', 'This invitation link is invalid or has expired.');
+    }
+
+    if (row.expiresAt.getTime() < Date.now()) {
+      throw new AppError('BAD_REQUEST', 'This invitation link has expired.');
+    }
+
+    if (!row.usedAt) {
+      await this.db
+        .update(inviteTokens)
+        .set({ usedAt: new Date() })
+        .where(eq(inviteTokens.id, row.id));
+    }
+
+    let user = await UserRepository.findByEmail(this.db, row.email);
+    if (!user) {
+      user = await this.db.transaction(async (tx) => {
+        return this.provisionUser(tx, {
+          email: row.email,
+          name: row.email.split('@')[0],
+          passwordHash: null,
+          emailVerified: true,
+        });
+      });
+    } else {
+      await this.db.transaction(async (tx) => {
+        await this.acceptPendingShares(tx, user);
+        if (!user.emailVerified) {
+          await tx.update(users).set({ emailVerified: true }).where(eq(users.id, user.id));
+        }
+      });
+    }
+
+    if (user.status !== 'ACTIVE') {
+      throw new AppError('FORBIDDEN', 'This account is not active.');
+    }
+
+    const now = new Date();
+    await UserRepository.update(this.db, user.id, { lastLoginAt: now });
+    await this.audit.log({ ...ctx, actorId: user.id }, 'auth.invite_redeemed', { type: 'user', id: user.id }, { email: row.email, targetUrl: row.targetUrl });
+    const session = await this.issueSession({ ...user, lastLoginAt: now }, ctx);
+    return { ...session, targetUrl: row.targetUrl };
+  }
+
   async sendMagicLink(email: string, callbackUrl?: string): Promise<{ success: boolean; message: string }> {
     const neonAuthUrl = this.env.NEON_AUTH_BASE_URL || 'https://ep-small-unit-b1bvawbw.neonauth.c-5.eu-central-1.aws.neon.tech/qubsuite/auth';
     const targetCallback = callbackUrl || `${this.env.APP_URL}/auth/callback`;
@@ -214,12 +273,12 @@ ${link}`,
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { message?: string };
-        throw new AppError('BAD_REQUEST', data.message || 'Failed to send magic link. Please check the email.');
+        throw new AppError('BAD_REQUEST', data.message || 'Failed to send sign-in link. Please check the email.');
       }
-      return { success: true, message: 'Magic link sent! Please check your email inbox.' };
+      return { success: true, message: 'Sign-in link sent! Please check your email inbox.' };
     } catch (err) {
       if (err instanceof AppError) throw err;
-      throw new AppError('BAD_REQUEST', (err as Error).message || 'Failed to send magic link.');
+      throw new AppError('BAD_REQUEST', (err as Error).message || 'Failed to send sign-in link.');
     }
   }
 
@@ -270,7 +329,7 @@ ${link}`,
     }
 
     if (!verifiedEmail) {
-      throw new AppError('UNAUTHENTICATED', 'No active Neon Auth session found. Please request a new magic link.');
+      throw new AppError('UNAUTHENTICATED', 'No active session found. Please request a new sign-in link.');
     }
 
     let user = await UserRepository.findByEmail(this.db, verifiedEmail);

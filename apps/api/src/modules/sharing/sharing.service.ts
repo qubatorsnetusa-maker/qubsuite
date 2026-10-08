@@ -12,9 +12,9 @@ import { generalAccessSchema, shareSchema } from '@qub/shared';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { Env } from '../../config/env';
 import type { Database, Executor } from '../../db';
-import { driveFiles, driveFolders, filePermissions, fileShares, folderPermissions, shareLinks } from '../../db/schema';
+import { driveFiles, driveFolders, filePermissions, fileShares, folderPermissions, inviteTokens, shareLinks } from '../../db/schema';
 import type { Mailer } from '../../services/mailer';
-import { hashPassword, randomToken } from '../../utils/crypto';
+import { hashPassword, hmacToken, randomToken } from '../../utils/crypto';
 import { AppError, badRequest, conflict, forbidden, notFound, policyViolation } from '../../utils/errors';
 import type { ActivityService, AuditContext, AuditService } from '../activity/activity.service';
 import type { PolicyService } from '../admin/policy.service';
@@ -45,6 +45,10 @@ interface ResourceInfo {
  * so there is exactly one permission model in the platform.
  */
 export class SharingService {
+  private hash(token: string): string {
+    return hmacToken(token, this.env.JWT_REFRESH_SECRET);
+  }
+
   constructor(
     private readonly db: Database,
     private readonly env: Env,
@@ -272,7 +276,29 @@ export class SharingService {
 
     if (input.notify) {
       try {
-        const itemUrl = `${this.env.APP_URL}${target ? this.linkFor(ref, info, resourceId) : `/register?email=${encodeURIComponent(input.email)}`}`;
+        const relativePath = this.linkFor(ref, info, resourceId);
+        let destinationUrl = `${this.env.APP_URL}${relativePath}`;
+        if (this.env.COOKIE_DOMAIN) {
+          const rootDomain = this.env.COOKIE_DOMAIN.replace(/^\./, '');
+          if (info.fileType === 'SPREADSHEET' && resourceId) destinationUrl = `https://sheet.${rootDomain}/sheets/${resourceId}`;
+          else if (info.fileType === 'DOCUMENT' && resourceId) destinationUrl = `https://docs.${rootDomain}/docs/${resourceId}`;
+          else if (info.fileType === 'FORM' && resourceId) destinationUrl = `https://forms.${rootDomain}/forms/${resourceId}/edit`;
+          else if (ref.type === 'FOLDER') destinationUrl = `https://drive.${rootDomain}/drive/folder/${ref.id}`;
+        }
+
+        // Generate a 1-click access token so clicking the email authenticates them and opens the document immediately
+        const rawToken = randomToken(48);
+        const tokenHash = this.hash(rawToken);
+        const expiresAt = new Date(Date.now() + 30 * 86_400_000); // 30 days valid
+
+        await this.db.insert(inviteTokens).values({
+          email: input.email,
+          tokenHash,
+          targetUrl: destinationUrl,
+          expiresAt,
+        });
+
+        const itemUrl = `${this.env.APP_URL}/invite/${rawToken}`;
         const roleDisplay = input.role.charAt(0).toUpperCase() + input.role.slice(1).toLowerCase();
         const htmlBody = `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 32px 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">

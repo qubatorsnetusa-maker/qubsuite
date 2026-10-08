@@ -25,7 +25,11 @@ function InviteRedeemPage() {
         if (!active) return;
         authStore.setSession(res);
         const target = res.targetUrl || '/drive';
-        void navigate({ href: target });
+        if (target.startsWith('http://') || target.startsWith('https://')) {
+          window.location.replace(target);
+        } else {
+          void navigate({ href: target });
+        }
       } catch (err) {
         if (!active) return;
         setError(errorMessage(err));

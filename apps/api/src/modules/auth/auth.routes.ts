@@ -111,6 +111,17 @@ export async function authRoutes(app: FastifyInstance) {
     setSessionCookies(reply, session);
     return ok(publicSession(session));
   });
+  r.post('/redeem-invite', {
+    config: authLimit,
+    schema: {
+      body: z.object({ token: z.string().min(1) }),
+    },
+  }, async (request, reply) => {
+    const result = await auth.redeemInvite(request.body.token, client(request));
+    setSessionCookies(reply, result);
+    return ok({ ...publicSession(result), targetUrl: result.targetUrl });
+  });
+
 
   r.get('/magic-link-poll', {
     config: authLimit,
