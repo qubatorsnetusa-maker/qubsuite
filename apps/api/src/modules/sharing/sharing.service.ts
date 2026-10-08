@@ -285,6 +285,8 @@ export class SharingService {
           else if (info.fileType === 'FORM' && resourceId) destinationUrl = `https://forms.${rootDomain}/forms/${resourceId}/edit`;
           else if (ref.type === 'FOLDER') destinationUrl = `https://drive.${rootDomain}/drive/folder/${ref.id}`;
         }
+        const querySep = destinationUrl.includes('?') ? '&' : '?';
+        destinationUrl = `${destinationUrl}${querySep}collab=1`;
 
         // Generate a 1-click access token so clicking the email authenticates them and opens the document immediately
         const rawToken = randomToken(48);

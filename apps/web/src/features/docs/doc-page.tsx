@@ -177,6 +177,16 @@ function DocEditor({ documentId }: { documentId: string }) {
     editor?.setEditable(canEdit);
   }, [editor, canEdit]);
 
+  useEffect(() => {
+    if (!collab.provider?.awareness) return;
+    collab.provider.awareness.setLocalStateField('user', {
+      id: me.id,
+      name: me.name,
+      color: presenceColor(me.id),
+      avatarUrl: me.avatarUrl,
+    });
+  }, [collab.provider, me.name, me.id, me.avatarUrl]);
+
   const liveWordCount = useMemo(() => {
     if (!editor) return 0;
     try {
