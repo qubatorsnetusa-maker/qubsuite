@@ -71,5 +71,6 @@ export const neonSessionSchema = z.object({
   email: emailSchema.optional(),
   name: z.string().optional(),
   neonUserId: z.string().optional(),
+  verifier: z.string().optional(),
 });
 export type NeonSessionInput = z.infer<typeof neonSessionSchema>;

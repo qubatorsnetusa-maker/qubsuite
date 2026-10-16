@@ -12,6 +12,8 @@ import {
   paginationQuerySchema,
   reportSpamSchema,
   shareSchema,
+  requestAccessSchema,
+  grantAccessRequestSchema,
   updateItemSchema,
   updatePermissionSchema,
 } from '@qub/shared';
@@ -210,5 +212,18 @@ export async function driveRoutes(app: FastifyInstance) {
   );
   r.post('/:kind/:id/link/rotate', { schema: { params: kindParams } }, async (request) =>
     ok(await sharing.rotateLink(uid(request), ref(request.params), auditContext(request))),
+  );
+  const reqIdParams = kindParams.extend({ requestId: z.uuid() });
+  r.post('/:kind/:id/request-access', { schema: { params: kindParams, body: requestAccessSchema } }, async (request) =>
+    ok(await sharing.requestAccess(uid(request), ref(request.params), request.body, auditContext(request))),
+  );
+  r.get('/:kind/:id/access-requests', { schema: { params: kindParams } }, async (request) =>
+    ok(await sharing.getAccessRequests(uid(request), ref(request.params))),
+  );
+  r.post('/:kind/:id/access-requests/:requestId/grant', { schema: { params: reqIdParams, body: grantAccessRequestSchema } }, async (request) =>
+    ok(await sharing.grantAccessRequest(uid(request), ref(request.params), request.params.requestId, request.body, auditContext(request))),
+  );
+  r.post('/:kind/:id/access-requests/:requestId/deny', { schema: { params: reqIdParams } }, async (request) =>
+    ok(await sharing.denyAccessRequest(uid(request), ref(request.params), request.params.requestId, auditContext(request))),
   );
 }

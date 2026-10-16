@@ -1,9 +1,12 @@
 import { getServiceUrl } from '@/lib/ecosystem-urls';
 import type {
+  AccessRequestDto,
   ActivityDto,
   BlockedUserDto,
   CopyItemInput,
   CreateFolderInput,
+  GrantAccessRequestInput,
+  RequestAccessInput,
   DriveActivityItemDto,
   DriveActivityQuery,
   DriveFileDto,
@@ -124,6 +127,14 @@ export const driveService = {
   cancelInvite: (kind: Kind, id: string, inviteId: string) => api(`/drive/${seg(kind)}/${id}/invites/${inviteId}`, { method: 'DELETE' }),
   setGeneralAccess: (kind: Kind, id: string, input: GeneralAccessInput) => api<SharingStateDto>(`/drive/${seg(kind)}/${id}/general-access`, { method: 'PUT', body: input }),
   rotateLink: (kind: Kind, id: string) => api<SharingStateDto>(`/drive/${seg(kind)}/${id}/link/rotate`, { method: 'POST' }),
+  requestAccess: (kind: Kind, id: string, input: RequestAccessInput) =>
+    api<{ success: boolean; message: string }>(`/drive/${seg(kind)}/${id}/request-access`, { method: 'POST', body: input }),
+  getAccessRequests: (kind: Kind, id: string) =>
+    api<AccessRequestDto[]>(`/drive/${seg(kind)}/${id}/access-requests`),
+  grantAccessRequest: (kind: Kind, id: string, requestId: string, input?: GrantAccessRequestInput) =>
+    api<SharingStateDto>(`/drive/${seg(kind)}/${id}/access-requests/${requestId}/grant`, { method: 'POST', body: input ?? {} }),
+  denyAccessRequest: (kind: Kind, id: string, requestId: string) =>
+    api<{ denied: boolean }>(`/drive/${seg(kind)}/${id}/access-requests/${requestId}/deny`, { method: 'POST' }),
 };
 
 /** In-app route for opening an item. */

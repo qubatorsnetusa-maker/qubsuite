@@ -19,6 +19,9 @@ export interface ShareTarget {
   kind: 'file' | 'folder';
   id: string;
   name: string;
+  customCopyUrl?: string;
+  copyButtonLabel?: string;
+  isForm?: boolean;
 }
 
 export function ShareDialog({ target, onOpenChange }: { target: ShareTarget | null; onOpenChange: (open: boolean) => void }) {
@@ -75,13 +78,86 @@ function ShareDialogBody({ target }: { target: ShareTarget }) {
     onSuccess: () => qc.invalidateQueries({ queryKey: key }),
   });
 
+  const grantRequest = useMutation({
+    mutationFn: ({ requestId, role }: { requestId: string; role?: GrantableRole }) =>
+      driveService.grantAccessRequest(target.kind, target.id, requestId, role ? { role } : undefined),
+    onSuccess: (updatedState) => {
+      setState(updatedState);
+      toast.success('Access granted');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+
+  const denyRequest = useMutation({
+    mutationFn: (requestId: string) => driveService.denyAccessRequest(target.kind, target.id, requestId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: key });
+      toast.success('Request declined');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+
   if (state.isLoading) return <div className="space-y-3"><Skeleton className="h-10" /><Skeleton className="h-24" /><Skeleton className="h-16" /></div>;
   if (state.error) return <p className="text-sm text-danger">{errorMessage(state.error)}</p>;
   const s = state.data!;
   const canManage = s.capabilities.canShare;
 
+  if (!canManage) {
+    return (
+      <div className="py-6 text-center space-y-2">
+        <p className="text-sm text-muted">You do not have permission to view or manage sharing for this item.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {s.pendingRequests && s.pendingRequests.length > 0 && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-primary">
+            Pending access requests ({s.pendingRequests.length})
+          </h4>
+          <ul className="space-y-2.5">
+            {s.pendingRequests.map((req) => (
+              <li key={req.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-2 rounded-lg bg-background border border-border/60">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Avatar user={req.user} size={32} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {req.user.name} <span className="text-xs text-muted font-normal">({req.user.email})</span>
+                    </p>
+                    <p className="text-xs text-muted truncate">
+                      Requested <span className="font-medium text-foreground">{ROLE_LABEL[req.role] ?? req.role}</span> access
+                      {req.message ? ` — "${req.message}"` : ''}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0">
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    loading={grantRequest.isPending}
+                    onClick={() => grantRequest.mutate({ requestId: req.id, role: req.role })}
+                    className="h-8 text-xs font-semibold px-3"
+                  >
+                    Grant {ROLE_LABEL[req.role] ?? req.role}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    loading={denyRequest.isPending}
+                    onClick={() => denyRequest.mutate(req.id)}
+                    className="h-8 text-xs px-2 text-muted hover:text-danger"
+                  >
+                    Decline
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {canManage && (
         <form
           className="space-y-3"
@@ -222,6 +298,16 @@ function GeneralAccess({ state, target, onChange, canManage }: { state: SharingS
   const roleAllowed = (r: GrantableRole) => ROLE_RANK[r] <= ROLE_RANK[maxLinkRole];
 
   const copy = async () => {
+    if (target.customCopyUrl) {
+      await navigator.clipboard.writeText(target.customCopyUrl);
+      const label = target.isForm
+        ? 'Form link copied'
+        : target.copyButtonLabel
+          ? `${target.copyButtonLabel} copied`
+          : 'Link copied to clipboard';
+      toast.success(label);
+      return;
+    }
     let url = state.link?.url;
     if (!url) return;
     try {
@@ -260,7 +346,9 @@ function GeneralAccess({ state, target, onChange, canManage }: { state: SharingS
           )}
           <p className="text-xs text-muted">
             {anyone
-              ? `Anyone on the internet with the link can ${linkRole === 'VIEWER' ? 'view' : linkRole === 'COMMENTER' ? 'comment' : 'edit'}${state.link?.hasPassword ? ' (password required)' : ''}`
+              ? target.isForm
+                ? 'Anyone on the internet with the link can view and submit responses'
+                : `Anyone on the internet with the link can ${linkRole === 'VIEWER' ? 'view' : linkRole === 'COMMENTER' ? 'comment' : 'edit'}${state.link?.hasPassword ? ' (password required)' : ''}`
               : state.visibility === 'PRIVATE'
                 ? 'Private — only you can open this'
                 : 'Only people with access can open with the link'}
@@ -306,9 +394,9 @@ function GeneralAccess({ state, target, onChange, canManage }: { state: SharingS
       )}
 
       <div className="mt-4 flex items-center justify-between gap-2">
-        {anyone && state.link ? (
+        {anyone && (state.link || target.customCopyUrl) ? (
           <>
-            {canManage ? (
+            {canManage && state.link ? (
               <Button variant="subtle" size="sm" onClick={() => rotate.mutate()} loading={rotate.isPending}>
                 <RefreshCw /> Reset link
               </Button>
@@ -316,7 +404,7 @@ function GeneralAccess({ state, target, onChange, canManage }: { state: SharingS
               <span />
             )}
             <Button variant="outline" onClick={() => void copy()}>
-              <Link2 /> Copy link
+              <Link2 /> {target.copyButtonLabel || 'Copy link'}
             </Button>
           </>
         ) : (

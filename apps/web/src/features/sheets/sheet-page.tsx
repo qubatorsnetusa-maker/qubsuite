@@ -40,7 +40,9 @@ import { cn, formatDate, formatRelative } from '@/lib/utils';
 import { qk } from '@/services/query-keys';
 import { sheetsService } from '@/services/sheets';
 import { MoveDialog } from '../drive/dialogs';
+import { getServiceUrl } from '@/lib/ecosystem-urls';
 import { ShareDialog } from '../sharing/share-dialog';
+import { RequestAccessDialog } from '../sharing/request-access-dialog';
 import { normalizeRange } from './geometry';
 import { Grid, type FillDirection, type GridHandle, type Selection } from './grid';
 import { SheetStore } from './sheet-store';
@@ -132,6 +134,7 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
   const [filterDialog, setFilterDialog] = useState<number | null>(null);
   const [panel, setPanel] = useState<'versions' | 'comments' | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [requestAccessOpen, setRequestAccessOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
   const [confirmDeleteSheet, setConfirmDeleteSheet] = useState<WorksheetDto | null>(null);
   const [menu, setMenu] = useState<{ kind: 'col' | 'row' | 'cell'; index: number; x: number; y: number } | null>(null);
@@ -583,6 +586,17 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
   const formulaValue = editing ? editing.value : (activeCell?.input ?? '');
   const suggestions = editing?.value.startsWith('=') ? FUNCTION_NAMES().filter((f) => f.startsWith(/([A-Z]+)$/i.exec(editing.value)?.[1]?.toUpperCase() ?? '\u0000')).slice(0, 6) : [];
 
+  const handleShare = async () => {
+    const sheetUrl = getServiceUrl('sheets', `/sheets/${id}`);
+    try {
+      await navigator.clipboard.writeText(sheetUrl);
+      toast.success('Spreadsheet link copied to clipboard');
+    } catch {
+      // ignore
+    }
+    setShareOpen(true);
+  };
+
   return (
     <div className="flex h-full flex-col bg-background">
       <div className="border-b border-border">
@@ -594,7 +608,8 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
           status={<SaveIndicator status={saveStatus} />}
           readOnlyLabel={canEdit ? undefined : 'View only'}
           presence={store.presence.filter((p) => p.user.clientId !== store.selfClientId).map((p) => ({ key: p.user.clientId, name: p.user.name, avatarUrl: p.user.avatarUrl, color: p.user.color }))}
-          onShare={() => setShareOpen(true)}
+          onShare={meta.data.capabilities.canShare ? handleShare : undefined}
+          onRequestAccess={!meta.data.capabilities.canShare && !canEdit ? () => setRequestAccessOpen(true) : undefined}
           menus={
             <>
               <DropdownMenu>
@@ -1095,7 +1110,32 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
           setValidationOpen(false);
         }}
       />
-      <ShareDialog target={shareOpen ? { kind: 'file', id: meta.data.fileId, name: meta.data.title } : null} onOpenChange={setShareOpen} />
+      <ShareDialog
+        target={
+          shareOpen
+            ? {
+                kind: 'file',
+                id: meta.data.fileId,
+                name: meta.data.title,
+                customCopyUrl: getServiceUrl('sheets', `/sheets/${id}`),
+                copyButtonLabel: 'Copy spreadsheet link',
+              }
+            : null
+        }
+        onOpenChange={setShareOpen}
+      />
+      <RequestAccessDialog
+        target={
+          requestAccessOpen
+            ? {
+                kind: 'file',
+                id: meta.data.fileId,
+                name: meta.data.title,
+              }
+            : null
+        }
+        onOpenChange={setRequestAccessOpen}
+      />
       <MoveDialog items={moveOpen ? [{ kind: 'file', id: meta.data.fileId, name: meta.data.title }] : null} onOpenChange={setMoveOpen} />
     </div>
   );

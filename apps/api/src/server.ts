@@ -5,7 +5,7 @@ import { createDb } from './db';
 async function main() {
   const db = createDb(env.DATABASE_URL, { max: env.DATABASE_POOL_MAX });
 
-  // Ensure invite_tokens table exists for frictionless one-click invitation links
+  // Ensure invite_tokens and access_requests tables exist
   try {
     await db.sql.unsafe(`
       CREATE TABLE IF NOT EXISTS invite_tokens (
@@ -18,9 +18,27 @@ async function main() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );
       CREATE INDEX IF NOT EXISTS invite_tokens_email_idx ON invite_tokens(email);
+
+      CREATE TABLE IF NOT EXISTS access_requests (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        resource_type resource_type NOT NULL,
+        file_id UUID REFERENCES drive_files(id) ON DELETE CASCADE,
+        folder_id UUID REFERENCES drive_folders(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role role NOT NULL DEFAULT 'EDITOR',
+        message TEXT,
+        status TEXT NOT NULL DEFAULT 'PENDING',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        resolved_at TIMESTAMPTZ,
+        resolved_by UUID REFERENCES users(id) ON DELETE SET NULL
+      );
+      CREATE INDEX IF NOT EXISTS access_requests_file_idx ON access_requests(file_id);
+      CREATE INDEX IF NOT EXISTS access_requests_user_idx ON access_requests(user_id);
+      CREATE INDEX IF NOT EXISTS access_requests_status_idx ON access_requests(status);
     `);
   } catch (err: any) {
-    console.warn('invite_tokens table init check:', err?.message);
+    console.warn('table init check:', err?.message);
   }
 
   const app = await buildApp({ env, db });

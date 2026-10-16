@@ -118,3 +118,29 @@ export const shareLinks = pgTable(
     check('share_links_token_length', sql`char_length(${t.token}) >= 32`),
   ],
 );
+
+export const accessRequests = pgTable(
+  'access_requests',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    resourceType: resourceTypeEnum('resource_type').notNull(),
+    fileId: uuid('file_id').references(() => driveFiles.id, { onDelete: 'cascade' }),
+    folderId: uuid('folder_id').references(() => driveFolders.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    role: roleEnum('role').notNull().default('EDITOR'),
+    message: text('message'),
+    status: text('status').notNull().default('PENDING'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+    resolvedBy: uuid('resolved_by').references(() => users.id, { onDelete: 'set null' }),
+  },
+  (t) => [
+    index('access_requests_file_idx').on(t.fileId),
+    index('access_requests_user_idx').on(t.userId),
+    index('access_requests_status_idx').on(t.status),
+    check('access_requests_role_not_owner', sql`${t.role} <> 'OWNER'`),
+  ],
+);

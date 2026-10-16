@@ -11,13 +11,14 @@ import {
   ChevronLeft,
   X,
   ArrowLeft,
-  Monitor,
-  Smartphone,
   Calendar,
   Sparkles,
   ExternalLink,
+  Smartphone,
+  Folder,
+  CheckCircle2,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FileIcon } from '@/components/file-icon';
 import { ErrorState, FullPageSpinner } from '@/components/states';
 import { Button } from '@/components/ui/button';
@@ -25,7 +26,7 @@ import { FieldError, Input } from '@/components/ui/form-controls';
 import { useAuth } from '@/hooks/use-auth';
 import { errorMessage } from '@/lib/api';
 import { formatBytes } from '@/lib/utils';
-import { openPath } from '@/services/drive';
+import { openPath, openServiceUrl } from '@/services/drive';
 import { shareService } from '@/services/notifications';
 
 function DocView({ token, access, fileId }: { token: string; access: string; fileId: string }) {
@@ -95,6 +96,14 @@ function SheetView({ token, access, fileId }: { token: string; access: string; f
   );
 }
 
+interface ExtractedTheme {
+  bg: string;
+  cardBg: string;
+  buttonBg: string;
+  buttonHoverBg: string;
+  accentText: string;
+}
+
 export function PublicSharePage() {
   const { token } = useParams({ from: '/share/$token' });
   const auth = useAuth();
@@ -105,18 +114,35 @@ export function PublicSharePage() {
   const [folderStack, setFolderStack] = useState<{ id: string; name: string }[]>([]);
   const [showInlinePreview, setShowInlinePreview] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<'computer' | 'mobile'>('computer');
-  const [leftTab, setLeftTab] = useState<'media' | 'qgc'>('media');
 
   const unlock = useMutation({ mutationFn: () => shareService.unlock(token, password), onSuccess: setUnlocked, meta: { silent: true } });
   const redeem = useMutation({
     mutationFn: () => shareService.redeem(token, password || undefined),
-    onSuccess: (r) => void navigate({ href: openPath({ kind: r.resourceType === 'FILE' ? 'file' : 'folder', id: r.id, fileType: r.fileType, resourceId: r.resourceId }) }),
+    onSuccess: (r) => {
+      const url = openServiceUrl({ kind: r.resourceType === 'FILE' ? 'file' : 'folder', id: r.id, fileType: r.fileType, resourceId: r.resourceId });
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        window.location.href = url;
+      } else {
+        void navigate({ href: url });
+      }
+    },
   });
 
   const data = unlocked ?? initial.data;
+
+  // Auto-redirect documents directly to Docs editor instead of showing Drive transfer page
+  useEffect(() => {
+    if (!data || data.requiresPassword || !data.file || data.file.fileType !== 'DOCUMENT' || !data.file.resourceId) return;
+    redeem.mutate();
+  }, [data?.requiresPassword, data?.file?.fileType, data?.file?.resourceId]);
+
   const [openFile, setOpenFile] = useState<{ id: string; fileType: string } | null>(null);
   const currentFolder = folderStack.at(-1);
   const sub = useQuery({ queryKey: ['share', token, 'folder', currentFolder?.id], queryFn: () => shareService.folder(token, data!.accessToken!, currentFolder!.id), enabled: !!currentFolder && !!data?.accessToken });
+
+  // Dynamic theme extraction
+  const [extractedTheme, setExtractedTheme] = useState<ExtractedTheme | null>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
 
   if (initial.isLoading) return <FullPageSpinner />;
   if (initial.error) return <ErrorState error={initial.error} title="This link isn't available" />;
@@ -125,19 +151,19 @@ export function PublicSharePage() {
   // Password gate screen
   if (d.requiresPassword) {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-[#e8e2dc] p-4 text-neutral-800 selection:bg-[#7b5b53]/20">
-        <div className="w-full max-w-md rounded-2xl border border-neutral-200/60 bg-[#fcfbf9] p-8 shadow-xl shadow-neutral-900/5">
+      <div className="min-h-screen w-full flex items-center justify-center bg-[#f8fafc] p-4 text-slate-800">
+        <div className="w-full max-w-md rounded-2xl border border-slate-200/80 bg-white p-8 shadow-xl shadow-slate-900/5">
           <form
             onSubmit={(e) => { e.preventDefault(); unlock.mutate(); }}
             className="space-y-6"
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#7b5b53]/10 text-[#7b5b53]">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
                 <Lock className="size-6" />
               </div>
               <div>
-                <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Password Protected</h2>
-                <p className="text-xs text-neutral-500">Enter the password shared by {d.owner.name}</p>
+                <h2 className="text-xl font-semibold tracking-tight text-slate-900">Password Protected</h2>
+                <p className="text-xs text-slate-500">Enter the password shared by {d.owner.name}</p>
               </div>
             </div>
 
@@ -146,7 +172,7 @@ export function PublicSharePage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter transfer password"
-              className="rounded-lg border-neutral-200 bg-white text-neutral-900 placeholder-neutral-400 focus:border-[#7b5b53] focus:ring-[#7b5b53]"
+              className="rounded-lg border-slate-200 bg-white text-slate-900 placeholder-slate-400 focus:border-blue-600 focus:ring-blue-600"
               autoFocus
               aria-label="Password"
             />
@@ -154,7 +180,7 @@ export function PublicSharePage() {
 
             <Button
               type="submit"
-              className="w-full rounded-lg bg-[#7b5b53] py-3 text-sm font-medium text-white shadow-sm transition hover:bg-[#6b4e47] active:scale-[0.99]"
+              className="w-full rounded-lg bg-blue-600 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.99]"
               loading={unlock.isPending}
             >
               Access Transfer
@@ -185,15 +211,92 @@ export function PublicSharePage() {
     formattedExpiry = `Available until ${sevenDaysOut.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} • 7 days retention`;
   }
 
+  const fileExt = fileName.includes('.') ? fileName.split('.').pop()?.toUpperCase() : '';
+  const isApk = fileExt === 'APK' || fileName.toLowerCase().endsWith('.apk');
+  const hasVisualPreview = !!(currentFile && (currentFile.fileType === 'IMAGE' || currentFile.fileType === 'VIDEO'));
+
   const fileTypeLabel = currentFile ? (
+    isApk ? 'Android Package (APK)' :
     currentFile.fileType === 'VIDEO' ? 'Video file' :
     currentFile.fileType === 'IMAGE' ? 'Image file' :
     currentFile.fileType === 'PDF' ? 'PDF document' :
     currentFile.fileType === 'DOCUMENT' ? 'Document' :
     currentFile.fileType === 'SPREADSHEET' ? 'Spreadsheet' :
     currentFile.fileType === 'AUDIO' ? 'Audio file' :
-    'File'
+    fileExt ? `${fileExt} file` : 'File'
   ) : d.folder ? 'Folder archive' : 'File';
+
+  // Extract color dynamically when image loads
+  const handleImageLoad = (img: HTMLImageElement) => {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      canvas.width = 64;
+      canvas.height = 64;
+      ctx.drawImage(img, 0, 0, 64, 64);
+      const { data: pixels } = ctx.getImageData(0, 0, 64, 64);
+      let rSum = 0, gSum = 0, bSum = 0, count = 0;
+      for (let i = 0; i < pixels.length; i += 16) {
+        const r = pixels[i] ?? 0;
+        const g = pixels[i + 1] ?? 0;
+        const b = pixels[i + 2] ?? 0;
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        const lum = (max + min) / 2;
+        // Skip pure black and pure white
+        if (lum > 25 && lum < 235) {
+          rSum += r;
+          gSum += g;
+          bSum += b;
+          count++;
+        }
+      }
+      if (count > 0) {
+        const rAvg = Math.round(rSum / count);
+        const gAvg = Math.round(gSum / count);
+        const bAvg = Math.round(bSum / count);
+
+        // Convert RGB to HSL
+        const rn = rAvg / 255, gn = gAvg / 255, bn = bAvg / 255;
+        const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
+        let h = 0, s = 0;
+        const l = (max + min) / 2;
+        if (max !== min) {
+          const d = max - min;
+          s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+          switch (max) {
+            case rn: h = (gn - bn) / d + (gn < bn ? 6 : 0); break;
+            case gn: h = (bn - rn) / d + 2; break;
+            case bn: h = (rn - gn) / d + 4; break;
+          }
+          h = Math.round(h * 60);
+        }
+        const sat = Math.round(Math.max(s * 100, 25)); // ensure vibrant tone
+
+        setExtractedTheme({
+          bg: `hsl(${h}, ${Math.min(sat, 30)}%, 93%)`,
+          cardBg: '#ffffff',
+          buttonBg: `hsl(${h}, ${sat}%, 32%)`,
+          buttonHoverBg: `hsl(${h}, ${sat}%, 26%)`,
+          accentText: `hsl(${h}, ${sat}%, 30%)`,
+        });
+      }
+    } catch {
+      // Canvas CORS or read error fallback
+    }
+  };
+
+  // Determine active theme
+  const activeTheme: ExtractedTheme = hasVisualPreview && extractedTheme
+    ? extractedTheme
+    : {
+        bg: '#f8fafc',
+        cardBg: '#ffffff',
+        buttonBg: '#2563eb',
+        buttonHoverBg: '#1d4ed8',
+        accentText: '#2563eb',
+      };
 
   const renderInlineViewer = (file: { id: string; fileType: string }) => {
     if (file.fileType === 'DOCUMENT') return <DocView token={token} access={access} fileId={file.id} />;
@@ -208,16 +311,29 @@ export function PublicSharePage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-between bg-[#e8e2dc] text-neutral-800 antialiased selection:bg-[#7b5b53]/20 font-sans">
-      {/* BEGIN: TopBar (Back and device toggles removed as requested) */}
-      <header className="w-full px-6 py-4 flex items-center justify-end z-20 text-neutral-700 text-sm">
+    <div
+      style={{ backgroundColor: activeTheme.bg }}
+      className="min-h-screen flex flex-col justify-between text-slate-800 antialiased font-sans transition-colors duration-500"
+    >
+      {/* BEGIN: TopBar */}
+      <header className="w-full px-6 py-4 flex items-center justify-between z-20 text-slate-700 text-sm">
+        <div className="flex items-center gap-2">
+          <div
+            style={{ backgroundColor: activeTheme.buttonBg }}
+            className="size-7 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-sm transition-colors duration-500"
+          >
+            Q
+          </div>
+          <span className="font-semibold text-slate-800 tracking-tight text-sm">QubDrive</span>
+        </div>
+
         <div>
           {auth.status === 'authenticated' ? (
             <Button
               variant="secondary"
               size="sm"
               asChild
-              className="rounded-full border border-neutral-300/80 bg-white/90 text-xs font-semibold text-neutral-800 shadow-xs hover:bg-white"
+              className="rounded-full border border-slate-200 bg-white/95 text-xs font-semibold text-slate-800 shadow-xs hover:bg-white"
             >
               <Link to="/drive">Open in Qub</Link>
             </Button>
@@ -226,7 +342,7 @@ export function PublicSharePage() {
               variant="outline"
               size="sm"
               asChild
-              className="rounded-full border border-neutral-300/80 bg-white/90 text-xs font-semibold text-neutral-800 shadow-xs hover:bg-white"
+              className="rounded-full border border-slate-200 bg-white/95 text-xs font-semibold text-slate-800 shadow-xs hover:bg-white"
             >
               <Link to="/login">Sign in</Link>
             </Button>
@@ -242,12 +358,11 @@ export function PublicSharePage() {
             previewDevice === 'mobile'
               ? 'max-w-[420px]'
               : 'max-w-[980px]'
-          } bg-[#fcfbf9] rounded-2xl shadow-xl shadow-neutral-900/5 overflow-hidden border border-neutral-200/60 min-h-[500px]`}
+          } bg-white rounded-2xl shadow-xl shadow-slate-900/5 overflow-hidden border border-slate-200/80 min-h-[500px]`}
         >
           <div className={`grid grid-cols-1 ${previewDevice === 'mobile' ? 'grid-cols-1' : 'md:grid-cols-2'} min-h-[500px]`}>
-            {/* Left Column: Visual Area (Video thumbnail with play button ONLY for videos; clean still image for others) */}
-            <div className="relative w-full h-72 md:h-auto min-h-[320px] overflow-hidden bg-neutral-900 flex items-center justify-center group">
-              {/* If it's a video file, load video stream frame #t=1 as thumbnail preview */}
+            {/* Left Column: Visual Preview or File Badge */}
+            <div className="relative w-full h-72 md:h-auto min-h-[320px] overflow-hidden flex items-center justify-center group bg-slate-900">
               {currentFile?.fileType === 'VIDEO' ? (
                 <>
                   <video
@@ -258,99 +373,113 @@ export function PublicSharePage() {
                     className="absolute inset-0 w-full h-full object-cover object-center brightness-90 transition-transform duration-500 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-black/25 transition-colors group-hover:bg-black/35" />
-              {/* Large Central Play Button for Video Preview */}
-              <button
-                type="button"
-                onClick={() => setShowInlinePreview(true)}
-                className="relative z-10 flex size-16 sm:size-20 items-center justify-center rounded-full bg-white/90 text-neutral-900 shadow-2xl backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-white active:scale-95 cursor-pointer group-hover:shadow-blue-500/30"
-                title="Play video preview"
-              >
-                <div className="ml-1 flex items-center justify-center text-[#7b5b53]">
-                  <svg className="size-8 sm:size-10 fill-current" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </div>
-              </button>
 
-              <div className="absolute bottom-3 left-4 right-4 z-10 flex items-center justify-between text-[11px] text-white/90 drop-shadow-md pointer-events-none">
-                <span className="font-medium bg-black/40 backdrop-blur-sm px-2.5 py-1 rounded-md">
-                  Click to preview
-                </span>
-                <span className="bg-black/40 backdrop-blur-sm px-2 py-1 rounded-md font-mono">
-                  {fileTypeLabel}
-                </span>
-              </div>
+                  {/* Large Central Play Button for Video Preview */}
+                  <button
+                    type="button"
+                    onClick={() => setShowInlinePreview(true)}
+                    className="relative z-10 flex size-16 sm:size-20 items-center justify-center rounded-full bg-white/90 text-neutral-900 shadow-2xl backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-white active:scale-95 cursor-pointer"
+                    title="Play video preview"
+                  >
+                    <div style={{ color: activeTheme.buttonBg }} className="ml-1 flex items-center justify-center">
+                      <svg className="size-8 sm:size-10 fill-current" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </div>
+                  </button>
+
+                  <div className="absolute bottom-3 left-4 right-4 z-10 flex items-center justify-between text-[11px] text-white/90 drop-shadow-md pointer-events-none">
+                    <span className="font-medium bg-black/40 backdrop-blur-sm px-2.5 py-1 rounded-md">
+                      Click to preview
+                    </span>
+                    <span className="bg-black/40 backdrop-blur-sm px-2 py-1 rounded-md font-mono">
+                      {fileTypeLabel}
+                    </span>
+                  </div>
                 </>
               ) : currentFile?.fileType === 'IMAGE' ? (
                 <>
                   <img
+                    ref={imgRef}
+                    crossOrigin="anonymous"
                     src={shareService.downloadUrl(token, access, currentFile.id, true)}
                     alt={fileName}
+                    onLoad={(e) => handleImageLoad(e.currentTarget)}
                     className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
                   />
-                  <div className="absolute inset-0 bg-black/20" />
+                  <div className="absolute inset-0 bg-black/15" />
                 </>
               ) : (
-                <>
-                  <img
-                    alt="Still Life Studio"
-                    className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
-                    src="/stitch/stitch_still_desk.png"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src =
-                        'https://lh3.googleusercontent.com/aida-public/AB6AXuAc_97Brn-K964kBBetnBDrToqj2ZrmaXC-WpR6uEiri7GdAPPaXa_z1m4CrMsMGsK5k_grbTm0w8wwQTp2QEcBNqOL0jJ7uI86PbvzsmC1w2EMkwtBXgabVIf8KHiAPuEdA5fFyAkaUp6L4xdS_HFD_hsgvyETRP7xTURPvpUEddkeSfeaj2sTZfz55lPZwpIMIin0HLNtOh-A6ktePzlae3oJlxozRf0-LtG2hjn6iHopKknuyB8CRQ';
-                    }}
-                  />
-                  <div className="absolute inset-0 bg-black/20" />
-                </>
+                /* Non-preview files (e.g. APK, archives, documents): Modern Icon Card with clean light slate styling */
+                <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-slate-100 to-blue-50/40 p-8 flex flex-col items-center justify-center text-center">
+                  <div className="relative mb-5 flex size-24 sm:size-28 items-center justify-center rounded-3xl bg-white shadow-xl shadow-blue-500/10 border border-slate-200/90 transition-transform duration-300 group-hover:scale-105">
+                    {isApk ? (
+                      <Smartphone className="size-12 sm:size-14 text-emerald-600 stroke-[1.6]" />
+                    ) : d.folder ? (
+                      <Folder className="size-12 sm:size-14 text-amber-500 stroke-[1.6]" />
+                    ) : (
+                      <FileIcon type={currentFile?.fileType ?? 'OTHER'} size={52} />
+                    )}
+                    <span className="absolute -bottom-2.5 px-3 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-blue-600 text-white shadow-sm">
+                      {isApk ? 'APK' : (fileExt || 'FILE')}
+                    </span>
+                  </div>
+
+                  <p className="max-w-[240px] truncate text-sm font-semibold text-slate-800">
+                    {fileName}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {formatBytes(fileSize)} • Ready for install &amp; download
+                  </p>
+                </div>
               )}
             </div>
 
-            {/* Right Column: Clean Off-White Details & Actions */}
-            <div className="flex flex-col justify-between p-7 sm:p-10 lg:p-12 bg-[#fcfbf9]">
+            {/* Right Column: Clean Details & Actions */}
+            <div className="flex flex-col justify-between p-7 sm:p-10 lg:p-12 bg-white">
               {/* Top Section: Status & Titles */}
               <div className="space-y-6">
                 {/* Status Pill */}
                 <div className="inline-flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                     Ready to download
                   </span>
                 </div>
 
                 {/* Main File Title & Size */}
                 <div className="space-y-1.5">
-                  <h1 className="text-2xl sm:text-3xl font-semibold text-neutral-900 tracking-tight leading-snug break-all">
+                  <h1 className="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight leading-snug break-all">
                     {fileName}
                   </h1>
-                  <p className="text-sm font-medium text-neutral-600 flex items-center gap-2">
+                  <p className="text-sm font-medium text-slate-600 flex items-center gap-2">
                     <span>{formatBytes(fileSize)}</span>
-                    <span className="text-neutral-300">•</span>
+                    <span className="text-slate-300">•</span>
                     <span>{fileTypeLabel}</span>
                   </p>
                 </div>
 
                 {/* Sender & Expiry Details */}
-                <div className="pt-2 border-t border-neutral-100 space-y-2 text-sm text-neutral-500">
+                <div className="pt-2 border-t border-slate-100 space-y-2 text-sm text-slate-500">
                   <p className="flex items-center gap-2">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-neutral-100 text-[11px] font-bold text-neutral-600">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-600">
                       {d.owner.name.charAt(0).toUpperCase()}
                     </span>
-                    <span className="text-neutral-700">By {d.owner.name}</span>
+                    <span className="text-slate-700">By {d.owner.name}</span>
                   </p>
-                  <p className="flex items-center gap-2 text-xs text-neutral-500">
-                    <Calendar className="size-3.5 text-neutral-400" />
+                  <p className="flex items-center gap-2 text-xs text-slate-500">
+                    <Calendar className="size-3.5 text-slate-400" />
                     <span>{formattedExpiry}</span>
                   </p>
                 </div>
 
                 {/* Folder items listing if folder */}
                 {d.folder && (
-                  <div className="max-h-36 overflow-y-auto rounded-xl border border-neutral-200/80 bg-neutral-50 p-2">
-                    <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+                  <div className="max-h-36 overflow-y-auto rounded-xl border border-slate-200/80 bg-slate-50 p-2">
+                    <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                       {d.folder.items.length} items included
                     </p>
-                    <div className="divide-y divide-neutral-100">
+                    <div className="divide-y divide-slate-100">
                       {d.folder.items.map((item) => (
                         <button
                           key={item.id}
@@ -358,8 +487,8 @@ export function PublicSharePage() {
                           className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-white rounded transition"
                         >
                           <FileIcon type={item.fileType} size={14} />
-                          <span className="flex-1 truncate text-neutral-700">{item.name}</span>
-                          <span className="text-[10px] text-neutral-400">{formatBytes(item.size)}</span>
+                          <span className="flex-1 truncate text-slate-700">{item.name}</span>
+                          <span className="text-[10px] text-slate-400">{formatBytes(item.size)}</span>
                         </button>
                       ))}
                     </div>
@@ -369,13 +498,14 @@ export function PublicSharePage() {
 
               {/* Bottom Actions Section */}
               <div className="pt-8 space-y-3">
-                {/* Primary CTA Button matching the stitch brown theme */}
+                {/* Primary CTA Button matching dynamic or blue theme */}
                 {downloadUrl ? (
                   <a
                     href={downloadUrl}
                     download={fileName}
                     aria-label={`Download ${fileName}`}
-                    className="w-fit min-w-[160px] px-8 py-3.5 bg-[#7b5b53] hover:bg-[#6b4e47] active:scale-[0.99] text-white text-sm font-medium rounded-lg shadow-sm transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer"
+                    style={{ backgroundColor: activeTheme.buttonBg }}
+                    className="w-fit min-w-[160px] px-8 py-3.5 active:scale-[0.99] text-white text-sm font-medium rounded-lg shadow-sm transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer hover:opacity-95"
                   >
                     <Download className="size-4.5" />
                     <span>Download File</span>
@@ -383,7 +513,8 @@ export function PublicSharePage() {
                 ) : (
                   <button
                     onClick={() => redeem.mutate()}
-                    className="w-fit min-w-[160px] px-8 py-3.5 bg-[#7b5b53] hover:bg-[#6b4e47] active:scale-[0.99] text-white text-sm font-medium rounded-lg shadow-sm transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer"
+                    style={{ backgroundColor: activeTheme.buttonBg }}
+                    className="w-fit min-w-[160px] px-8 py-3.5 active:scale-[0.99] text-white text-sm font-medium rounded-lg shadow-sm transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer hover:opacity-95"
                   >
                     <span>Save to Qub Drive</span>
                   </button>
@@ -393,7 +524,7 @@ export function PublicSharePage() {
                 {currentFile && ['IMAGE', 'PDF', 'VIDEO', 'AUDIO', 'DOCUMENT', 'SPREADSHEET'].includes(currentFile.fileType) && (
                   <button
                     onClick={() => setShowInlinePreview(true)}
-                    className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-500 hover:text-neutral-800 transition-colors pt-1 px-1 cursor-pointer"
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors pt-1 px-1 cursor-pointer"
                     type="button"
                   >
                     <Eye className="size-3.5" />
@@ -408,25 +539,25 @@ export function PublicSharePage() {
         {/* INTEGRATED AD SECTION: Qubators Global Conference 2026 Billboard Banner */}
         <section
           aria-label="Conference Billboard"
-          className="w-full max-w-[980px] mt-6 rounded-2xl border border-neutral-200/60 bg-[#fcfbf9] p-6 sm:p-7 shadow-lg shadow-neutral-900/5 backdrop-blur-xl transition hover:shadow-xl"
+          className="w-full max-w-[980px] mt-6 rounded-2xl border border-slate-200/80 bg-white p-6 sm:p-7 shadow-lg shadow-slate-900/5 backdrop-blur-xl transition hover:shadow-xl"
         >
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-2 max-w-2xl">
               <div className="flex items-center gap-2.5">
-                <span className="rounded-md bg-neutral-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+                <span className="rounded-md bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                   Featured Billboard
                 </span>
-                <span className="text-xs text-neutral-400 font-medium">
+                <span className="text-xs text-slate-400 font-medium">
                   Lagos &amp; Online • 2026
                 </span>
               </div>
-              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900">
+              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
                 Qubators Global Conference 2026
               </h2>
-              <p className="text-sm leading-relaxed text-neutral-600">
+              <p className="text-sm leading-relaxed text-slate-600">
                 A one-day global gathering of tech experts, builders, creators, founders, innovators, investors and emerging leaders shaping the future through technology.
               </p>
-              <p className="text-xs leading-relaxed text-neutral-500 pt-0.5">
+              <p className="text-xs leading-relaxed text-slate-500 pt-0.5">
                 We believe great tech skills and God's purpose go together. Join us in person in Lagos or online from anywhere. Reserve your spot today.
               </p>
             </div>
@@ -436,7 +567,8 @@ export function PublicSharePage() {
                 href="https://www.qubators.org/qgc/register"
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#7b5b53] hover:bg-[#6b4e47] text-white px-6 py-3.5 text-sm font-semibold shadow-sm transition active:scale-95"
+                style={{ backgroundColor: activeTheme.buttonBg }}
+                className="inline-flex items-center justify-center gap-2 rounded-xl text-white px-6 py-3.5 text-sm font-semibold shadow-sm transition active:scale-95 hover:opacity-95"
               >
                 <span>Learn More &amp; Register</span>
                 <ArrowUpRight className="size-4" />
@@ -448,19 +580,17 @@ export function PublicSharePage() {
       {/* END: CentralWorkspace */}
 
       {/* BEGIN: MinimalFooter */}
-      <footer className="w-full px-6 py-4 flex flex-col md:flex-row items-center justify-between text-xs text-neutral-500 gap-3 border-t border-neutral-300/40">
+      <footer className="w-full px-6 py-4 flex flex-col md:flex-row items-center justify-between text-xs text-slate-500 gap-3 border-t border-slate-200/60">
         <div className="flex items-center gap-2.5">
-          {/* Minimal Brand Identity matching stitch design */}
-          <div className="flex items-center gap-1.5 font-semibold text-neutral-700">
-            <span className="w-3.5 h-3.5 rounded bg-blue-600 inline-block" />
+          <div className="flex items-center gap-1.5 font-semibold text-slate-700">
+            <span style={{ backgroundColor: activeTheme.buttonBg }} className="w-3.5 h-3.5 rounded inline-block" />
             <span>Qub Transfer</span>
           </div>
-          <span className="text-neutral-300">•</span>
-          <span className="text-neutral-500">Fast Cloud Sharing</span>
+          <span className="text-slate-300">•</span>
+          <span className="text-slate-500">Fast Cloud Sharing</span>
         </div>
 
-        {/* Security & Policy note mirroring reference screen */}
-        <div className="text-center md:text-right text-[11px] text-neutral-400 max-w-xl">
+        <div className="text-center md:text-right text-[11px] text-slate-400 max-w-xl">
           This file transfer is secured and encrypted. Transfer recipient is responsible for content downloaded in accordance with our terms of service.
         </div>
       </footer>
@@ -468,15 +598,15 @@ export function PublicSharePage() {
 
       {/* Full-Screen Preview Drawer Modal */}
       {showInlinePreview && currentFile && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-neutral-900/80 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex flex-col bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-200">
           <div className="flex h-16 items-center justify-between border-b border-white/10 bg-white/95 px-6 backdrop-blur-md">
             <div className="flex items-center gap-3">
               <FileIcon type={currentFile.fileType as any} size={20} />
-              <span className="font-semibold text-neutral-900 truncate max-w-md">{fileName}</span>
+              <span className="font-semibold text-slate-900 truncate max-w-md">{fileName}</span>
             </div>
             <div className="flex items-center gap-3">
               {downloadUrl && (
-                <Button asChild size="sm" className="rounded-lg bg-[#7b5b53] hover:bg-[#6b4e47] text-white">
+                <Button asChild size="sm" style={{ backgroundColor: activeTheme.buttonBg }} className="rounded-lg text-white hover:opacity-95">
                   <a href={downloadUrl} download={fileName}>
                     <Download className="mr-1.5 size-4" /> Download
                   </a>
@@ -486,7 +616,7 @@ export function PublicSharePage() {
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowInlinePreview(false)}
-                className="rounded-lg text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100"
+                className="rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100"
               >
                 <X className="mr-1 size-4" /> Close preview
               </Button>

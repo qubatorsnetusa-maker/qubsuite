@@ -7,12 +7,15 @@ import {
   type ShareInput,
   type SharingStateDto,
   type UpdatePermissionInput,
+  type AccessRequestDto,
+  type RequestAccessInput,
+  type GrantAccessRequestInput,
 } from '@qub/shared';
 import { generalAccessSchema, shareSchema } from '@qub/shared';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { Env } from '../../config/env';
 import type { Database, Executor } from '../../db';
-import { driveFiles, driveFolders, filePermissions, fileShares, folderPermissions, inviteTokens, shareLinks } from '../../db/schema';
+import { accessRequests, driveFiles, driveFolders, filePermissions, fileShares, folderPermissions, inviteTokens, shareLinks } from '../../db/schema';
 import type { Mailer } from '../../services/mailer';
 import { hashPassword, hmacToken, randomToken } from '../../utils/crypto';
 import { AppError, badRequest, conflict, forbidden, notFound, policyViolation } from '../../utils/errors';
@@ -148,6 +151,7 @@ export class SharingService {
     ];
 
     const canManage = access.canShare;
+    if (!canManage) throw forbidden('You do not have permission to view sharing settings.');
     const pending = canManage
       ? await this.db
           .select()
@@ -155,6 +159,28 @@ export class SharingService {
           .where(and(ref.type === 'FILE' ? eq(fileShares.fileId, ref.id) : eq(fileShares.folderId, ref.id), isNull(fileShares.acceptedAt)))
       : [];
     const link = canManage ? await this.activeLink(ref) : null;
+
+    let pendingRequests: AccessRequestDto[] = [];
+    const rawReqs = await this.db
+      .select()
+      .from(accessRequests)
+      .where(
+        and(
+          ref.type === 'FILE' ? eq(accessRequests.fileId, ref.id) : eq(accessRequests.folderId, ref.id),
+          eq(accessRequests.status, 'PENDING'),
+        ),
+      );
+    if (rawReqs.length > 0) {
+      const reqUsers = await UserRepository.summaries(this.db, rawReqs.map((r) => r.userId));
+      pendingRequests = rawReqs.map((r) => ({
+        id: r.id,
+        user: reqUsers.get(r.userId) ?? { id: r.userId, name: 'Unknown User', email: '', avatarUrl: null },
+        role: r.role as any,
+        message: r.message,
+        status: r.status as any,
+        createdAt: r.createdAt.toISOString(),
+      }));
+    }
 
     return {
       resourceType: ref.type,
@@ -164,6 +190,7 @@ export class SharingService {
       visibility: deriveVisibility(info.generalAccess, permissions.length + pending.length),
       permissions,
       pendingInvites: pending.map((p) => ({ id: p.id, email: p.email, role: p.role as 'EDITOR', createdAt: p.createdAt.toISOString() })),
+      pendingRequests,
       link: link
         ? {
             id: link.id,
@@ -229,6 +256,16 @@ export class SharingService {
             .values({ folderId: ref.id, userId: target.id, ...flags, grantedBy: userId })
             .onConflictDoUpdate({ target: [folderPermissions.folderId, folderPermissions.userId], set: { ...flags, source: 'DIRECT', grantedBy: userId, updatedAt: new Date() } });
         }
+        await tx
+          .update(accessRequests)
+          .set({ status: 'GRANTED', resolvedAt: new Date(), resolvedBy: userId })
+          .where(
+            and(
+              ref.type === 'FILE' ? eq(accessRequests.fileId, ref.id) : eq(accessRequests.folderId, ref.id),
+              eq(accessRequests.userId, target.id),
+              eq(accessRequests.status, 'PENDING'),
+            ),
+          );
       } else {
         await tx
           .delete(fileShares)
@@ -459,6 +496,303 @@ export class SharingService {
       union select fp.user_id from folder_permissions fp where fp.folder_id in (select folder_id from chain)
       union select fo.owner_id from drive_folders fo where fo.id in (select folder_id from chain)`)) as unknown as { user_id: string }[];
     return rows.map((r) => r.user_id);
+  }
+
+  private getDestinationUrl(ref: ResourceRef, info: ResourceInfo, resourceId: string | null): string {
+    const relativePath = this.linkFor(ref, info, resourceId);
+    let destinationUrl = `${this.env.APP_URL}${relativePath}`;
+    if (this.env.COOKIE_DOMAIN) {
+      const rootDomain = this.env.COOKIE_DOMAIN.replace(/^\./, '');
+      if (info.fileType === 'SPREADSHEET' && resourceId) destinationUrl = `https://sheet.${rootDomain}/sheets/${resourceId}`;
+      else if (info.fileType === 'DOCUMENT' && resourceId) destinationUrl = `https://docs.${rootDomain}/docs/${resourceId}`;
+      else if (info.fileType === 'FORM' && resourceId) destinationUrl = `https://forms.${rootDomain}/forms/${resourceId}/edit`;
+      else if (ref.type === 'FOLDER') destinationUrl = `https://drive.${rootDomain}/drive/folder/${ref.id}`;
+    }
+    return destinationUrl;
+  }
+
+  /** Request access to a file or folder. Notifies owner via in-app notification & email. */
+  async requestAccess(
+    userId: string,
+    ref: ResourceRef,
+    input: RequestAccessInput,
+    audit: AuditContext,
+  ): Promise<{ success: boolean; message: string }> {
+    const info = await this.resource(ref);
+    if (userId === info.ownerId) throw badRequest('You are the owner of this document.');
+
+    const requesterMap = await UserRepository.summaries(this.db, [userId]);
+    const requester = requesterMap.get(userId);
+    const ownerMap = await UserRepository.summaries(this.db, [info.ownerId]);
+    const owner = ownerMap.get(info.ownerId);
+
+    const [existing] = await this.db
+      .select()
+      .from(accessRequests)
+      .where(
+        and(
+          ref.type === 'FILE' ? eq(accessRequests.fileId, ref.id) : eq(accessRequests.folderId, ref.id),
+          eq(accessRequests.userId, userId),
+          eq(accessRequests.status, 'PENDING'),
+        ),
+      )
+      .limit(1);
+
+    if (existing) {
+      await this.db
+        .update(accessRequests)
+        .set({ role: input.role, message: input.message ?? null, updatedAt: new Date() })
+        .where(eq(accessRequests.id, existing.id));
+    } else {
+      await this.db.insert(accessRequests).values({
+        resourceType: ref.type,
+        fileId: ref.type === 'FILE' ? ref.id : null,
+        folderId: ref.type === 'FOLDER' ? ref.id : null,
+        userId,
+        role: input.role,
+        message: input.message ?? null,
+        status: 'PENDING',
+      });
+    }
+
+    const resourceId = await this.resourceIdFor(ref);
+    const destinationUrl = this.getDestinationUrl(ref, info, resourceId);
+    const roleDisplay = input.role.charAt(0).toUpperCase() + input.role.slice(1).toLowerCase();
+
+    // 1. In-app notification to the owner
+    await this.notifications.notify([
+      {
+        userId: info.ownerId,
+        actorId: userId,
+        type: 'PERMISSION_CHANGED',
+        title: `${requester?.name ?? 'Someone'} requested ${roleDisplay.toLowerCase()} access`,
+        body: `"${info.name}"${input.message ? ` — "${input.message}"` : ''}`,
+        link: destinationUrl,
+        resourceType: ref.type,
+        resourceId: ref.id,
+      },
+    ]);
+
+    // 2. Email notification to the owner
+    if (owner?.email) {
+      try {
+        let reviewUrl = destinationUrl;
+        try {
+          const rawToken = randomToken(48);
+          const tokenHash = this.hash(rawToken);
+          const expiresAt = new Date(Date.now() + 30 * 86_400_000);
+          await this.db.insert(inviteTokens).values({
+            email: owner.email,
+            tokenHash,
+            targetUrl: destinationUrl,
+            expiresAt,
+          });
+          reviewUrl = `${this.env.APP_URL}/invite/${rawToken}`;
+        } catch {}
+
+        const htmlBody = `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 32px 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+            <div style="margin-bottom: 24px;">
+              <span style="font-size: 20px; font-weight: 700; color: #1a56db; letter-spacing: -0.5px;">QubDocs</span>
+            </div>
+            <h2 style="font-size: 20px; font-weight: 600; color: #0f172a; margin: 0 0 16px;">
+              ${requester?.name ?? 'Someone'} requested access
+            </h2>
+            <p style="font-size: 14px; color: #334155; line-height: 1.6; margin: 0 0 20px;">
+              <strong>${requester?.name ?? 'Someone'}</strong> (${requester?.email ?? ''}) has requested <strong>${roleDisplay}</strong> access to <strong>"${info.name}"</strong>.
+            </p>
+            ${input.message ? `<div style="background: #f8fafc; border-left: 4px solid #3b82f6; padding: 12px 16px; margin-bottom: 24px; border-radius: 0 8px 8px 0; font-size: 14px; color: #475569; font-style: italic;">"${input.message}"</div>` : ''}
+            <div style="margin: 28px 0;">
+              <a href="${reviewUrl}" style="display: inline-block; background: #1a56db; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 12px 24px; border-radius: 8px; box-shadow: 0 2px 4px rgba(26, 86, 219, 0.2);">
+                Open Document & Share
+              </a>
+            </div>
+            <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 28px 0;" />
+            <p style="font-size: 12px; color: #94a3b8; margin: 0;">
+              You received this email because you are the owner of "${info.name}" on QubDocs.
+            </p>
+          </div>
+        `;
+        void this.mailer.send({
+          to: owner.email,
+          subject: `${requester?.name ?? 'Someone'} requested access to "${info.name}"`,
+          text: `${requester?.name ?? 'Someone'} (${requester?.email ?? ''}) requested ${roleDisplay.toLowerCase()} access to "${info.name}".${input.message ? `\n\n"${input.message}"` : ''}\n\nReview & Share: ${reviewUrl}`,
+          html: htmlBody,
+        });
+      } catch (err) {
+        // Mail delivery failure must not break request submission
+      }
+    }
+
+    return { success: true, message: 'Access request sent to the owner' };
+  }
+
+  /** List pending access requests for an item. */
+  async getAccessRequests(userId: string, ref: ResourceRef): Promise<AccessRequestDto[]> {
+    await this.permissions.require(userId, ref, 'SHARE');
+    const rawReqs = await this.db
+      .select()
+      .from(accessRequests)
+      .where(
+        and(
+          ref.type === 'FILE' ? eq(accessRequests.fileId, ref.id) : eq(accessRequests.folderId, ref.id),
+          eq(accessRequests.status, 'PENDING'),
+        ),
+      );
+    if (rawReqs.length === 0) return [];
+    const users = await UserRepository.summaries(this.db, rawReqs.map((r) => r.userId));
+    return rawReqs.map((r) => ({
+      id: r.id,
+      user: users.get(r.userId) ?? { id: r.userId, name: 'Unknown User', email: '', avatarUrl: null },
+      role: r.role as any,
+      message: r.message,
+      status: r.status as any,
+      createdAt: r.createdAt.toISOString(),
+    }));
+  }
+
+  /** Grant an access request. Adds permission and notifies recipient via in-app & email. */
+  async grantAccessRequest(
+    userId: string,
+    ref: ResourceRef,
+    requestId: string,
+    input: GrantAccessRequestInput,
+    audit: AuditContext,
+  ): Promise<SharingStateDto> {
+    const access = await this.permissions.require(userId, ref, 'SHARE');
+    const [req] = await this.db
+      .select()
+      .from(accessRequests)
+      .where(
+        and(
+          eq(accessRequests.id, requestId),
+          ref.type === 'FILE' ? eq(accessRequests.fileId, ref.id) : eq(accessRequests.folderId, ref.id),
+        ),
+      )
+      .limit(1);
+
+    if (!req) throw notFound('Access request not found');
+    const info = await this.resource(ref);
+    const roleToGrant = input.role || req.role || 'EDITOR';
+    if (!access.isOwner && !roleAtLeast(access.role, roleToGrant)) throw forbidden('You cannot grant a higher role than your own.');
+
+    const recipientMap = await UserRepository.summaries(this.db, [req.userId]);
+    const recipient = recipientMap.get(req.userId);
+    const grantorMap = await UserRepository.summaries(this.db, [userId]);
+    const grantor = grantorMap.get(userId);
+
+    const flags = { role: roleToGrant, canShare: roleToGrant === 'EDITOR', canDownload: true, canCopy: true, grantedBy: userId };
+
+    await this.db.transaction(async (tx) => {
+      if (ref.type === 'FILE') {
+        await tx
+          .insert(filePermissions)
+          .values({ fileId: ref.id, userId: req.userId, ...flags })
+          .onConflictDoUpdate({ target: [filePermissions.fileId, filePermissions.userId], set: { ...flags, source: 'DIRECT', updatedAt: new Date() } });
+      } else {
+        await tx
+          .insert(folderPermissions)
+          .values({ folderId: ref.id, userId: req.userId, ...flags })
+          .onConflictDoUpdate({ target: [folderPermissions.folderId, folderPermissions.userId], set: { ...flags, source: 'DIRECT', updatedAt: new Date() } });
+      }
+
+      await tx
+        .update(accessRequests)
+        .set({ status: 'GRANTED', role: roleToGrant, resolvedAt: new Date(), resolvedBy: userId, updatedAt: new Date() })
+        .where(eq(accessRequests.id, requestId));
+    });
+
+    const resourceId = await this.resourceIdFor(ref);
+    const destinationUrl = this.getDestinationUrl(ref, info, resourceId);
+    const roleDisplay = roleToGrant.charAt(0).toUpperCase() + roleToGrant.slice(1).toLowerCase();
+
+    // 1. In-app notification to the recipient
+    await this.notifications.notify([
+      {
+        userId: req.userId,
+        actorId: userId,
+        type: 'PERMISSION_CHANGED',
+        title: `Access granted: "${info.name}"`,
+        body: `${grantor?.name ?? 'The owner'} granted you ${roleDisplay.toLowerCase()} access.`,
+        link: destinationUrl,
+        resourceType: ref.type,
+        resourceId: ref.id,
+      },
+    ]);
+
+    // 2. Email notification to the recipient
+    if (recipient?.email) {
+      try {
+        let openUrl = destinationUrl;
+        try {
+          const rawToken = randomToken(48);
+          const tokenHash = this.hash(rawToken);
+          const expiresAt = new Date(Date.now() + 30 * 86_400_000);
+          await this.db.insert(inviteTokens).values({
+            email: recipient.email,
+            tokenHash,
+            targetUrl: destinationUrl,
+            expiresAt,
+          });
+          openUrl = `${this.env.APP_URL}/invite/${rawToken}`;
+        } catch {}
+
+        const htmlBody = `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 32px 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+            <div style="margin-bottom: 24px;">
+              <span style="font-size: 20px; font-weight: 700; color: #1a56db; letter-spacing: -0.5px;">QubDocs</span>
+            </div>
+            <h2 style="font-size: 20px; font-weight: 600; color: #0f172a; margin: 0 0 16px;">
+              Access granted
+            </h2>
+            <p style="font-size: 14px; color: #334155; line-height: 1.6; margin: 0 0 20px;">
+              <strong>${grantor?.name ?? 'The owner'}</strong> has granted you <strong>${roleDisplay}</strong> access to <strong>"${info.name}"</strong>.
+            </p>
+            <div style="margin: 28px 0;">
+              <a href="${openUrl}" style="display: inline-block; background: #1a56db; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 12px 24px; border-radius: 8px; box-shadow: 0 2px 4px rgba(26, 86, 219, 0.2);">
+                Open ${info.name}
+              </a>
+            </div>
+            <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 28px 0;" />
+            <p style="font-size: 12px; color: #94a3b8; margin: 0;">
+              You received this email because you requested access to "${info.name}" on QubDocs.
+            </p>
+          </div>
+        `;
+        void this.mailer.send({
+          to: recipient.email,
+          subject: `Access granted: "${info.name}"`,
+          text: `${grantor?.name ?? 'The owner'} granted you ${roleDisplay.toLowerCase()} access to "${info.name}".\n\nOpen: ${openUrl}`,
+          html: htmlBody,
+        });
+      } catch (err) {
+        // Mail delivery failure must not break request resolution
+      }
+    }
+
+    await this.audit.log(audit, 'sharing.request_granted', { type: ref.type, id: ref.id }, { requestId, role: roleToGrant, recipientId: req.userId });
+    return this.getState(userId, ref);
+  }
+
+  /** Deny an access request. */
+  async denyAccessRequest(
+    userId: string,
+    ref: ResourceRef,
+    requestId: string,
+    audit: AuditContext,
+  ): Promise<{ denied: boolean }> {
+    await this.permissions.require(userId, ref, 'SHARE');
+    await this.db
+      .update(accessRequests)
+      .set({ status: 'DENIED', resolvedAt: new Date(), resolvedBy: userId, updatedAt: new Date() })
+      .where(
+        and(
+          eq(accessRequests.id, requestId),
+          ref.type === 'FILE' ? eq(accessRequests.fileId, ref.id) : eq(accessRequests.folderId, ref.id),
+        ),
+      );
+    await this.audit.log(audit, 'sharing.request_denied', { type: ref.type, id: ref.id }, { requestId });
+    return { denied: true };
   }
 
   async ancestorsOf(folderId: string) {

@@ -1,6 +1,6 @@
 import type { FileType } from '@qub/shared';
 import { Link } from '@tanstack/react-router';
-import { CloudOff, Check, Loader2, Lock, UserPlus, WifiOff, AlertTriangle } from 'lucide-react';
+import { CloudOff, Check, Loader2, Lock, LockKeyholeOpen, UserPlus, WifiOff, AlertTriangle } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { FileIcon } from './file-icon';
 import { Button } from './ui/button';
@@ -107,6 +107,7 @@ export function EditorHeader({
   menus,
   presence,
   onShare,
+  onRequestAccess,
   actions,
   readOnlyLabel,
 }: {
@@ -118,6 +119,7 @@ export function EditorHeader({
   menus?: ReactNode;
   presence?: PresenceUser[];
   onShare?(): void;
+  onRequestAccess?(): void;
   actions?: ReactNode;
   readOnlyLabel?: string;
 }) {
@@ -140,11 +142,15 @@ export function EditorHeader({
       </div>
       {presence && presence.length > 0 && <PresenceAvatars users={presence} />}
       {actions}
-      {onShare && (
-        <Button variant="secondary" onClick={onShare} className="ml-1">
+      {onRequestAccess ? (
+        <Button variant="primary" onClick={onRequestAccess} className="ml-1 font-semibold px-4 shadow-sm flex items-center gap-1.5 bg-primary hover:bg-primary-hover text-white">
+          <LockKeyholeOpen className="size-4" /> <span className="hidden sm:inline">Request access</span><span className="sm:hidden">Request</span>
+        </Button>
+      ) : onShare ? (
+        <Button variant="primary" onClick={onShare} className="ml-1 font-semibold px-4 shadow-sm">
           <UserPlus /> <span className="hidden sm:inline">Share</span>
         </Button>
-      )}
+      ) : null}
       <UserMenu />
     </header>
   );

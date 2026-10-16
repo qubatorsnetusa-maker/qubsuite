@@ -175,3 +175,14 @@ export const bulkIdsSchema = z.object({
   fileIds: z.array(uuidSchema).max(500).default([]),
   folderIds: z.array(uuidSchema).max(500).default([]),
 });
+
+export const requestAccessSchema = z.object({
+  role: z.enum(GRANTABLE_ROLES).default('EDITOR'),
+  message: z.string().max(1000).optional(),
+});
+export type RequestAccessInput = z.infer<typeof requestAccessSchema>;
+
+export const grantAccessRequestSchema = z.object({
+  role: z.enum(GRANTABLE_ROLES).default('EDITOR'),
+});
+export type GrantAccessRequestInput = z.infer<typeof grantAccessRequestSchema>;

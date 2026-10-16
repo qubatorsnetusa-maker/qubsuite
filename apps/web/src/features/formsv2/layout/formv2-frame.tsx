@@ -111,7 +111,21 @@ function Frame() {
       <div className="min-h-0 flex-1 overflow-y-auto">
         <Outlet />
       </div>
-      <ShareDialog target={share ? { kind: 'file', id: form.fileId, name: form.title } : null} onOpenChange={setShare} />
+      <ShareDialog
+        target={
+          share
+            ? {
+                kind: 'file',
+                id: form.fileId,
+                name: form.title,
+                isForm: true,
+                customCopyUrl: `${window.location.origin}/formsv2/f/${form.publicId}`,
+                copyButtonLabel: 'Copy form link',
+              }
+            : null
+        }
+        onOpenChange={setShare}
+      />
     </div>
   );
 }

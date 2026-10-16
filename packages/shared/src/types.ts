@@ -185,6 +185,15 @@ export interface ShareLinkDto {
   createdAt: string;
 }
 
+export interface AccessRequestDto {
+  id: string;
+  user: UserSummary;
+  role: GrantableRole;
+  message: string | null;
+  status: 'PENDING' | 'GRANTED' | 'DENIED';
+  createdAt: string;
+}
+
 export interface SharingStateDto {
   resourceType: ResourceType;
   resourceId: string;
@@ -193,6 +202,7 @@ export interface SharingStateDto {
   visibility: Visibility;
   permissions: PermissionDto[];
   pendingInvites: PendingInviteDto[];
+  pendingRequests?: AccessRequestDto[];
   link: ShareLinkDto | null;
   capabilities: Capabilities;
   /** Organization sharing policy, so the share dialog only offers what is allowed. */

@@ -121,7 +121,16 @@ export async function socketUrl(path: string): Promise<string> {
 }
 
 export function errorMessage(err: unknown): string {
+  if (typeof err === 'string' && err.trim()) return err;
   if (err instanceof ApiError) return err.message;
   if (err instanceof Error) return err.message;
+  if (err && typeof err === 'object') {
+    if ('message' in err && typeof (err as any).message === 'string' && (err as any).message.trim()) {
+      return (err as any).message;
+    }
+    if ('error' in err && typeof (err as any).error === 'string' && (err as any).error.trim()) {
+      return (err as any).error;
+    }
+  }
   return 'Something went wrong.';
 }

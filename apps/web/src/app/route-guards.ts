@@ -20,6 +20,14 @@ export async function guestOnly() {
   if (s.status === 'authenticated') throw redirect({ to: defaultDestination() as any });
 }
 
-export const redirectSearch = z.object({ redirect: z.string().optional(), email: z.string().optional(), callback: z.string().optional(), error: z.string().optional(), token: z.string().optional() });
+export const redirectSearch = z.object({
+  redirect: z.coerce.string().optional(),
+  email: z.coerce.string().optional(),
+  name: z.coerce.string().optional(),
+  callback: z.coerce.string().optional(),
+  error: z.coerce.string().optional(),
+  token: z.coerce.string().optional(),
+  neon_auth_session_verifier: z.coerce.string().optional(),
+});
 
 export const tokenSearch = z.object({ token: z.string().default('') });

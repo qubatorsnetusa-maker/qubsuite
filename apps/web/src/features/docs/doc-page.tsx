@@ -25,7 +25,9 @@ import { cn, randomId } from '@/lib/utils';
 import { docsService } from '@/services/docs';
 import { qk } from '@/services/query-keys';
 import { MoveDialog } from '../drive/dialogs';
+import { getServiceUrl } from '@/lib/ecosystem-urls';
 import { ShareDialog } from '../sharing/share-dialog';
+import { RequestAccessDialog } from '../sharing/request-access-dialog';
 import { CommentHighlights, createAnchor, setAnchorView } from './comment-anchors';
 import { CommentsPanel, type Draft } from './comments-panel';
 import { DocMenus, type DocMenusProps } from './doc-menus';
@@ -94,6 +96,7 @@ function DocEditor({ documentId }: { documentId: string }) {
     ? PAPER_SIZES[pageConfig.paperSize as PaperSize]?.portraitHeight ?? 1056
     : PAPER_SIZES[pageConfig.paperSize as PaperSize]?.portraitWidth ?? 816;
   const [shareOpen, setShareOpen] = useState(false);
+  const [requestAccessOpen, setRequestAccessOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [activeAnchor, setActiveAnchor] = useState<string | null>(null);
@@ -117,6 +120,7 @@ function DocEditor({ documentId }: { documentId: string }) {
   const role = collab.role ?? serverRole;
   const canEdit = roleAtLeast(role, 'EDITOR') && !doc.data?.isTrashed;
   const canComment = roleAtLeast(role, 'COMMENTER') && !doc.data?.isTrashed;
+  const canShare = doc.data?.capabilities.canShare ?? false;
 
   const editor = useEditor(
     {
@@ -277,6 +281,17 @@ function DocEditor({ documentId }: { documentId: string }) {
   });
 
   const d = doc.data!;
+
+  const handleShare = async () => {
+    const docUrl = getServiceUrl('docs', `/docs/${documentId}`);
+    try {
+      await navigator.clipboard.writeText(docUrl);
+      toast.success('Document link copied to clipboard');
+    } catch {
+      // ignore
+    }
+    setShareOpen(true);
+  };
   if (collab.fatal) return <ErrorState error={new Error(collab.fatal)} title="Document unavailable" />;
 
   return (
@@ -290,7 +305,8 @@ function DocEditor({ documentId }: { documentId: string }) {
           status={<SaveIndicator status={collab.saveState} lastSavedAt={collab.lastSavedAt} />}
           readOnlyLabel={canEdit ? undefined : canComment ? 'Can comment' : 'View only'}
           presence={collab.users.map((u) => ({ key: u.clientId, name: u.name, avatarUrl: u.avatarUrl, color: u.color }))}
-          onShare={() => setShareOpen(true)}
+          onShare={canShare ? handleShare : undefined}
+          onRequestAccess={!canShare && !canEdit ? () => setRequestAccessOpen(true) : undefined}
           menus={
             editor ? (
               <DocMenusWithImage
@@ -435,7 +451,32 @@ function DocEditor({ documentId }: { documentId: string }) {
 
       {editor && <WordCountDialog editor={editor} open={wordCountOpen} onOpenChange={setWordCountOpen} />}
       {versionsOpen && <VersionsPanel documentId={documentId} canEdit={canEdit} onClose={() => setVersionsOpen(false)} />}
-      <ShareDialog target={shareOpen ? { kind: 'file', id: d.fileId, name: d.title } : null} onOpenChange={setShareOpen} />
+      <ShareDialog
+        target={
+          shareOpen
+            ? {
+                kind: 'file',
+                id: d.fileId,
+                name: d.title,
+                customCopyUrl: getServiceUrl('docs', `/docs/${documentId}`),
+                copyButtonLabel: 'Copy document link',
+              }
+            : null
+        }
+        onOpenChange={setShareOpen}
+      />
+      <RequestAccessDialog
+        target={
+          requestAccessOpen
+            ? {
+                kind: 'file',
+                id: d.fileId,
+                name: d.title,
+              }
+            : null
+        }
+        onOpenChange={setRequestAccessOpen}
+      />
       {editor && <VoiceTypingWidget editor={editor} isOpen={voiceOpen} onClose={() => setVoiceOpen(false)} />}
       <PageSetupDialog open={pageSetupOpen} onOpenChange={setPageSetupOpen} config={pageConfig} onSave={setPageConfig} />
       <MoveDialog items={moveOpen ? [{ kind: 'file', id: d.fileId, name: d.title }] : null} onOpenChange={setMoveOpen} />

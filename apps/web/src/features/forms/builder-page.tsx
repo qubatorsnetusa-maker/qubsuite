@@ -167,7 +167,21 @@ export function FormTopBar({
           </Link>
         )}
       </nav>
-      <ShareDialog target={share ? { kind: 'file', id: form.fileId, name: form.title } : null} onOpenChange={setShare} />
+      <ShareDialog
+        target={
+          share
+            ? {
+                kind: 'file',
+                id: form.fileId,
+                name: form.title,
+                isForm: true,
+                customCopyUrl: publicUrl,
+                copyButtonLabel: 'Copy form link',
+              }
+            : null
+        }
+        onOpenChange={setShare}
+      />
       <MoveDialog items={move ? [{ kind: 'file', id: form.fileId, name: form.title }] : null} onOpenChange={setMove} />
     </div>
   );

@@ -46,7 +46,12 @@ export const PermissionRepository = {
     if (!ids.length) return [];
     return db.execute<DirectGrantRow>(sql`
       select file_id as item_id, role, can_share, can_download, can_copy
-      from file_permissions where user_id = ${userId} and file_id in ${ids}`) as unknown as DirectGrantRow[];
+      from file_permissions where user_id = ${userId} and file_id in ${ids}
+      union all
+      select fs.file_id as item_id, fs.role, fs.can_share, fs.can_download, fs.can_copy
+      from file_shares fs
+      join users u on lower(u.email) = lower(fs.email)
+      where u.id = ${userId} and fs.file_id in ${ids} and fs.accepted_at is null`) as unknown as DirectGrantRow[];
   },
 
   /**
@@ -63,11 +68,20 @@ export const PermissionRepository = {
         where p.parent_id is not null
       )
       select c.item_id, c.folder_id, c.depth, fo.owner_id as folder_owner,
-             fp.role, fp.can_share, fp.can_download, fp.can_copy
+             coalesce(fp.role, fsp.role) as role,
+             coalesce(fp.can_share, fsp.can_share) as can_share,
+             coalesce(fp.can_download, fsp.can_download) as can_download,
+             coalesce(fp.can_copy, fsp.can_copy) as can_copy
       from chain c
       join drive_folders fo on fo.id = c.folder_id
       left join folder_permissions fp on fp.folder_id = c.folder_id and fp.user_id = ${userId}
-      where fo.owner_id = ${userId} or fp.id is not null`) as unknown as GrantRow[];
+      left join (
+        select fs.folder_id, fs.role, fs.can_share, fs.can_download, fs.can_copy
+        from file_shares fs
+        join users u on lower(u.email) = lower(fs.email)
+        where u.id = ${userId} and fs.folder_id is not null and fs.accepted_at is null
+      ) fsp on fsp.folder_id = c.folder_id
+      where fo.owner_id = ${userId} or fp.id is not null or fsp.folder_id is not null`) as unknown as GrantRow[];
   },
 
   /** For each folder: itself (depth 0) and every ancestor the user owns or has a grant on. */
@@ -82,11 +96,20 @@ export const PermissionRepository = {
         where p.parent_id is not null
       )
       select c.item_id, c.folder_id, c.depth, fo.owner_id as folder_owner,
-             fp.role, fp.can_share, fp.can_download, fp.can_copy
+             coalesce(fp.role, fsp.role) as role,
+             coalesce(fp.can_share, fsp.can_share) as can_share,
+             coalesce(fp.can_download, fsp.can_download) as can_download,
+             coalesce(fp.can_copy, fsp.can_copy) as can_copy
       from chain c
       join drive_folders fo on fo.id = c.folder_id
       left join folder_permissions fp on fp.folder_id = c.folder_id and fp.user_id = ${userId}
-      where fo.owner_id = ${userId} or fp.id is not null`) as unknown as GrantRow[];
+      left join (
+        select fs.folder_id, fs.role, fs.can_share, fs.can_download, fs.can_copy
+        from file_shares fs
+        join users u on lower(u.email) = lower(fs.email)
+        where u.id = ${userId} and fs.folder_id is not null and fs.accepted_at is null
+      ) fsp on fsp.folder_id = c.folder_id
+      where fo.owner_id = ${userId} or fp.id is not null or fsp.folder_id is not null`) as unknown as GrantRow[];
   },
 
   /** Ancestor ids of a folder, nearest first, including the folder itself. */
@@ -111,5 +134,61 @@ export const PermissionRepository = {
       )
       select id from sub`)) as unknown as { id: string }[];
     return rows.map((r) => r.id);
+  },
+
+  /** Public link grants for files with ANYONE_WITH_LINK general access (directly or via parent folder). */
+  async publicFileGrants(db: Executor, ids: string[]): Promise<DirectGrantRow[]> {
+    if (!ids.length) return [];
+    return db.execute<DirectGrantRow>(sql`
+      with recursive chain as (
+        select f.id as item_id, f.folder_id as folder_id, 0 as depth from drive_files f where f.id in ${ids}
+        union all
+        select c.item_id, p.parent_id, c.depth + 1
+        from chain c join drive_folders p on p.id = c.folder_id
+        where p.parent_id is not null
+      )
+      select df.id as item_id, coalesce(sl.permission, 'VIEWER') as role, false as can_share, true as can_download, true as can_copy
+      from drive_files df
+      left join share_links sl on sl.file_id = df.id
+        and sl.revoked_at is null
+        and (sl.expires_at is null or sl.expires_at > now())
+        and sl.password_hash is null
+      where df.id in ${ids}
+        and df.general_access = 'ANYONE_WITH_LINK'
+        and not df.is_trashed
+      union all
+      select c.item_id, coalesce(sl.permission, 'VIEWER') as role, false as can_share, true as can_download, true as can_copy
+      from chain c
+      join drive_folders f on f.id = c.folder_id
+      left join share_links sl on sl.folder_id = f.id
+        and sl.revoked_at is null
+        and (sl.expires_at is null or sl.expires_at > now())
+        and sl.password_hash is null
+      where f.general_access = 'ANYONE_WITH_LINK'
+        and not f.is_trashed
+    `) as unknown as DirectGrantRow[];
+  },
+
+  /** Public link grants for folders with ANYONE_WITH_LINK general access (directly or via parent folder). */
+  async publicFolderGrants(db: Executor, ids: string[]): Promise<DirectGrantRow[]> {
+    if (!ids.length) return [];
+    return db.execute<DirectGrantRow>(sql`
+      with recursive chain as (
+        select f.id as item_id, f.id as folder_id, 0 as depth from drive_folders f where f.id in ${ids}
+        union all
+        select c.item_id, p.parent_id, c.depth + 1
+        from chain c join drive_folders p on p.id = c.folder_id
+        where p.parent_id is not null
+      )
+      select c.item_id, coalesce(sl.permission, 'VIEWER') as role, false as can_share, true as can_download, true as can_copy
+      from chain c
+      join drive_folders f on f.id = c.folder_id
+      left join share_links sl on sl.folder_id = f.id
+        and sl.revoked_at is null
+        and (sl.expires_at is null or sl.expires_at > now())
+        and sl.password_hash is null
+      where f.general_access = 'ANYONE_WITH_LINK'
+        and not f.is_trashed
+    `) as unknown as DirectGrantRow[];
   },
 };

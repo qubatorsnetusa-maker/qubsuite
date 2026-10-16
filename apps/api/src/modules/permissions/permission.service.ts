@@ -77,7 +77,7 @@ function ancestorGrants(rows: GrantRow[], userId: string, skipSelf: boolean) {
  */
 /** Organization rule applied on top of grants: viewers/commenters lose download and copy when it's off. */
 export interface ContentPolicySource {
-  get(): Promise<{ content: { viewersCanDownload: boolean } }>;
+  get(): Promise<{ content: { viewersCanDownload: boolean }; sharing?: { allowPublicLinks: boolean; maxLinkRole: Role } }>;
 }
 
 export class PermissionService {
@@ -87,9 +87,12 @@ export class PermissionService {
   ) {}
 
   private async applyContentPolicy(out: Map<string, Access>): Promise<Map<string, Access>> {
-    if (!out.size || (await this.policies.get()).content.viewersCanDownload) return out;
-    for (const [id, a] of out) {
-      if (!a.isOwner && !roleAtLeast(a.role, 'EDITOR')) out.set(id, { ...a, canDownload: false, canCopy: false });
+    if (!out.size) return out;
+    const policy = await this.policies.get();
+    if (!policy.content.viewersCanDownload) {
+      for (const [id, a] of out) {
+        if (!a.isOwner && !roleAtLeast(a.role, 'EDITOR')) out.set(id, { ...a, canDownload: false, canCopy: false });
+      }
     }
     return out;
   }
@@ -105,18 +108,36 @@ export class PermissionService {
       else ids.push(id);
     }
     if (!ids.length) return out;
-    const [files, direct, ancestors] = await Promise.all([
+    const [files, direct, ancestors, publicGrants, policy] = await Promise.all([
       PermissionRepository.files(tx, ids),
       PermissionRepository.directFileGrants(tx, userId, ids),
       PermissionRepository.fileAncestorGrants(tx, userId, ids),
+      PermissionRepository.publicFileGrants(tx, ids),
+      this.policies.get(),
     ]);
     const directBy = groupBy(direct, (d) => d.item_id);
     const ancBy = groupBy(ancestors, (a) => a.item_id);
+    const allowPublic = policy.sharing ? policy.sharing.allowPublicLinks : true;
+    const maxLinkRole = policy.sharing ? policy.sharing.maxLinkRole : 'EDITOR';
+    const pubBy = groupBy(
+      allowPublic
+        ? publicGrants.map((g) => ({
+            ...g,
+            role: roleAtLeast(maxLinkRole, g.role) ? g.role : maxLinkRole,
+          }))
+        : [],
+      (p) => p.item_id,
+    );
     for (const f of files as ItemRow[]) {
       const isOwner = f.owner_id === userId;
       // Trashed items are visible to their owner only.
       if (f.is_trashed && !isOwner) continue;
-      const access = combine(isOwner, [...(directBy.get(f.id) ?? []), ...ancestorGrants(ancBy.get(f.id) ?? [], userId, false)] as DirectGrantRow[]);
+      const grants = [
+        ...(directBy.get(f.id) ?? []),
+        ...ancestorGrants(ancBy.get(f.id) ?? [], userId, false),
+        ...(pubBy.get(f.id) ?? []),
+      ];
+      const access = combine(isOwner, grants as DirectGrantRow[]);
       if (access) {
         accessCache.set(`file:${userId}:${f.id}`, access);
         out.set(f.id, access);
@@ -136,19 +157,37 @@ export class PermissionService {
       else ids.push(id);
     }
     if (!ids.length) return out;
-    const [folders, chain] = await Promise.all([
+    const [folders, chain, publicGrants, policy] = await Promise.all([
       PermissionRepository.folders(tx, ids),
       PermissionRepository.folderChainGrants(tx, userId, ids),
+      PermissionRepository.publicFolderGrants(tx, ids),
+      this.policies.get(),
     ]);
     const chainBy = groupBy(chain, (c) => c.item_id);
+    const allowPublic = policy.sharing ? policy.sharing.allowPublicLinks : true;
+    const maxLinkRole = policy.sharing ? policy.sharing.maxLinkRole : 'EDITOR';
+    const pubBy = groupBy(
+      allowPublic
+        ? publicGrants.map((g) => ({
+            ...g,
+            role: roleAtLeast(maxLinkRole, g.role) ? g.role : maxLinkRole,
+          }))
+        : [],
+      (p) => p.item_id,
+    );
     for (const f of folders as ItemRow[]) {
       const isOwner = f.owner_id === userId;
       if (f.is_trashed && !isOwner) continue;
       const rows = chainBy.get(f.id) ?? [];
       const self = rows.filter((r) => r.depth === 0 && r.role).map((r) => ({ role: r.role, can_share: r.can_share, can_download: r.can_download, can_copy: r.can_copy }));
-      const access = combine(isOwner, [...self, ...ancestorGrants(rows, userId, true)]);
+      const grants = [
+        ...self,
+        ...ancestorGrants(rows, userId, true),
+        ...(pubBy.get(f.id) ?? []),
+      ];
+      const access = combine(isOwner, grants as DirectGrantRow[]);
       if (access) {
-        accessCache.set(`file:${userId}:${f.id}`, access);
+        accessCache.set(`folder:${userId}:${f.id}`, access);
         out.set(f.id, access);
       }
     }

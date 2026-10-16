@@ -1,6 +1,6 @@
 import { KingsChatButton } from './kingschat-button';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { forgotPasswordSchema, loginSchema, passwordSchema, registerSchema, type LoginInput, type RegisterInput } from '@qub/shared';
+import { checkEmailSyntaxAndTypo, getTypoSuggestion, forgotPasswordSchema, loginSchema, passwordSchema, registerSchema, type LoginInput, type RegisterInput } from '@qub/shared';
 import { useMutation } from '@tanstack/react-query';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { CheckCircle2, MailCheck } from 'lucide-react';
@@ -17,7 +17,7 @@ function AuthCard({ title, subtitle, children, footer }: { title: string; subtit
   return (
     <main className="flex min-h-full items-center justify-center bg-surface-2 px-4 py-10">
       <div className="w-full max-w-[448px] rounded-3xl bg-background p-8 shadow-card sm:p-10">
-        <QubLogo />
+        <QubLogo product="QubDocs" />
         <h1 className="mt-8 text-[28px] font-normal leading-tight">{title}</h1>
         {subtitle && <p className="mt-2 text-sm text-muted">{subtitle}</p>}
         <div className="mt-8">{children}</div>
@@ -68,19 +68,22 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(search.error ? `Sign-in error: ${search.error}` : null);
   const [kcError, setKcError] = useState<string | null>(null);
+  const isCallback =
+    (search.callback !== undefined && String(search.callback).replace(/["']/g, '').trim() === '1') ||
+    !!search.neon_auth_session_verifier;
   const [resendCooldown, setResendCooldown] = useState(0);
-  const [verifying, setVerifying] = useState(search.callback === '1');
+  const [verifying, setVerifying] = useState(isCallback);
 
   // Handle redirect callback from Neon Auth magic link email verification
   useEffect(() => {
-    if (search.callback !== '1') return;
+    if (!isCallback) return;
 
     let active = true;
     async function resolveCallback() {
       try {
         let sessionToken: string | undefined = undefined;
         let neonEmail: string | undefined = search.email;
-        let neonName: string | undefined = undefined;
+        let neonName: string | undefined = search.name || (typeof window !== "undefined" ? localStorage.getItem("qub_pending_name") || undefined : undefined);
         let neonUserId: string | undefined = undefined;
 
         try {
@@ -107,6 +110,7 @@ export function LoginPage() {
           email: neonEmail,
           name: neonName,
           neonUserId,
+          verifier: search.neon_auth_session_verifier,
         });
 
         if (!active) return;
@@ -122,7 +126,7 @@ export function LoginPage() {
     return () => {
       active = false;
     };
-  }, [search, navigate]);
+  }, [search, isCallback, navigate]);
 
   // Background polling: if the user clicks the magic link on their phone or another tab,
   // this active login tab will automatically detect it and log in!
@@ -153,14 +157,15 @@ export function LoginPage() {
   const handleSendLink = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const trimmed = email.trim().toLowerCase();
-    if (!trimmed || !trimmed.includes('@')) {
-      setError('Please enter a valid email address');
+    const check = checkEmailSyntaxAndTypo(trimmed);
+    if (!check.valid) {
+      setError(check.reason || 'Please enter a valid email address');
       return;
     }
     setError(null);
     setLoading(true);
     try {
-      const callbackUrl = `${window.location.origin}/login?callback=1${search.redirect ? `&redirect=${encodeURIComponent(search.redirect)}` : ''}`;
+      const callbackUrl = `${window.location.origin}/login?callback=1&email=${encodeURIComponent(trimmed)}${search.redirect ? `&redirect=${encodeURIComponent(search.redirect)}` : ''}`;
       await authService.sendMagicLink(trimmed, callbackUrl);
       setSentEmail(trimmed);
       setResendCooldown(30);
@@ -225,8 +230,8 @@ export function LoginPage() {
 
   return (
     <AuthCard
-      title="Sign in"
-      subtitle="Sign in with your email to continue to QubDocs"
+      title="Welcome to QubDocs"
+      subtitle="Sign in with KingsChat or your email to continue to QubDocs"
       footer={
         <>
           New to QubDocs?{' '}
@@ -255,6 +260,18 @@ export function LoginPage() {
             onChange={(e) => { setEmail(e.target.value); setError(null); }}
             invalid={!!error}
           />
+          {getTypoSuggestion(email) && (
+            <div className="mt-2 flex items-center justify-between rounded-lg bg-primary/10 px-3 py-1.5 text-xs text-primary">
+              <span>Did you mean <strong>{getTypoSuggestion(email)}</strong>?</span>
+              <button
+                type="button"
+                className="font-semibold underline hover:opacity-80"
+                onClick={() => { setEmail(getTypoSuggestion(email)!); setError(null); }}
+              >
+                Use this
+              </button>
+            </div>
+          )}
           <p className="mt-1.5 text-xs text-muted">
             We'll email you a secure sign-in link. No password required.
           </p>
@@ -274,28 +291,131 @@ export function RegisterPage() {
   const [name, setName] = useState('');
   const [sentEmail, setSentEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(search.error ? `Sign-up error: ${search.error}` : null);
   const [kcError, setKcError] = useState<string | null>(null);
+  const isCallback =
+    (search.callback !== undefined && String(search.callback).replace(/["']/g, '').trim() === '1') ||
+    !!search.neon_auth_session_verifier;
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [verifying, setVerifying] = useState(isCallback);
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Handle redirect callback from Neon Auth magic link email verification
+  useEffect(() => {
+    if (!isCallback) return;
+
+    let active = true;
+    async function resolveCallback() {
+      try {
+        let sessionToken: string | undefined = undefined;
+        let neonEmail: string | undefined = search.email;
+        let neonName: string | undefined = undefined;
+        let neonUserId: string | undefined = undefined;
+
+        try {
+          const NEON_AUTH_URL = 'https://ep-small-unit-b1bvawbw.neonauth.c-5.eu-central-1.aws.neon.tech/qubsuite/auth';
+          const res = await fetch(`${NEON_AUTH_URL}/get-session`, {
+            credentials: 'include',
+            headers: { Accept: 'application/json' },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.session?.token) {
+              sessionToken = data.session.token;
+              neonEmail = data.user?.email || neonEmail;
+              neonName = data.user?.name;
+              neonUserId = data.user?.id;
+            }
+          }
+        } catch {
+          // Fallback to database lookup
+        }
+
+        await authService.neonSession({
+          sessionToken,
+          email: neonEmail,
+          name: neonName,
+          neonUserId,
+          verifier: search.neon_auth_session_verifier,
+        });
+
+        if (!active) return;
+        void navigate({ href: safeRedirect(search.redirect), replace: true });
+      } catch (err: any) {
+        if (!active) return;
+        setVerifying(false);
+        setError(errorMessage(err) || 'Sign-up link expired or invalid. Please request a new one.');
+      }
+    }
+
+    void resolveCallback();
+    return () => {
+      active = false;
+    };
+  }, [search, isCallback, navigate]);
+
+  // Background polling: automatically authenticate once verified on mobile/another tab
+  useEffect(() => {
+    if (!sentEmail || verifying) return;
+    const since = new Date().toISOString();
+    const interval = setInterval(async () => {
+      try {
+        const res = await authService.pollMagicLink(sentEmail, since);
+        if (res.authenticated) {
+          clearInterval(interval);
+          void navigate({ href: safeRedirect(search.redirect), replace: true });
+        }
+      } catch {
+        // ignore poll errors
+      }
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [sentEmail, verifying, search.redirect, navigate]);
+
+  // Resend cooldown timer
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
+
+  const handleRegister = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      setError('Please enter your full name');
+      return;
+    }
     const trimmed = email.trim().toLowerCase();
-    if (!trimmed || !trimmed.includes('@')) {
-      setError('Please enter a valid email address');
+    const check = checkEmailSyntaxAndTypo(trimmed);
+    if (!check.valid) {
+      setError(check.reason || 'Please enter a valid email address');
       return;
     }
     setError(null);
     setLoading(true);
     try {
-      const callbackUrl = `${window.location.origin}/auth/callback${search.redirect ? `?redirect=${encodeURIComponent(search.redirect)}` : ''}`;
+      if (typeof window !== 'undefined') localStorage.setItem('qub_pending_name', trimmedName);
+      const callbackUrl = `${window.location.origin}/login?callback=1&email=${encodeURIComponent(trimmed)}&name=${encodeURIComponent(trimmedName)}${search.redirect ? `&redirect=${encodeURIComponent(search.redirect)}` : ''}`;
       await authService.sendMagicLink(trimmed, callbackUrl);
       setSentEmail(trimmed);
+      setResendCooldown(30);
     } catch (err: any) {
-      setError(errorMessage(err) || 'Failed to send sign-in link.');
+      setError(errorMessage(err) || 'Failed to send sign-in link. Please check your email.');
     } finally {
       setLoading(false);
     }
   };
+
+  if (verifying) {
+    return (
+      <AuthCard title="Signing you in..." subtitle="Activating your account with QubDocs">
+        <div className="flex flex-col items-center justify-center py-8">
+          <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <p className="mt-4 text-xs text-muted">Just a moment while we set up your session...</p>
+        </div>
+      </AuthCard>
+    );
+  }
 
   if (sentEmail) {
     return (
@@ -303,10 +423,19 @@ export function RegisterPage() {
         title="Check your email"
         subtitle={<>We sent a sign-up link to <strong className="text-foreground">{sentEmail}</strong>.</>}
         footer={
-          <div className="text-center">
-            <Link to="/login" className="text-sm font-medium text-primary hover:underline">
-              Back to sign in
-            </Link>
+          <div className="space-y-2 text-center">
+            <button
+              type="button"
+              onClick={() => { setSentEmail(null); setError(null); }}
+              className="text-sm font-medium text-primary hover:underline"
+            >
+              Use a different email
+            </button>
+            <div>
+              <Link to="/login" className="text-xs text-muted hover:underline">
+                Back to sign in
+              </Link>
+            </div>
           </div>
         }
       >
@@ -315,8 +444,20 @@ export function RegisterPage() {
             <MailCheck className="size-8" />
           </div>
           <p className="mt-4 text-sm text-muted">
-            Click the link in the email to activate your account and start using QubDocs.
+            Click the link in the email to activate your account and start using QubDocs. You can keep this page open to sign in automatically once verified.
           </p>
+        </div>
+
+        <div className="space-y-3">
+          <Button
+            variant="outline"
+            size="lg"
+            className="w-full"
+            disabled={resendCooldown > 0 || loading}
+            onClick={() => void handleRegister()}
+          >
+            {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend sign-in link'}
+          </Button>
         </div>
       </AuthCard>
     );
@@ -342,14 +483,16 @@ export function RegisterPage() {
       />
       <form onSubmit={handleRegister} noValidate className="space-y-5">
         <div>
-          <Label htmlFor="name">Full name (optional)</Label>
+          <Label htmlFor="name">Full name</Label>
           <Input
             id="name"
             autoComplete="name"
+            required
             className="mt-1.5"
-            placeholder="Your name"
+            placeholder="Your full name"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => { setName(e.target.value); setError(null); }}
+            invalid={!!error && !name.trim()}
           />
         </div>
         <div>
@@ -364,6 +507,18 @@ export function RegisterPage() {
             onChange={(e) => { setEmail(e.target.value); setError(null); }}
             invalid={!!error}
           />
+          {getTypoSuggestion(email) && (
+            <div className="mt-2 flex items-center justify-between rounded-lg bg-primary/10 px-3 py-1.5 text-xs text-primary">
+              <span>Did you mean <strong>{getTypoSuggestion(email)}</strong>?</span>
+              <button
+                type="button"
+                className="font-semibold underline hover:opacity-80"
+                onClick={() => { setEmail(getTypoSuggestion(email)!); setError(null); }}
+              >
+                Use this
+              </button>
+            </div>
+          )}
         </div>
         <Button type="submit" size="lg" className="w-full" loading={loading}>
           Create account

@@ -1,4 +1,5 @@
-import { isPlaceholderEmail, placeholderEmailFor, type AuthResult, type ChangePasswordInput, type LoginInput, type RegisterInput, type SessionInfo } from '@qub/shared';
+import dns from 'dns';
+import { checkEmailSyntaxAndTypo, isPlaceholderEmail, placeholderEmailFor, type AuthResult, type ChangePasswordInput, type LoginInput, type RegisterInput, type SessionInfo } from '@qub/shared';
 import { and, desc, eq, gt, isNull, ne, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { Env } from '../../config/env';
@@ -44,6 +45,49 @@ const SETUP_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const ADMIN_RESET_TTL_MS = 24 * 60 * 60 * 1000;
 /** Parallel refreshes (e.g. two tabs) within this window are not treated as token theft. */
 const REFRESH_REUSE_GRACE_MS = 30_000;
+
+
+try {
+  dns.setServers(['8.8.8.8', '1.1.1.1']);
+} catch {
+  // Ignore in environments where setServers is restricted
+}
+
+async function verifyEmailDomainMx(rawEmail: string): Promise<void> {
+  const check = checkEmailSyntaxAndTypo(rawEmail);
+  if (!check.valid) {
+    throw new AppError('BAD_REQUEST', check.reason || 'Invalid email address format.');
+  }
+
+  const domain = check.domain!;
+
+  try {
+    const mxPromise = dns.promises.resolveMx(domain);
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('DNS_TIMEOUT')), 2500);
+    });
+
+    const records = await Promise.race([mxPromise, timeoutPromise]);
+    const validRecords = (records || []).filter((r) => r.exchange && r.exchange.trim() !== '.' && r.exchange.trim() !== '');
+
+    if (validRecords.length === 0) {
+      throw new AppError('BAD_REQUEST', `The email domain @${domain} does not have an active mail server to receive emails.`);
+    }
+  } catch (err: any) {
+    if (err instanceof AppError) throw err;
+
+    if (
+      err.code === 'ENOTFOUND' ||
+      err.code === 'ENODATA' ||
+      err.code === 'NXDOMAIN' ||
+      err.code === 'SERVFAIL'
+    ) {
+      throw new AppError('BAD_REQUEST', `The email domain @${domain} does not exist or cannot receive mail. Please check for typos.`);
+    }
+
+    console.warn(`[sendMagicLink] MX check skipped for @${domain} due to: ${err.message || err.code}`);
+  }
+}
 
 export class AuthService {
   constructor(
@@ -130,11 +174,11 @@ ${link}`,
   }
 
   /** Invitations sent to this email before the account existed become real permissions. */
-  private async acceptPendingShares(tx: Executor, user: UserRow): Promise<void> {
+  async acceptPendingShares(tx: Executor, user: UserRow): Promise<void> {
     const pending = await tx
       .select()
       .from(fileShares)
-      .where(and(eq(fileShares.email, user.email), isNull(fileShares.acceptedAt)));
+      .where(and(sql`lower(${fileShares.email}) = lower(${user.email})`, isNull(fileShares.acceptedAt)));
     for (const share of pending) {
       const grant = {
         userId: user.id,
@@ -144,8 +188,24 @@ ${link}`,
         canCopy: share.canCopy,
         grantedBy: share.invitedBy,
       };
-      if (share.fileId) await tx.insert(filePermissions).values({ ...grant, fileId: share.fileId }).onConflictDoNothing();
-      if (share.folderId) await tx.insert(folderPermissions).values({ ...grant, folderId: share.folderId }).onConflictDoNothing();
+      if (share.fileId) {
+        await tx
+          .insert(filePermissions)
+          .values({ ...grant, fileId: share.fileId })
+          .onConflictDoUpdate({
+            target: [filePermissions.fileId, filePermissions.userId],
+            set: { role: share.role, canShare: share.canShare, canDownload: share.canDownload, canCopy: share.canCopy, updatedAt: new Date() },
+          });
+      }
+      if (share.folderId) {
+        await tx
+          .insert(folderPermissions)
+          .values({ ...grant, folderId: share.folderId })
+          .onConflictDoUpdate({
+            target: [folderPermissions.folderId, folderPermissions.userId],
+            set: { role: share.role, canShare: share.canShare, canDownload: share.canDownload, canCopy: share.canCopy, updatedAt: new Date() },
+          });
+      }
       await tx.update(fileShares).set({ acceptedAt: new Date() }).where(eq(fileShares.id, share.id));
     }
   }
@@ -162,6 +222,7 @@ ${link}`,
     if (this.env.REQUIRE_EMAIL_VERIFICATION && !user.emailVerified) {
       throw new AppError('EMAIL_NOT_VERIFIED', 'Please verify your email address before signing in.');
     }
+    await this.acceptPendingShares(this.db, user);
     await UserRepository.update(this.db, user.id, { lastLoginAt: new Date() });
     await this.audit.log({ ...ctx, actorId: user.id }, 'auth.login', { type: 'user', id: user.id });
     return this.issueSession({ ...user, lastLoginAt: new Date() }, ctx);
@@ -185,6 +246,7 @@ ${link}`,
       user = again;
     }
     if (user.status !== 'ACTIVE') throw new AppError('FORBIDDEN', 'This account is not active.');
+    await this.acceptPendingShares(this.db, user);
     const now = new Date();
     await UserRepository.update(this.db, user.id, { lastLoginAt: now });
     await this.audit.log({ ...ctx, actorId: user.id }, 'auth.login', { type: 'user', id: user.id }, { method: 'kingschat' });
@@ -237,16 +299,17 @@ ${link}`,
       user = await this.db.transaction(async (tx) => {
         return this.provisionUser(tx, {
           email: row.email,
-          name: row.email.split('@')[0],
+          name: (row.email.split('@')[0] || 'User').slice(0, 100),
           passwordHash: null,
           emailVerified: true,
         });
       });
     } else {
+      const existingUser = user;
       await this.db.transaction(async (tx) => {
-        await this.acceptPendingShares(tx, user);
-        if (!user.emailVerified) {
-          await tx.update(users).set({ emailVerified: true }).where(eq(users.id, user.id));
+        await this.acceptPendingShares(tx, existingUser);
+        if (!existingUser.emailVerified) {
+          await tx.update(users).set({ emailVerified: true }).where(eq(users.id, existingUser.id));
         }
       });
     }
@@ -263,12 +326,29 @@ ${link}`,
   }
 
   async sendMagicLink(email: string, callbackUrl?: string): Promise<{ success: boolean; message: string }> {
+    // Pre-flight verification against bounces and invalid/fake domains
+    await verifyEmailDomainMx(email);
+
     const neonAuthUrl = this.env.NEON_AUTH_BASE_URL || 'https://ep-small-unit-b1bvawbw.neonauth.c-5.eu-central-1.aws.neon.tech/qubsuite/auth';
     const targetCallback = callbackUrl || `${this.env.APP_URL}/auth/callback`;
+    let reqOrigin = 'https://qubdocs.online';
+    if (callbackUrl) {
+      try {
+        reqOrigin = new URL(callbackUrl).origin;
+      } catch {
+        // fallback
+      }
+    } else if (this.env.APP_URL) {
+      reqOrigin = this.env.APP_URL;
+    }
+
     try {
       const res = await fetch(`${neonAuthUrl}/sign-in/magic-link`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Origin': reqOrigin,
+        },
         body: JSON.stringify({ email, callbackURL: targetCallback }),
       });
       if (!res.ok) {
@@ -288,7 +368,7 @@ ${link}`,
    * the user in public.users, and issues the official QubDocs session.
    */
   async neonAuthSignIn(
-    input: { sessionToken?: string; email?: string; name?: string; neonUserId?: string },
+    input: { sessionToken?: string; email?: string; name?: string; neonUserId?: string; verifier?: string },
     ctx: ClientContext,
   ): Promise<IssuedSession> {
     let verifiedEmail: string | null = null;
@@ -304,10 +384,41 @@ ${link}`,
         LIMIT 1
       `)) as unknown as { id: string; token: string; neonUserId: string; email: string; name: string | null }[];
 
-      if (rows && rows.length > 0) {
+      if (rows && rows.length > 0 && rows[0]) {
         verifiedEmail = rows[0].email;
         verifiedName = rows[0].name;
         verifiedNeonUserId = rows[0].neonUserId;
+      }
+    }
+
+    if (!verifiedEmail && input.verifier) {
+      const vRows = (await this.db.execute(sql`
+        SELECT id, identifier, "createdAt", "expiresAt"
+        FROM neon_auth.verification
+        WHERE identifier = ${input.verifier} AND "expiresAt" > now()
+        LIMIT 1
+      `)) as unknown as { id: string; identifier: string; createdAt: Date; expiresAt: Date }[];
+
+      if (vRows && vRows.length > 0 && vRows[0]) {
+        const v = vRows[0];
+        const vTime = new Date(v.createdAt).getTime();
+        const startWindow = new Date(vTime - 60000).toISOString();
+        const endWindow = new Date(vTime + 60000).toISOString();
+        const rows = (await this.db.execute(sql`
+          SELECT s.id, s.token, s."expiresAt", u.id as "neonUserId", u.email, u.name
+          FROM neon_auth.session s
+          JOIN neon_auth.user u ON u.id = s."userId"
+          WHERE s."createdAt" >= ${startWindow} AND s."createdAt" <= ${endWindow} AND s."expiresAt" > now()
+          ORDER BY s."createdAt" DESC
+          LIMIT 1
+        `)) as unknown as { id: string; token: string; neonUserId: string; email: string; name: string | null }[];
+
+        if (rows && rows.length > 0 && rows[0]) {
+          verifiedEmail = rows[0].email;
+          verifiedName = rows[0].name;
+          verifiedNeonUserId = rows[0].neonUserId;
+          await this.db.execute(sql`DELETE FROM neon_auth.verification WHERE identifier = ${input.verifier}`).catch(() => {});
+        }
       }
     }
 
@@ -321,7 +432,24 @@ ${link}`,
         LIMIT 1
       `)) as unknown as { id: string; token: string; neonUserId: string; email: string; name: string | null }[];
 
-      if (rows && rows.length > 0) {
+      if (rows && rows.length > 0 && rows[0]) {
+        verifiedEmail = rows[0].email;
+        verifiedName = rows[0].name;
+        verifiedNeonUserId = rows[0].neonUserId;
+      }
+    }
+
+    if (!verifiedEmail && ctx.ip) {
+      const rows = (await this.db.execute(sql`
+        SELECT s.id, s.token, s."expiresAt", u.id as "neonUserId", u.email, u.name
+        FROM neon_auth.session s
+        JOIN neon_auth.user u ON u.id = s."userId"
+        WHERE s."ipAddress" = ${ctx.ip} AND s."createdAt" > now() - interval '2 minutes' AND s."expiresAt" > now()
+        ORDER BY s."createdAt" DESC
+        LIMIT 1
+      `)) as unknown as { id: string; token: string; neonUserId: string; email: string; name: string | null }[];
+
+      if (rows && rows.length > 0 && rows[0]) {
         verifiedEmail = rows[0].email;
         verifiedName = rows[0].name;
         verifiedNeonUserId = rows[0].neonUserId;
@@ -336,12 +464,15 @@ ${link}`,
     if (!user) {
       user = await this.provisionUser(this.db, {
         email: verifiedEmail,
-        name: (verifiedName || input.name || verifiedEmail.split('@')[0]).slice(0, 100),
+        name: (verifiedName || input.name || verifiedEmail.split('@')[0] || 'User').slice(0, 100),
         passwordHash: null,
         emailVerified: true,
       });
-    } else if (!user.emailVerified) {
-      await UserRepository.update(this.db, user.id, { emailVerified: true });
+    } else {
+      await this.acceptPendingShares(this.db, user);
+      if (!user.emailVerified) {
+        await UserRepository.update(this.db, user.id, { emailVerified: true });
+      }
     }
 
     if (verifiedNeonUserId) {
@@ -372,11 +503,12 @@ ${link}`,
    * Polls for a recently completed magic link verification for an email address.
    */
   async pollMagicLink(email: string, since: Date, ctx: ClientContext): Promise<IssuedSession | null> {
+    const sinceIso = since instanceof Date ? since.toISOString() : new Date(since).toISOString();
     const rows = (await this.db.execute(sql`
       SELECT s.id, s.token, s."expiresAt", u.id as "neonUserId", u.email, u.name
       FROM neon_auth.session s
       JOIN neon_auth.user u ON u.id = s."userId"
-      WHERE lower(u.email) = lower(${email}) AND s."createdAt" >= ${since} AND s."expiresAt" > now()
+      WHERE lower(u.email) = lower(${email}) AND s."createdAt" >= ${sinceIso} AND s."expiresAt" > now()
       ORDER BY s."createdAt" DESC
       LIMIT 1
     `)) as unknown as { id: string; token: string; neonUserId: string; email: string; name: string | null }[];
