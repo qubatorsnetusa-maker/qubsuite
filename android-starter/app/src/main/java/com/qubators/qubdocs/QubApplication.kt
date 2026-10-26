@@ -1,12 +1,11 @@
-package com.qub.suite
+package com.qubators.qubdocs
 
 import android.app.Application
-import com.qub.suite.data.sync.QubSyncWorker
+import com.qubators.qubdocs.data.sync.QubSyncWorker
 
 class QubApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        // Schedule periodic background sync when network is reconnected
         QubSyncWorker.schedulePeriodicSync(this)
     }
 }

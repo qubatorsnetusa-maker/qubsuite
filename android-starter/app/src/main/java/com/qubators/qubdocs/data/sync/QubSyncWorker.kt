@@ -1,12 +1,13 @@
-package com.qub.suite.data.sync
+package com.qubators.qubdocs.data.sync
 
 import android.content.Context
 import androidx.work.*
-import com.qub.suite.data.local.QubDatabase
-import com.qub.suite.data.local.SyncStatus
-import com.qub.suite.data.models.CreateDocumentRequestDto
-import com.qub.suite.data.models.UpdateDocumentRequestDto
-import com.qub.suite.data.network.NetworkClient
+import com.qubators.qubdocs.data.local.QubDatabase
+import com.qubators.qubdocs.data.local.SyncStatus
+import com.qubators.qubdocs.data.models.CreateDocumentRequestDto
+import com.qubators.qubdocs.data.models.UpdateDocumentRequestDto
+import com.qubators.qubdocs.data.network.AuthManager
+import com.qubators.qubdocs.data.network.NetworkClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
@@ -19,9 +20,10 @@ class QubSyncWorker(
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         try {
             val database = QubDatabase.getDatabase(applicationContext)
+            val authManager = AuthManager.getInstance(applicationContext)
             val api = NetworkClient.createService(
                 baseUrl = "http://10.0.2.2:4100/",
-                tokenProvider = { null }
+                tokenProvider = { authManager.getToken() }
             )
 
             val pendingDocs = database.documentDao().getPendingSyncDocuments()
@@ -33,6 +35,7 @@ class QubSyncWorker(
                             CreateDocumentRequestDto(
                                 title = doc.title,
                                 folderId = doc.folderId,
+                                fileType = doc.fileType,
                                 contentJson = doc.contentJson
                             )
                         )
@@ -70,7 +73,7 @@ class QubSyncWorker(
     }
 
     companion object {
-        private const val SYNC_WORK_NAME = "qub_offline_sync"
+        private const val SYNC_WORK_NAME = "qubdocs_offline_sync"
 
         fun schedulePeriodicSync(context: Context) {
             val constraints = Constraints.Builder()

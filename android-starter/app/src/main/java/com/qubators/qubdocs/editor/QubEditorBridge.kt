@@ -1,7 +1,7 @@
-package com.qub.suite.editor
+package com.qubators.qubdocs.editor
 
 import android.webkit.JavascriptInterface
-import com.qub.suite.data.models.FormattingState
+import com.qubators.qubdocs.data.models.FormattingState
 import kotlinx.serialization.json.Json
 
 interface EditorEventListener {

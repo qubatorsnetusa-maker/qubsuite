@@ -1,12 +1,10 @@
-package com.qub.suite.ui
+package com.qubators.qubdocs.ui.editor
 
 import android.annotation.SuppressLint
-import android.net.Uri
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -23,9 +21,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.WebViewAssetLoader
-import com.qub.suite.data.models.FormattingState
-import com.qub.suite.editor.EditorEventListener
-import com.qub.suite.editor.QubEditorBridge
+import com.qubators.qubdocs.data.models.FormattingState
+import com.qubators.qubdocs.editor.EditorEventListener
+import com.qubators.qubdocs.editor.QubEditorBridge
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,18 +61,17 @@ fun QubEditorScreen(
                     IconButton(onClick = {
                         onSaveLocally(title, currentContent)
                     }) {
-                        Icon(Icons.Default.CloudDone, contentDescription = "Save status", tint = Color(0xFF10B981))
+                        Icon(Icons.Default.CloudDone, contentDescription = "Saved", tint = Color(0xFF10B981))
                     }
                 }
             )
         },
         bottomBar = {
-            // Native Material 3 Bottom Formatting Toolbar
             Surface(
                 tonalElevation = 3.dp,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .imePadding() // Automatically lifts above Android soft keyboard!
+                    .imePadding()
             ) {
                 Row(
                     modifier = Modifier
@@ -136,7 +133,6 @@ fun QubEditorScreen(
             }
         }
     ) { paddingValues ->
-        // Native WebView embedding the local Vite editor bundle
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -150,7 +146,6 @@ fun QubEditorScreen(
                 listener = object : EditorEventListener {
                     override fun onEditorReady() {
                         isEditorReady = true
-                        // Pass initial content into editor
                         if (initialContentJson.isNotBlank()) {
                             val escaped = initialContentJson
                                 .replace("\\", "\\\\")
@@ -211,7 +206,6 @@ fun QubEditorNativeView(
     AndroidView(
         modifier = modifier,
         factory = { context ->
-            // Use WebViewAssetLoader for secure HTTPS local asset loading
             val assetLoader = WebViewAssetLoader.Builder()
                 .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(context))
                 .build()
@@ -222,7 +216,6 @@ fun QubEditorNativeView(
                 settings.allowFileAccess = false
                 settings.allowContentAccess = false
 
-                // Attach bidirectional bridge
                 addJavascriptInterface(QubEditorBridge(listener), "AndroidBridge")
 
                 webViewClient = object : WebViewClient() {
@@ -235,8 +228,6 @@ fun QubEditorNativeView(
                 }
 
                 onWebViewCreated(this)
-
-                // Load the offline mobile editor bundled in APK assets/qub-editor/
                 loadUrl("https://appassets.androidplatform.net/assets/qub-editor/mobile-editor.html")
             }
         }

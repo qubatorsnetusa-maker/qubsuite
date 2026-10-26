@@ -1,12 +1,13 @@
-package com.qub.suite.ui.drive
+package com.qubators.qubdocs.ui.drive
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.qub.suite.data.local.DocumentEntity
-import com.qub.suite.data.local.QubDatabase
-import com.qub.suite.data.local.SyncStatus
-import com.qub.suite.data.sync.QubSyncWorker
+import com.qubators.qubdocs.data.local.DocumentEntity
+import com.qubators.qubdocs.data.local.QubDatabase
+import com.qubators.qubdocs.data.local.SyncStatus
+import com.qubators.qubdocs.data.network.AuthManager
+import com.qubators.qubdocs.data.sync.QubSyncWorker
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -17,6 +18,7 @@ class DriveViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = QubDatabase.getDatabase(application)
     private val docDao = db.documentDao()
+    private val authManager = AuthManager.getInstance(application)
 
     val documents: StateFlow<List<DocumentEntity>> = docDao.observeAllDocuments()
         .stateIn(
@@ -25,11 +27,12 @@ class DriveViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = emptyList()
         )
 
-    fun createNewDocument(title: String = "Untitled document", onCreated: (docId: String) -> Unit) {
+    fun createNewDocument(title: String = "Untitled", fileType: String = "DOCUMENT", onCreated: (docId: String) -> Unit) {
         viewModelScope.launch {
             val newDoc = DocumentEntity(
                 id = UUID.randomUUID().toString(),
                 title = title,
+                fileType = fileType,
                 contentJson = "{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\"}]}",
                 syncStatus = SyncStatus.PENDING_CREATE,
                 updatedAt = System.currentTimeMillis()
@@ -51,6 +54,7 @@ class DriveViewModel(application: Application) : AndroidViewModel(application) {
             val updated = DocumentEntity(
                 id = docId,
                 title = title,
+                fileType = existing?.fileType ?: "DOCUMENT",
                 contentJson = contentJson,
                 syncStatus = syncStatus,
                 updatedAt = System.currentTimeMillis()
@@ -72,5 +76,9 @@ class DriveViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+    }
+
+    fun logout() {
+        authManager.logout()
     }
 }

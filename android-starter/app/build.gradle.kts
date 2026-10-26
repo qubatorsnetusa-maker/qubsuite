@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "com.qub.suite"
+    namespace = "com.qubators.qubdocs"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.qub.suite"
+        applicationId = "com.qubators.qubdocs"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

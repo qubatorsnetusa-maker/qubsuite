@@ -1,4 +1,4 @@
-package com.qub.suite.data.local
+package com.qubators.qubdocs.data.local
 
 import android.content.Context
 import androidx.room.*
@@ -16,7 +16,7 @@ data class DocumentEntity(
     @PrimaryKey val id: String,
     val title: String,
     val contentJson: String,
-    val fileType: String = "DOCUMENT",
+    val fileType: String = "DOCUMENT", // DOCUMENT, SPREADSHEET, FORM, PDF, SLIDES
     val folderId: String? = null,
     val updatedAt: Long = System.currentTimeMillis(),
     val syncStatus: SyncStatus = SyncStatus.SYNCED
@@ -35,6 +35,9 @@ data class SyncQueueEntity(
 interface DocumentDao {
     @Query("SELECT * FROM documents WHERE syncStatus != 'PENDING_DELETE' ORDER BY updatedAt DESC")
     fun observeAllDocuments(): Flow<List<DocumentEntity>>
+
+    @Query("SELECT * FROM documents WHERE syncStatus != 'PENDING_DELETE' AND fileType = :type ORDER BY updatedAt DESC")
+    fun observeDocumentsByType(type: String): Flow<List<DocumentEntity>>
 
     @Query("SELECT * FROM documents WHERE id = :docId LIMIT 1")
     suspend fun getDocumentById(docId: String): DocumentEntity?
@@ -88,7 +91,7 @@ abstract class QubDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     QubDatabase::class.java,
-                    "qub_database"
+                    "qubdocs_database"
                 )
                 .fallbackToDestructiveMigration()
                 .build()

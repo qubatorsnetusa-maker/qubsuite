@@ -1,7 +1,7 @@
-package com.qub.suite.data.network
+package com.qubators.qubdocs.data.network
 
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
-import com.qub.suite.data.models.*
+import com.qubators.qubdocs.data.models.*
 import kotlinx.serialization.json.Json
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
@@ -12,6 +12,17 @@ import retrofit2.http.*
 import java.util.concurrent.TimeUnit
 
 interface QubApiService {
+    // Auth Endpoints
+    @POST("api/auth/login")
+    suspend fun login(@Body request: LoginRequestDto): AuthResponseDto
+
+    @POST("api/auth/register")
+    suspend fun register(@Body request: RegisterRequestDto): AuthResponseDto
+
+    @POST("api/auth/kingschat")
+    suspend fun loginWithKingsChat(@Body request: KingsChatAuthRequestDto): AuthResponseDto
+
+    // Drive & Files Endpoints
     @GET("api/drive/recent")
     suspend fun getRecentFiles(@Query("limit") limit: Int = 20): DriveResponseDto
 

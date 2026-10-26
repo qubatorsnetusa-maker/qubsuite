@@ -1,6 +1,5 @@
-package com.qub.suite.data.models
+package com.qubators.qubdocs.data.models
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -9,6 +8,7 @@ enum class NativeFileType {
     SPREADSHEET,
     FORM,
     PDF,
+    SLIDES,
     OTHER
 }
 
@@ -36,6 +36,7 @@ data class DriveResponseDto(
 data class CreateDocumentRequestDto(
     val title: String,
     val folderId: String? = null,
+    val fileType: String = "DOCUMENT",
     val contentJson: String? = null
 )
 
@@ -43,6 +44,26 @@ data class CreateDocumentRequestDto(
 data class UpdateDocumentRequestDto(
     val title: String? = null,
     val contentJson: String? = null
+)
+
+@Serializable
+data class LoginRequestDto(
+    val email: String,
+    val password: String
+)
+
+@Serializable
+data class RegisterRequestDto(
+    val email: String,
+    val password: String,
+    val name: String
+)
+
+@Serializable
+data class KingsChatAuthRequestDto(
+    val accessToken: String? = null,
+    val authCode: String? = null,
+    val phoneNumber: String? = null
 )
 
 @Serializable
@@ -56,7 +77,8 @@ data class UserDto(
     val id: String,
     val email: String,
     val name: String,
-    val avatarUrl: String? = null
+    val avatarUrl: String? = null,
+    val authProvider: String = "email"
 )
 
 @Serializable
