@@ -33,8 +33,9 @@ if (typeof window !== 'undefined') {
   });
 }
 
-// Register PWA service worker in production builds
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+// Register PWA service worker on standard web browsers; disable in Android wrapper
+const isAndroidApp = typeof navigator !== 'undefined' && /QubDocsAndroid/i.test(navigator.userAgent);
+if ('serviceWorker' in navigator && import.meta.env.PROD && !isAndroidApp) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
       .register('/sw.js')
@@ -45,4 +46,19 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
         console.warn('[PWA] Service worker registration failed:', err);
       });
   });
+} else if ('serviceWorker' in navigator && isAndroidApp) {
+  // If an old service worker was registered by a previous session in the WebView, unregister it and clear cache
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    for (const registration of registrations) {
+      registration.unregister();
+    }
+  });
+  if (typeof caches !== 'undefined') {
+    caches.keys().then((names) => {
+      for (const name of names) {
+        caches.delete(name);
+      }
+    });
+  }
 }
+

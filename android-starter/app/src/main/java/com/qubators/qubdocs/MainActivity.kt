@@ -14,6 +14,9 @@ import android.os.Message
 import android.view.View
 import android.webkit.*
 import android.widget.Toast
+import androidx.webkit.ServiceWorkerClientCompat
+import androidx.webkit.ServiceWorkerControllerCompat
+import androidx.webkit.WebViewFeature
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
@@ -73,6 +76,19 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Intercept service worker asset requests so background workers don't bypass local assets
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.SERVICE_WORKER_BASIC_USAGE) &&
+            WebViewFeature.isFeatureSupported(WebViewFeature.SERVICE_WORKER_SHOULD_INTERCEPT_REQUEST)
+        ) {
+            try {
+                ServiceWorkerControllerCompat.getInstance().setServiceWorkerClient(object : ServiceWorkerClientCompat() {
+                    override fun shouldInterceptRequest(request: WebResourceRequest): WebResourceResponse? {
+                        return interceptLocalAssets(request)
+                    }
+                })
+            } catch (_: Exception) {}
+        }
 
         val initialUrl = parseDeepLink(intent) ?: DEFAULT_URL
 
@@ -156,7 +172,7 @@ class MainActivity : ComponentActivity() {
                             allowFileAccess = true
                             allowContentAccess = true
                             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                            cacheMode = WebSettings.LOAD_DEFAULT
+                            cacheMode = WebSettings.LOAD_NO_CACHE
                             useWideViewPort = true
                             loadWithOverviewMode = true
                             setSupportZoom(true)
@@ -166,6 +182,11 @@ class MainActivity : ComponentActivity() {
                             javaScriptCanOpenWindowsAutomatically = true
                             userAgentString = "$userAgentString QubDocsAndroid/1.0"
                         }
+
+                        clearCache(true)
+                        try {
+                            WebStorage.getInstance().deleteAllData()
+                        } catch (_: Exception) {}
 
                         val cookieManager = CookieManager.getInstance()
                         cookieManager.setAcceptCookie(true)
@@ -515,6 +536,30 @@ class MainActivity : ComponentActivity() {
             return null
         }
 
+        // Intercept any service worker script requests and return an auto-unregistering worker
+        if (reqPath.endsWith("/sw.js") || reqPath.endsWith("sw.js")) {
+            val unregisterJs = """
+                self.addEventListener('install', () => self.skipWaiting());
+                self.addEventListener('activate', () => {
+                    self.registration.unregister();
+                    self.clients.matchAll().then(clients => clients.forEach(c => c.navigate(c.url)));
+                });
+            """.trimIndent()
+            val swHeaders = mutableMapOf(
+                "Content-Type" to "application/javascript; charset=utf-8",
+                "Cache-Control" to "no-cache, no-store, must-revalidate",
+                "Access-Control-Allow-Origin" to "*"
+            )
+            return WebResourceResponse(
+                "application/javascript",
+                "UTF-8",
+                200,
+                "OK",
+                swHeaders,
+                ByteArrayInputStream(unregisterJs.toByteArray(Charsets.UTF_8))
+            )
+        }
+
         // Clean relative path without leading slash
         val relativePath = reqPath.trimStart('/')
 
@@ -527,11 +572,11 @@ class MainActivity : ComponentActivity() {
 
         val mime = getMimeType(assetPath)
         val isTextOrJs = mime.startsWith("text/") || mime == "application/javascript" || mime == "application/json"
-        val encoding = if (isTextOrJs) "UTF-8" else null
+        val encoding = if (mime == "text/html" || mime == "application/json") "UTF-8" else null
         val responseHeaders = mutableMapOf(
             "Access-Control-Allow-Origin" to "*",
             "Access-Control-Allow-Methods" to "GET, HEAD, OPTIONS",
-            "Cache-Control" to "no-cache",
+            "Cache-Control" to "no-cache, no-store, must-revalidate",
             "Content-Type" to if (isTextOrJs) "$mime; charset=utf-8" else mime
         )
 
@@ -550,7 +595,7 @@ class MainActivity : ComponentActivity() {
                 val htmlHeaders = mutableMapOf(
                     "Access-Control-Allow-Origin" to "*",
                     "Access-Control-Allow-Methods" to "GET, HEAD, OPTIONS",
-                    "Cache-Control" to "no-cache",
+                    "Cache-Control" to "no-cache, no-store, must-revalidate",
                     "Content-Type" to "text/html; charset=utf-8"
                 )
                 return WebResourceResponse("text/html", "UTF-8", 200, "OK", htmlHeaders, htmlStream)
@@ -559,20 +604,14 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        return WebResourceResponse(
-            "text/plain",
-            "UTF-8",
-            404,
-            "Not Found",
-            responseHeaders,
-            ByteArrayInputStream("Asset not found".toByteArray(Charsets.UTF_8))
-        )
+        // If asset is not in local APK assets, return null to let WebView fall back to network
+        return null
     }
 
     private fun getMimeType(filePath: String): String {
         return when {
             filePath.endsWith(".html") -> "text/html"
-            filePath.endsWith(".js") || filePath.endsWith(".mjs") -> "text/javascript"
+            filePath.endsWith(".js") || filePath.endsWith(".mjs") -> "application/javascript"
             filePath.endsWith(".css") -> "text/css"
             filePath.endsWith(".json") || filePath.endsWith(".map") -> "application/json"
             filePath.endsWith(".svg") -> "image/svg+xml"
