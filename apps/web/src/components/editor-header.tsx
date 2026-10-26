@@ -33,7 +33,17 @@ export function SaveIndicator({ status, lastSavedAt, onRetry }: { status: SaveSt
   );
 }
 
-export function EditableTitle({ value, onSave, disabled }: { value: string; onSave(v: string): Promise<unknown> | void; disabled?: boolean }) {
+export function EditableTitle({
+  value,
+  onSave,
+  disabled,
+  onAutoSuggestTitle,
+}: {
+  value: string;
+  onSave(v: string): Promise<unknown> | void;
+  disabled?: boolean;
+  onAutoSuggestTitle?: () => string | null | undefined;
+}) {
   const [draft, setDraft] = useState(value);
   useEffect(() => setDraft(value), [value]);
   const commit = () => {
@@ -41,11 +51,36 @@ export function EditableTitle({ value, onSave, disabled }: { value: string; onSa
     if (!v) setDraft(value);
     else if (v !== value) void onSave(v);
   };
+
+  const isUntitled = !value || /^untitled(\s+(document|spreadsheet|form|presentation|file))?$/i.test(value.trim());
+
+  const handleFocusOrClick = (target: HTMLInputElement) => {
+    if (isUntitled && onAutoSuggestTitle) {
+      const suggested = onAutoSuggestTitle();
+      if (suggested && suggested.trim() && suggested.trim().toLowerCase() !== value.trim().toLowerCase()) {
+        const clean = suggested.trim().slice(0, 255);
+        setDraft(clean);
+        void onSave(clean);
+        setTimeout(() => {
+          target.select();
+        }, 0);
+        return;
+      }
+    }
+    target.select();
+  };
+
   return (
     <input
       value={draft}
       disabled={disabled}
       onChange={(e) => setDraft(e.target.value)}
+      onFocus={(e) => handleFocusOrClick(e.target)}
+      onClick={(e) => {
+        if (isUntitled && onAutoSuggestTitle) {
+          handleFocusOrClick(e.currentTarget);
+        }
+      }}
       onBlur={commit}
       onKeyDown={(e) => {
         if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
@@ -110,6 +145,7 @@ export function EditorHeader({
   onRequestAccess,
   actions,
   readOnlyLabel,
+  onAutoSuggestTitle,
 }: {
   fileType: FileType;
   title: string;
@@ -122,6 +158,7 @@ export function EditorHeader({
   onRequestAccess?(): void;
   actions?: ReactNode;
   readOnlyLabel?: string;
+  onAutoSuggestTitle?: () => string | null | undefined;
 }) {
   return (
     <header className="flex items-center gap-2 px-3 pb-1 pt-2">
@@ -130,7 +167,7 @@ export function EditorHeader({
       </Link>
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-3">
-          <EditableTitle value={title} onSave={onRename} disabled={!canEdit} />
+          <EditableTitle value={title} onSave={onRename} disabled={!canEdit} onAutoSuggestTitle={onAutoSuggestTitle} />
           {status}
           {readOnlyLabel && (
             <span className="flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-xs text-muted">

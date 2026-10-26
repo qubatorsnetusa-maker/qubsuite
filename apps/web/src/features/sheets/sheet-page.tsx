@@ -1,3 +1,11 @@
+import * as XLSX from 'xlsx';
+import { BarChart3, Highlighter } from 'lucide-react';
+import { SheetChartDialog } from './sheet-chart-dialog';
+import { SheetPivotDialog } from './sheet-pivot-dialog';
+import { ConditionalFormatDialog } from './conditional-format-dialog';
+import type { ConditionalFormatRule } from './conditional-format';
+import { SheetChartCard } from './sheet-chart-card';
+import type { SheetChart } from './chart-utils';
 import type { CellRange, CellStyle, FilterQuery, SheetClientMessage, SheetOp, SheetServerMessage, SpreadsheetDto, WorksheetDto } from '@qub/shared';
 import { cellA1, colToLetters, parseA1, rangeA1, translateFormulaInput, FUNCTION_NAMES } from '@qub/shared/formula';
 import { roleAtLeast } from '@qub/shared';
@@ -24,6 +32,7 @@ import {
   FolderInput,
   WrapText,
   Printer,
+  Table,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { toast } from 'sonner';
@@ -41,6 +50,7 @@ import { qk } from '@/services/query-keys';
 import { sheetsService } from '@/services/sheets';
 import { MoveDialog } from '../drive/dialogs';
 import { getServiceUrl } from '@/lib/ecosystem-urls';
+import { setPageMetadata } from '@/lib/meta';
 import { ShareDialog } from '../sharing/share-dialog';
 import { RequestAccessDialog } from '../sharing/request-access-dialog';
 import { normalizeRange } from './geometry';
@@ -68,6 +78,16 @@ const CLIPBOARD_MIME = 'application/x-qub-cells';
 export function SheetPage() {
   const { spreadsheetId } = useParams({ from: '/_authenticated/sheets/$spreadsheetId' });
   const meta = useQuery({ queryKey: qk.sheets.one(spreadsheetId), queryFn: () => sheetsService.get(spreadsheetId) });
+
+  useEffect(() => {
+    if (meta.data?.title) {
+      setPageMetadata({
+        title: meta.data.title,
+        suiteName: 'Sheets',
+        description: 'Collaborate on this spreadsheet in real time with Qub Sheets',
+      });
+    }
+  }, [meta.data?.title]);
   if (meta.isLoading) return <FullPageSpinner label="Opening spreadsheet…" />;
   if (meta.error) return <ErrorState error={meta.error} onRetry={() => void meta.refetch()} title="Can’t open this spreadsheet" />;
   return <SheetEditor key={spreadsheetId} initial={meta.data!} />;
@@ -112,6 +132,16 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
   const navigate = useNavigate();
   const id = initial.id;
   const meta = useQuery({ queryKey: qk.sheets.one(id), queryFn: () => sheetsService.get(id), initialData: initial });
+
+  useEffect(() => {
+    if (meta.data?.title) {
+      setPageMetadata({
+        title: meta.data.title,
+        suiteName: 'Sheets',
+        description: 'Collaborate on this spreadsheet in real time with Qub Sheets',
+      });
+    }
+  }, [meta.data?.title]);
   const store = useMemo(() => {
     const s = new SheetStore(id);
     s.sheets = initial.sheets;
@@ -144,6 +174,11 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
   const [find, setFind] = useState<{ replace: boolean; nonce: number } | null>(null);
   const [validationOpen, setValidationOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [chartOpen, setChartOpen] = useState(false);
+  const [conditionalOpen, setConditionalOpen] = useState(false);
+  const [pivotOpen, setPivotOpen] = useState(false);
+  const [conditionalRules, setConditionalRules] = useState<ConditionalFormatRule[]>([]);
+  const [charts, setCharts] = useState<SheetChart[]>([]);
   const socketRef = useRef<ReconnectingSocket<SheetServerMessage, SheetClientMessage> | null>(null);
 
   // ---------- realtime ----------
@@ -180,6 +215,22 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
     const t = setTimeout(() => socketRef.current?.send({ type: 'presence', selection: { sheetId: sheet.id, activeRow: sel.active.row, activeCol: sel.active.col, range } }), 80);
     return () => clearTimeout(t);
   }, [sel, sheet.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const handleCreatePivot = async (name: string, ops: SheetOp[]) => {
+    try {
+      const updatedSheets = await sheetsService.addSheet(id, name);
+      qc.setQueryData(qk.sheets.one(id), (prev: SpreadsheetDto | undefined) => (prev ? { ...prev, sheets: updatedSheets } : prev));
+      const newSheet = updatedSheets.find((s) => s.name === name) || updatedSheets[updatedSheets.length - 1];
+      if (newSheet) {
+        setSheetId(newSheet.id);
+        const sheetOps = ops.map((op) => ({ ...op, sheetId: newSheet.id }));
+        run(sheetOps);
+        toast.success(`Created pivot table in "${name}"`);
+      }
+    } catch {
+      toast.error('Failed to create pivot table sheet');
+    }
+  };
 
   const saveStatus: SaveStatus = !navigator.onLine ? 'offline' : conn !== 'open' ? (store.hasPending() ? 'connection-lost' : conn === 'connecting' ? 'saving' : 'connection-lost') : store.hasPending() ? 'saving' : 'saved';
 
@@ -586,6 +637,57 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
   const formulaValue = editing ? editing.value : (activeCell?.input ?? '');
   const suggestions = editing?.value.startsWith('=') ? FUNCTION_NAMES().filter((f) => f.startsWith(/([A-Z]+)$/i.exec(editing.value)?.[1]?.toUpperCase() ?? '\u0000')).slice(0, 6) : [];
 
+    const exportXlsx = () => {
+    try {
+      const wb = XLSX.utils.book_new();
+      for (const s of meta.data.sheets) {
+        const cells = store.sheetCells(s.id);
+        let maxRow = 0;
+        let maxCol = 0;
+        for (const c of cells.values()) {
+          if (c.row > maxRow) maxRow = c.row;
+          if (c.col > maxCol) maxCol = c.col;
+        }
+        const aoa: (string | number)[][] = [];
+        for (let r = 0; r <= maxRow; r++) {
+          const rowData: (string | number)[] = [];
+          for (let c = 0; c <= maxCol; c++) {
+            const cell = cells.get(`${r}:${c}`);
+            if (cell) {
+              if (typeof cell.value === 'number') {
+                rowData.push(cell.value);
+              } else if (cell.formattedValue) {
+                rowData.push(cell.formattedValue);
+              } else if (cell.input) {
+                rowData.push(cell.input);
+              } else {
+                rowData.push('');
+              }
+            } else {
+              rowData.push('');
+            }
+          }
+          aoa.push(rowData);
+        }
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        XLSX.utils.book_append_sheet(wb, ws, s.name.slice(0, 31));
+      }
+      const u8 = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([u8], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${meta.data.title || 'Spreadsheet'}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success('Spreadsheet exported to Excel (.xlsx)');
+    } catch {
+      toast.error('Failed to export Excel file');
+    }
+  };
+
   const handleShare = async () => {
     const sheetUrl = getServiceUrl('sheets', `/sheets/${id}`);
     try {
@@ -630,6 +732,9 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger>Download</DropdownMenuSubTrigger>
                       <DropdownMenuSubContent>
+                        <DropdownMenuItem onSelect={exportXlsx}>
+                          Microsoft Excel (.xlsx, all sheets)
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           onSelect={() => {
                             const a = document.createElement('a');
@@ -716,6 +821,15 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
                   <DropdownMenuItem disabled={!canEdit} onSelect={() => run([{ type: 'insertCols', sheetId: sheet.id, index: range.startCol, count: 1 }])}>Column left</DropdownMenuItem>
                   <DropdownMenuItem disabled={!canEdit} onSelect={() => run([{ type: 'insertCols', sheetId: sheet.id, index: range.endCol + 1, count: 1 }])}>Column right</DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => setChartOpen(true)}>
+                    <BarChart3 className="mr-2 size-4" /> Chart…
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setPivotOpen(true)}>
+                    <Table className="mr-2 size-4" /> Pivot table…
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setPivotOpen(true)}>
+                    <Table className="mr-2 size-4" /> Pivot table…
+                  </DropdownMenuItem>
                   <DropdownMenuItem disabled={!canEdit} onSelect={() => sheetMutation.mutate(() => sheetsService.addSheet(id))}>Sheet</DropdownMenuItem>
                   <DropdownMenuItem disabled={!canComment} onSelect={() => setPanel('comments')}>Comment</DropdownMenuItem>
                   {canEdit && (
@@ -851,6 +965,15 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
               <ToolButton label={filter ? 'Remove filter' : 'Create a filter'} active={!!filter} onClick={() => (filter ? (setFilter(null), setHiddenRows(new Set())) : setFilterDialog(sel.active.col))}>
                 <Filter />
               </ToolButton>
+              <ToolButton label="Insert chart" onClick={() => setChartOpen(true)}>
+                <BarChart3 />
+              </ToolButton>
+              <ToolButton label="Pivot table" onClick={() => setPivotOpen(true)} disabled={!canEdit}>
+                <Table />
+              </ToolButton>
+              <ToolButton label="Conditional formatting" onClick={() => setConditionalOpen(true)} disabled={!canEdit}>
+                <Highlighter />
+              </ToolButton>
               <FunctionsMenu onAutoSum={autoSum} onInsert={insertFunction} onClosed={() => gridRef.current?.focus()} />
             </>
           )}
@@ -939,6 +1062,16 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
             }}
           />
         )}
+        {charts.map((c) => (
+          <SheetChartCard
+            key={c.id}
+            chart={c}
+            store={store}
+            sheetId={sheet.id}
+            canEdit={canEdit}
+            onRemove={() => setCharts((prev) => prev.filter((x) => x.id !== c.id))}
+          />
+        ))}
         <Grid
           ref={gridRef}
           sheet={sheet}
@@ -965,6 +1098,7 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
           onColumnMenu={(c, e) => openMenu('col', c, e)}
           onRowMenu={(r, e) => openMenu('row', r, e)}
           onCellMenu={(e) => openMenu('cell', 0, e)}
+          conditionalRules={conditionalRules}
           presence={store.presence}
           selfClientId={store.selfClientId}
           hiddenRows={hiddenRows}
@@ -1099,6 +1233,30 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
           setSheetId(sheetId);
           void refreshMeta();
         }}
+      />
+            <ConditionalFormatDialog
+        open={conditionalOpen}
+        onOpenChange={setConditionalOpen}
+        sheetId={sheet.id}
+        currentRange={range}
+        rules={conditionalRules}
+        onSaveRules={setConditionalRules}
+      />
+            <SheetPivotDialog
+        open={pivotOpen}
+        onOpenChange={setPivotOpen}
+        store={store}
+        sheetId={sheet.id}
+        currentRange={range}
+        onCreatePivotSheet={handleCreatePivot}
+      />
+      <SheetChartDialog
+        open={chartOpen}
+        onOpenChange={setChartOpen}
+        store={store}
+        sheetId={sheet.id}
+        currentRange={range}
+        onInsertChart={(ch) => setCharts((prev) => [...prev, ch])}
       />
       <ValidationDialog
         open={validationOpen}

@@ -75,7 +75,7 @@ export function createServices(app: FastifyInstance, env: Env, db: Database, ove
   const forms = new FormService(db, files, permissions, activity, natives);
   const variables = new VariableService(db, forms);
   const ops = new OpsService(db, forms, files, activity);
-  const responses = new ResponseService(db, forms, storage, notifications, activity, policies, usage);
+  const responses = new ResponseService(db, forms, storage, notifications, activity, policies, usage, sheets);
   const publicShare = new PublicShareService(app, db, permissions, sheets, activity, policies);
   const adminUsers = new AdminUserService(db, auth, audit, activity, policies, storage, natives, notifications);
   const adminInsights = new AdminInsightsService(db, env, policies, audit, activity, adminUsers);

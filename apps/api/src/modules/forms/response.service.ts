@@ -18,6 +18,8 @@ import type { PolicyService } from '../admin/policy.service';
 import type { UsageService } from '../admin/usage.service';
 import type { NotificationService } from '../notifications/notification.service';
 import { UserRepository } from '../users/user.repository';
+import type { SpreadsheetService } from '../sheets/spreadsheet.service';
+import { SpreadsheetRepository } from '../sheets/spreadsheet.repository';
 import { FormRepository } from './form.repository';
 import type { FormService } from './form.service';
 
@@ -45,6 +47,7 @@ export class ResponseService {
     private readonly activity: ActivityService,
     private readonly policies: PolicyService,
     private readonly usage: UsageService,
+    private readonly sheets?: SpreadsheetService,
   ) {}
 
   attachBroadcaster(b: ResponseBroadcaster): void {
@@ -241,6 +244,9 @@ export class ResponseService {
         (prior) => (prior > 0 ? `${prior + 1} new responses to "${file.name}"` : `New response to "${file.name}"`),
       );
       this.broadcaster?.responseReceived(form.id, saved.total, saved.submittedAt.toISOString());
+      if (settings.linkedSpreadsheetId && this.sheets) {
+        void this.streamToLinkedSheet(file.ownerId, settings, fields, answers, email, saved.submittedAt);
+      }
     }
     return {
       id: saved.responseId,
@@ -512,6 +518,66 @@ export class ResponseService {
     };
   }
 
+  /** Streams a form response row into a linked QubSheet in real-time. */
+  private async streamToLinkedSheet(
+    ownerId: string,
+    settings: import('@qub/shared').FormSettings,
+    fields: FormFieldDto[],
+    answers: Answers,
+    email: string | null,
+    submittedAt: Date,
+  ): Promise<void> {
+    if (!settings.linkedSpreadsheetId || !this.sheets) return;
+    try {
+      const spreadsheetId = settings.linkedSpreadsheetId;
+      const sheetRows = await SpreadsheetRepository.sheets(this.db, spreadsheetId);
+      if (!sheetRows.length) return;
+      const targetSheet = (settings.linkedSheetId ? sheetRows.find((s) => s.id === settings.linkedSheetId) : null) ?? sheetRows[0]!;
+
+      const existingCells = await SpreadsheetRepository.cellsInRange(this.db, targetSheet.id, {
+        rowStart: 0,
+        rowEnd: 10000,
+        colStart: 0,
+        colEnd: 100,
+      });
+
+      let nextRow = 0;
+      for (const c of existingCells) {
+        if (c.row >= nextRow) nextRow = c.row + 1;
+      }
+
+      const inputOps: { row: number; col: number; input: string }[] = [];
+
+      // If sheet has no rows, create headers
+      if (nextRow === 0) {
+        inputOps.push({ row: 0, col: 0, input: 'Timestamp' });
+        inputOps.push({ row: 0, col: 1, input: 'Respondent Email' });
+        fields.forEach((f, idx) => {
+          inputOps.push({ row: 0, col: idx + 2, input: f.label || `Question ${idx + 1}` });
+        });
+        nextRow = 1;
+      }
+
+      // Add response data row
+      inputOps.push({ row: nextRow, col: 0, input: submittedAt.toISOString().replace('T', ' ').slice(0, 19) });
+      inputOps.push({ row: nextRow, col: 1, input: email || '' });
+      fields.forEach((f, idx) => {
+        const val = answers[f.id];
+        const display = displayAnswer(f, val);
+        inputOps.push({ row: nextRow, col: idx + 2, input: display });
+      });
+
+      await this.sheets.applyOps(ownerId, spreadsheetId, [
+        {
+          type: 'setCells',
+          sheetId: targetSheet.id,
+          cells: inputOps,
+        },
+      ]);
+    } catch (err) {
+      console.error('Failed to stream response to linked spreadsheet:', err);
+    }
+  }
   /** Removes respondent uploads that were never attached to a submission. */
   async purgeOrphanUploads(olderThan: Date): Promise<number> {
     const rows = await this.db.delete(formUploads).where(and(isNull(formUploads.responseId), lt(formUploads.createdAt, olderThan))).returning({ key: formUploads.storageKey });

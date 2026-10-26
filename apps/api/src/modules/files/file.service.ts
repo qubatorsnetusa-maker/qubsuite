@@ -77,7 +77,7 @@ export class FileService {
   async upload(userId: string, folderId: string | undefined, source: UploadSource): Promise<DriveFileDto> {
     const folder = await this.folders.resolveTarget(userId, folderId);
     const [user] = await this.db.select({ isPro: users.isPro, storageUnlimited: users.storageUnlimited, platformRole: users.platformRole }).from(users).where(eq(users.id, userId)).limit(1);
-    const isPro = Boolean(user?.isPro || user?.storageUnlimited || user?.platformRole === 'SUPERADMIN' || user?.platformRole === 'ADMIN');
+    const isPro = Boolean(user?.isPro || user?.storageUnlimited || user?.platformRole === 'SUPER_ADMIN');
     // WeTransfer-style 7-day retention for free users; permanent for Pro users
     const expiresAt = isPro ? null : new Date(Date.now() + 7 * 86_400_000);
 

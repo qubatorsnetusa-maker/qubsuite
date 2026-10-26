@@ -32,7 +32,6 @@ import {
   HelpCircle,
   Activity,
   Calendar,
-  Sparkles,
   Target,
 } from 'lucide-react';
 import type { FormConfig, FormSubmission } from '../types';

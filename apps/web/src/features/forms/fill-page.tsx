@@ -5,6 +5,7 @@ import { useEffect, useRef } from 'react';
 import { ErrorState, FullPageSpinner } from '@/components/states';
 import { Button } from '@/components/ui/button';
 import { ApiError } from '@/lib/api';
+import { setPageMetadata } from '@/lib/meta';
 import { formsService } from '@/services/forms';
 import { qk } from '@/services/query-keys';
 import { respondentFormFromPublic } from './renderer/respondent-form';
@@ -32,7 +33,13 @@ export function FillForm({ publicId }: { publicId: string }) {
   });
 
   useEffect(() => {
-    if (form.data) document.title = form.data.title;
+    if (form.data) {
+      setPageMetadata({
+        title: form.data.title,
+        description: form.data.description || 'Fill out this form on Qub Forms',
+        suiteName: 'Forms',
+      });
+    }
   }, [form.data]);
 
   if (form.isLoading) return <FullPageSpinner />;

@@ -6,6 +6,7 @@ import { borderWidth, effectiveEdge } from './borders';
 import { validationIssue } from './validation';
 import { buildGeometry, COL_HEADER_HEIGHT, indexAt, ROW_HEADER_WIDTH, type Geometry } from './geometry';
 import { CELL_PADDING_X, measureText, spillSpan } from './spill';
+import { getConditionalStyle, type ConditionalFormatRule } from './conditional-format';
 
 export interface Selection {
   active: { row: number; col: number };
@@ -52,17 +53,30 @@ interface GridProps {
   onToggleCheckbox(row: number, col: number): void;
   onPickListValue(row: number, col: number, value: string): void;
   onAutofill(target: CellRange, direction: FillDirection): void;
+  conditionalRules?: ConditionalFormatRule[];
 }
 
-function styleFor(cell: CellDto | undefined): CSSProperties {
+function styleFor(
+  cell: CellDto | undefined,
+  r?: number,
+  c?: number,
+  sheetId?: string,
+  conditionalRules?: ConditionalFormatRule[],
+): CSSProperties {
   const s = cell?.style;
   const numeric = cell?.dataType === 'NUMBER';
+  const condStyle =
+    r !== undefined && c !== undefined && sheetId && conditionalRules
+      ? getConditionalStyle(cell, r, c, sheetId, conditionalRules)
+      : null;
   return {
-    fontWeight: s?.bold ? 600 : undefined,
-    fontStyle: s?.italic ? 'italic' : undefined,
-    textDecoration: [s?.underline && 'underline', s?.strike && 'line-through'].filter(Boolean).join(' ') || undefined,
-    color: cell?.dataType === 'ERROR' ? '#d93025' : s?.color,
-    background: s?.background,
+    fontWeight: condStyle?.fontWeight ?? (s?.bold ? 600 : undefined),
+    fontStyle: condStyle?.fontStyle ?? (s?.italic ? 'italic' : undefined),
+    textDecoration:
+      condStyle?.textDecoration ??
+      ([s?.underline && 'underline', s?.strike && 'line-through'].filter(Boolean).join(' ') || undefined),
+    color: condStyle?.color ?? (cell?.dataType === 'ERROR' ? '#d93025' : s?.color),
+    background: condStyle?.background ?? s?.background,
     textAlign: s?.align ?? (numeric || cell?.dataType === 'BOOLEAN' ? 'right' : 'left'),
     fontSize: s?.fontSize ? `${s.fontSize}px` : undefined,
     justifyContent: (s?.align ?? (numeric ? 'right' : 'left')) === 'right' ? 'flex-end' : s?.align === 'center' ? 'center' : 'flex-start',
@@ -359,7 +373,7 @@ export const Grid = forwardRef<GridHandle, GridProps>(function Grid(props, ref) 
             key={`spill-${r}:${c}`}
             aria-hidden
             className="pointer-events-none absolute z-[4] flex items-end overflow-hidden whitespace-nowrap px-[3px] pb-[2px] text-[13px] leading-[16px]"
-            style={{ ...styleFor(cell), background: undefined, left: geo.colX[o.from]! - originX, top: geo.rowY[r]! - originY, width: geo.colX[o.to + 1]! - geo.colX[o.from]!, height: h }}
+            style={{ ...styleFor(cell, r, c, sheet.id, props.conditionalRules), background: undefined, left: geo.colX[o.from]! - originX, top: geo.rowY[r]! - originY, width: geo.colX[o.to + 1]! - geo.colX[o.from]!, height: h }}
           >
             {o.text}
           </div>,
@@ -381,7 +395,7 @@ export const Grid = forwardRef<GridHandle, GridProps>(function Grid(props, ref) 
               top: geo.rowY[r]! - originY,
               width: geo.colW(c),
               height: h,
-              ...styleFor(cell),
+              ...styleFor(cell, r, c, sheet.id, props.conditionalRules),
               // The overlay draws overflowing content; the cell keeps its text (for assistive tech) but invisibly.
               ...(overflowing.has(c) ? { color: 'transparent' } : null),
               ...(hideRight.has(c) ? { borderRightColor: 'transparent' } : null),
@@ -409,9 +423,28 @@ export const Grid = forwardRef<GridHandle, GridProps>(function Grid(props, ref) 
       if (!p.selection || p.user.clientId === selfClientId || p.selection.sheetId !== sheet.id) continue;
       const a = { startRow: p.selection.activeRow, endRow: p.selection.activeRow, startCol: p.selection.activeCol, endCol: p.selection.activeCol };
       if (a.endRow >= geo.rowCount || a.endCol >= geo.colCount) continue;
+      const pRange = p.selection.range;
+      if (
+        pRange &&
+        (pRange.startRow !== pRange.endRow || pRange.startCol !== pRange.endCol) &&
+        pRange.endRow < geo.rowCount &&
+        pRange.endCol < geo.colCount
+      ) {
+        out.push(
+          <div
+            key={`p-range-${p.user.clientId}`}
+            className="pointer-events-none absolute z-10 border"
+            style={{
+              ...rect(pRange, originX, originY),
+              borderColor: p.user.color,
+              backgroundColor: `color-mix(in srgb, ${p.user.color} 15%, transparent)`,
+            }}
+          />,
+        );
+      }
       out.push(
         <div key={`p-${p.user.clientId}`} className="pointer-events-none absolute z-10 border-2" style={{ ...rect(a, originX, originY), borderColor: p.user.color }}>
-          <span className="absolute -top-4 left-[-2px] whitespace-nowrap rounded-t px-1 text-[10px] font-semibold text-white" style={{ background: p.user.color }}>
+          <span className="absolute -top-4 left-[-2px] whitespace-nowrap rounded-t px-1 text-[10px] font-semibold text-white shadow-xs" style={{ background: p.user.color }}>
             {p.user.name}
           </span>
         </div>,

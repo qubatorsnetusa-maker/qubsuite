@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   CheckCircle2,
-  Sparkles,
+  Star,
   Heart,
   Rocket,
   ThumbsUp,
@@ -192,7 +192,7 @@ export const ThankYouEditor: React.FC<ThankYouEditorProps> = ({
     {
       id: 'sparkles',
       label: 'Celebration',
-      icon: Sparkles,
+      icon: Star,
       bgClass: 'bg-amber-50 border-amber-200',
       textClass: 'text-amber-600',
     },

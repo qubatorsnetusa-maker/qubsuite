@@ -1,53 +1,6 @@
+import { AiAssistIcon } from '@/components/ai-assist-icon';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import {
-  Plus,
-  Trash2,
-  Copy,
-  ChevronUp,
-  ChevronDown,
-  GripVertical,
-  Settings,
-  Eye,
-  Type,
-  Mail,
-  Phone,
-  ListOrdered,
-  Star,
-  SlidersHorizontal,
-  CheckCircle2,
-  Sparkles,
-  Palette,
-  Share2,
-  FileDown,
-  Check,
-  AlignLeft,
-  HandMetal,
-  Smartphone,
-  Monitor,
-  Link2,
-  Globe,
-  ExternalLink,
-  GitBranch,
-  Clock,
-  AlertCircle,
-  RotateCcw,
-  Cloud,
-  Hash,
-  Calendar,
-  ToggleLeft,
-  Upload,
-  Building,
-  LayoutTemplate,
-  ChevronRight,
-  Split,
-  ShieldAlert,
-  Wifi,
-  WifiOff,
-  History,
-  Database,
-  HardDrive,
-  X,
-} from 'lucide-react';
+import { Plus, Trash2, Copy, ChevronUp, ChevronDown, GripVertical, Settings, Eye, Type, Mail, Phone, ListOrdered, Star, SlidersHorizontal, CheckCircle2, Palette, Share2, FileDown, Check, AlignLeft, HandMetal, Smartphone, Monitor, Link2, Globe, ExternalLink, GitBranch, Clock, AlertCircle, RotateCcw, Cloud, Hash, Calendar, ToggleLeft, Upload, Building, LayoutTemplate, ChevronRight, Split, ShieldAlert, Wifi, WifiOff, History, Database, HardDrive, X, Bot } from 'lucide-react';
 import type { FormConfig, FormStep, QuestionType, PreviewDevice, ThankYouConfig } from '../types';
 import { FORM_THEMES } from '../data/defaultForms';
 import { DevicePreviewFrame } from './DevicePreviewFrame';
@@ -653,7 +606,7 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
   const getStepIcon = (type: QuestionType) => {
     switch (type) {
       case 'welcome':
-        return <Sparkles className="w-3.5 h-3.5" />;
+        return <Bot className="w-3.5 h-3.5" />;
       case 'short_text':
         return <Type className="w-3.5 h-3.5" />;
       case 'long_text':
@@ -887,7 +840,7 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
         >
           <div className="flex items-center gap-2.5">
             <span className="w-7 h-7 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 border border-amber-300/60 shadow-2xs">
-              <Sparkles className="w-4 h-4 text-amber-600" />
+              <Bot className="w-4 h-4 text-amber-600" />
             </span>
             <span>
               <strong>Draft Available:</strong> An auto-saved draft from{' '}
@@ -1096,7 +1049,7 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
                         : 'bg-amber-100 text-amber-700'
                       }`}
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
+                    <Bot className="w-3.5 h-3.5" />
                   </span>
                   <div className="truncate">
                     <div className="text-xs font-semibold leading-tight">Welcome Screen</div>
@@ -1123,7 +1076,7 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
                 onClick={handleAddWelcomeScreen}
                 className="w-full py-2 px-3 rounded-xl border border-dashed border-amber-300 hover:border-amber-400 bg-white hover:bg-amber-50 text-amber-900 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer shadow-2xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2"
               >
-                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                <Bot className="w-3.5 h-3.5 text-amber-600" />
                 <span>+ Add Welcome Screen</span>
               </button>
             )}
@@ -1507,7 +1460,7 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
                 : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              <Bot className="w-3.5 h-3.5 text-amber-500" />
               <span>Welcome Screen</span>
               {(form.steps.some((s) => s.type === 'welcome') || form.welcomeScreen?.enabled) && (
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500 ring-2 ring-amber-200" />

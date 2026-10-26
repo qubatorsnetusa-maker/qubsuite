@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from '../lib/motion';
 import {
   X,
   Search,
-  Sparkles,
+  Bot,
   Type,
   AlignLeft,
   Mail,
@@ -169,7 +169,7 @@ const QUESTION_TYPES: QuestionTypeOption[] = [
     title: 'Welcome Screen',
     category: 'Special Screens',
     description: 'Introductory landing screen with estimated time and title.',
-    icon: <Sparkles className="w-4 h-4" />,
+    icon: <Bot className="w-4 h-4" />,
     iconBg: 'bg-amber-50',
     iconColor: 'text-amber-600',
   },

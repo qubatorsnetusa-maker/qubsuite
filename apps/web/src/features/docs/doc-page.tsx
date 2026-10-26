@@ -2,7 +2,7 @@ import ImageResize from 'tiptap-extension-resize-image';
 import { HorizontalRuler } from './doc-ruler';
 import { VerticalRuler } from './vertical-ruler';
 import { FloatingAiBar, type AiMode } from './floating-ai-bar';
-import { extractPlainText, textStats } from '@qub/editor-schema';
+import { extractPlainText, textStats, markdownToHtml } from '@qub/editor-schema';
 import type { CollaboratorDto } from '@qub/shared';
 import { roleAtLeast } from '@qub/shared';
 import { documentExtensions } from '@qub/editor-schema';
@@ -12,7 +12,8 @@ import Collaboration from '@tiptap/extension-collaboration';
 import CollaborationCaret from '@tiptap/extension-collaboration-caret';
 import { Placeholder } from '@tiptap/extensions';
 import { EditorContent, useEditor } from '@tiptap/react';
-import { History, MessageSquare } from 'lucide-react';
+import { History, MessageSquare, Presentation } from 'lucide-react';
+import { DocSlidesPresenter } from './doc-slides-presenter';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { EditorHeader, SaveIndicator } from '@/components/editor-header';
@@ -26,6 +27,7 @@ import { docsService } from '@/services/docs';
 import { qk } from '@/services/query-keys';
 import { MoveDialog } from '../drive/dialogs';
 import { getServiceUrl } from '@/lib/ecosystem-urls';
+import { setPageMetadata } from '@/lib/meta';
 import { ShareDialog } from '../sharing/share-dialog';
 import { RequestAccessDialog } from '../sharing/request-access-dialog';
 import { CommentHighlights, createAnchor, setAnchorView } from './comment-anchors';
@@ -59,6 +61,16 @@ const readOutlinePref = () => {
 export function DocPage() {
   const { documentId } = useParams({ from: '/_authenticated/docs/$documentId' });
   const doc = useQuery({ queryKey: qk.docs.one(documentId), queryFn: () => docsService.get(documentId) });
+
+  useEffect(() => {
+    if (doc.data?.title) {
+      setPageMetadata({
+        title: doc.data.title,
+        suiteName: 'Docs',
+        description: 'Collaborate on this document in real time with Qub Docs',
+      });
+    }
+  }, [doc.data?.title]);
   if (doc.isLoading) return <FullPageSpinner label="Opening document…" />;
   if (doc.error) return <ErrorState error={doc.error} onRetry={() => void doc.refetch()} title="Can’t open this document" />;
   return <DocEditor key={documentId} documentId={documentId} />;
@@ -70,6 +82,16 @@ function DocEditor({ documentId }: { documentId: string }) {
   const navigate = useNavigate();
   const search = useSearch({ from: '/_authenticated/docs/$documentId' });
   const doc = useQuery({ queryKey: qk.docs.one(documentId), queryFn: () => docsService.get(documentId) });
+
+  useEffect(() => {
+    if (doc.data?.title) {
+      setPageMetadata({
+        title: doc.data.title,
+        suiteName: 'Docs',
+        description: 'Collaborate on this document in real time with Qub Docs',
+      });
+    }
+  }, [doc.data?.title]);
   const collaborators = useQuery({ queryKey: qk.docs.collaborators(documentId), queryFn: () => docsService.collaborators(documentId) });
   const peopleRef = useRef<CollaboratorDto[]>([]);
   peopleRef.current = collaborators.data ?? [];
@@ -102,6 +124,7 @@ function DocEditor({ documentId }: { documentId: string }) {
   const [activeAnchor, setActiveAnchor] = useState<string | null>(null);
   const [find, setFind] = useState<{ replace: boolean; nonce: number } | null>(null);
   const [wordCountOpen, setWordCountOpen] = useState(false);
+  const [slidesOpen, setSlidesOpen] = useState(false);
   const [outlineOpen, setOutlineOpen] = useState(readOutlinePref);
   const [pageStack, setPageStack] = useState<HTMLDivElement | null>(null);
   const toggleOutline = useCallback(() => {
@@ -115,6 +138,16 @@ function DocEditor({ documentId }: { documentId: string }) {
     });
   }, []);
   const openFind = useCallback((replace: boolean) => setFind((f) => ({ replace, nonce: (f?.nonce ?? 0) + 1 })), []);
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'p')) {
+        e.preventDefault();
+        setSlidesOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const serverRole = doc.data?.capabilities.role ?? 'VIEWER';
   const role = collab.role ?? serverRole;
@@ -145,7 +178,8 @@ function DocEditor({ documentId }: { documentId: string }) {
         handleDrop: (view, event, slice, moved) => {
           if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
             const file = event.dataTransfer.files[0];
-            if (file && file.type.startsWith('image/')) {
+            if (!file) return false;
+            if (file.type.startsWith('image/')) {
               event.preventDefault();
               const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
               if (coordinates) {
@@ -156,9 +190,35 @@ function DocEditor({ documentId }: { documentId: string }) {
               }
               return true;
             }
+            const ext = file.name.split('.').pop()?.toLowerCase();
+            if (ext === 'md' || ext === 'markdown') {
+              event.preventDefault();
+              void file.text().then((text) => {
+                const html = markdownToHtml(text);
+                const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
+                if (coordinates) {
+                  view.dispatch(view.state.tr.setSelection((view.state.selection.constructor as any).near(view.state.doc.resolve(coordinates.pos))));
+                }
+                editor?.commands.insertContent(html);
+                toast.success(`Inserted markdown from ${file.name}`);
+              });
+              return true;
+            }
+            if (ext === 'txt') {
+              event.preventDefault();
+              void file.text().then((text) => {
+                const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
+                if (coordinates) {
+                  view.dispatch(view.state.tr.setSelection((view.state.selection.constructor as any).near(view.state.doc.resolve(coordinates.pos))));
+                }
+                editor?.commands.insertContent(text);
+                toast.success(`Inserted text from ${file.name}`);
+              });
+              return true;
+            }
           }
           return false;
-        },
+        },
         handlePaste: (view, event) => {
           if (event.clipboardData && event.clipboardData.files && event.clipboardData.files.length > 0) {
             const file = event.clipboardData.files[0];
@@ -282,6 +342,20 @@ function DocEditor({ documentId }: { documentId: string }) {
 
   const d = doc.data!;
 
+  const getFirstLineOfDocument = useCallback(() => {
+    if (!editor) return null;
+    let firstLine: string | null = null;
+    editor.state.doc.descendants((node) => {
+      if (firstLine !== null) return false;
+      if (node.isTextblock && node.textContent.trim()) {
+        firstLine = node.textContent.trim();
+        return false;
+      }
+      return true;
+    });
+    return firstLine;
+  }, [editor]);
+
   const handleShare = async () => {
     const docUrl = getServiceUrl('docs', `/docs/${documentId}`);
     try {
@@ -301,6 +375,7 @@ function DocEditor({ documentId }: { documentId: string }) {
           fileType="DOCUMENT"
           title={d.title}
           onRename={(t) => rename.mutateAsync(t)}
+          onAutoSuggestTitle={getFirstLineOfDocument}
           canEdit={canEdit}
           status={<SaveIndicator status={collab.saveState} lastSavedAt={collab.lastSavedAt} />}
           readOnlyLabel={canEdit ? undefined : canComment ? 'Can comment' : 'View only'}
@@ -331,6 +406,7 @@ function DocEditor({ documentId }: { documentId: string }) {
                 onFind={openFind}
                 onToggleOutline={toggleOutline}
                 onWordCount={() => setWordCountOpen(true)}
+                onPresentSlides={() => setSlidesOpen(true)}
                 onComment={startComment}
                 onPrint={print}
               />
@@ -341,6 +417,11 @@ function DocEditor({ documentId }: { documentId: string }) {
               <Tooltip content="Version history">
                 <Button variant="subtle" size="icon" onClick={() => setVersionsOpen(true)} aria-label="Version history">
                   <History />
+                </Button>
+              </Tooltip>
+              <Tooltip content="Present as slides (F5)">
+                <Button variant="subtle" size="icon" onClick={() => setSlidesOpen(true)} aria-label="Present as slides">
+                  <Presentation />
                 </Button>
               </Tooltip>
               <Tooltip content="Comments">

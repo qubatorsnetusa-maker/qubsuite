@@ -1,39 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion } from '../lib/motion';
-import {
-  GitBranch,
-  ArrowRight,
-  Sparkles,
-  CheckCircle2,
-  AlertCircle,
-  HelpCircle,
-  ZoomIn,
-  ZoomOut,
-  RotateCcw,
-  Maximize2,
-  Minimize2,
-  Play,
-  Settings2,
-  Plus,
-  Eye,
-  Sliders,
-  Check,
-  Star,
-  ListOrdered,
-  Calendar,
-  ToggleLeft,
-  Upload,
-  Globe,
-  Mail,
-  Hash,
-  FileText,
-  Building,
-  ChevronRight,
-  ExternalLink,
-  Split,
-  Workflow,
-  Compass,
-} from 'lucide-react';
+import { GitBranch, ArrowRight, CheckCircle2, AlertCircle, HelpCircle, ZoomIn, ZoomOut, RotateCcw, Maximize2, Minimize2, Play, Settings2, Plus, Eye, Sliders, Check, Star, ListOrdered, Calendar, ToggleLeft, Upload, Globe, Mail, Hash, FileText, Building, ChevronRight, ExternalLink, Split, Workflow, Compass, Bot } from 'lucide-react';
 import type { FormConfig, FormStep, LogicRule, QuestionType } from '../types';
 import { OPERATOR_LABELS, checkRuleMatch } from '../utils/logicUtils';
 
@@ -102,7 +69,7 @@ export const LogicFlowView: React.FC<LogicFlowViewProps> = ({
   const renderTypeIcon = (type: QuestionType, className = 'w-3.5 h-3.5') => {
     switch (type) {
       case 'welcome':
-        return <Sparkles className={className} />;
+        return <Bot className={className} />;
       case 'short_text':
       case 'long_text':
         return <FileText className={className} />;

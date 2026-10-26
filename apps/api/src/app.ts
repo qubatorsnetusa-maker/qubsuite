@@ -1,7 +1,9 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
+import { resolveRouteMetadata, injectHtmlMetadata } from './modules/meta/ssr-meta';
 import Fastify, { LogController, type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import { serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod';
 import { sql } from 'drizzle-orm';
@@ -101,11 +103,29 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   if (env.SERVE_WEB_DIST) {
     const root = path.resolve(env.SERVE_WEB_DIST);
     await app.register(fastifyStatic, { root, prefix: '/qubsuite/', wildcard: false });
-    app.setNotFoundHandler((request, reply) => {
+
+    let cachedIndexHtml: string | null = null;
+    const getIndexHtml = async () => {
+      if (!cachedIndexHtml || env.NODE_ENV === 'development') {
+        const indexPath = path.join(root, 'index.html');
+        try {
+          cachedIndexHtml = await fs.promises.readFile(indexPath, 'utf8');
+        } catch {
+          cachedIndexHtml = `<!doctype html><html><head><title>QubSuite</title></head><body><div id="root"></div></body></html>`;
+        }
+      }
+      return cachedIndexHtml;
+    };
+
+    app.setNotFoundHandler(async (request, reply) => {
       if (request.url.startsWith('/api/')) {
         return reply.code(404).send({ success: false, error: { code: 'ROUTE_NOT_FOUND', message: 'Route not found.' } });
       }
-      return reply.sendFile('index.html');
+
+      const meta = await resolveRouteMetadata(services, request.url);
+      const rawHtml = await getIndexHtml();
+      const injected = injectHtmlMetadata(rawHtml, meta, `${request.protocol}://${request.hostname}${request.url}`);
+      return reply.type('text/html; charset=utf-8').send(injected);
     });
   }
 

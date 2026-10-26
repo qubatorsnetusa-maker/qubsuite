@@ -16,6 +16,7 @@ export const ERROR_CODES = {
   /** Blocked by an organization policy set in the admin console. */
   POLICY_VIOLATION: 403,
   UNSUPPORTED_MEDIA_TYPE: 415,
+  UPSTREAM_UNAVAILABLE: 502,
   INTERNAL_ERROR: 500,
 } as const;
 

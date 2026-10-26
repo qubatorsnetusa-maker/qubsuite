@@ -1,6 +1,6 @@
 import { getServiceUrl, type EcosystemService } from '@/lib/ecosystem-urls';
 import { Link } from '@tanstack/react-router';
-import { ArrowLeft, HardDrive, LayoutGrid, Menu, Search, Settings, X } from 'lucide-react';
+import { ArrowLeft, HardDrive, LayoutGrid, Menu, Presentation, Search, Settings, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { FileIcon } from '@/components/file-icon';
 import { Popover, PopoverContent, PopoverTrigger, Tooltip } from '@/components/ui/misc';
@@ -22,8 +22,16 @@ function AppLinks({ onNavigate, layout }: { onNavigate?: () => void; layout: 'li
           </a>
         );
       })}
+      <a href={getServiceUrl('slides', '/slides')} onClick={onNavigate} className={item}>
+        <Presentation className={layout === 'grid' ? 'size-9 text-[#f59e0b]' : 'size-[22px] text-[#f59e0b]'} />
+        Qub Slides
+      </a>
+      <a href={getServiceUrl('pdf', '/pdf')} onClick={onNavigate} className={item}>
+        <FileIcon type="PDF" size={layout === 'grid' ? 36 : 22} />
+        Qub PDF
+      </a>
       <a href={getServiceUrl('drive', '/drive')} onClick={onNavigate} className={item}>
-        {layout === 'grid' ? <HardDrive className="size-9 text-[#1a56db]" /> : <HardDrive className="size-5 text-[#1a56db]" />}
+        <HardDrive className={layout === 'grid' ? 'size-9 text-[#1a56db]' : 'size-[22px] text-[#1a56db]'} />
         Qub Drive
       </a>
     </>
@@ -148,7 +156,7 @@ export function AppHeader({
               </button>
             </PopoverTrigger>
           </Tooltip>
-          <PopoverContent align="end" className="grid w-72 grid-cols-2 gap-1 p-3">
+          <PopoverContent align="end" className="grid w-80 grid-cols-3 gap-2 p-3">
             <AppLinks layout="grid" />
           </PopoverContent>
         </Popover>

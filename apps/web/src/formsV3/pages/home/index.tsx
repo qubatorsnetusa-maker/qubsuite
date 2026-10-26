@@ -27,8 +27,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Smartphone,
-  Sparkles,
-  Star,
+  CheckSquare, Star,
   Timer,
   TrendingUp,
   Webhook,
@@ -158,7 +157,7 @@ function TopNavBar({ authHref }: { authHref: string }) {
           href="#"
         >
           <div className="w-8 h-8 rounded-lg bg-accent-indigo-subtle border border-primary/20 flex items-center justify-center text-primary group-hover:scale-105 transition-transform duration-200 shadow-sm">
-            <Sparkles size={20} />
+            <CheckSquare size={20} />
           </div>
           <span className="text-headline-sm font-headline-sm font-bold tracking-tight text-on-surface">
             Qub-forms
@@ -1279,7 +1278,7 @@ function Footer() {
         <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
           <a className="text-headline-sm font-headline-sm font-bold text-on-surface flex items-center gap-2" href="#">
             <div className="w-6 h-6 rounded bg-accent-indigo-subtle border border-primary/20 flex items-center justify-center text-primary">
-              <Sparkles size={16} />
+              <CheckSquare size={16} />
             </div>
             <span>Qub-forms</span>
           </a>

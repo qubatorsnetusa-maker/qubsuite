@@ -12,7 +12,6 @@ import {
   X,
   ArrowLeft,
   Calendar,
-  Sparkles,
   ExternalLink,
   Smartphone,
   Folder,
@@ -28,6 +27,7 @@ import { errorMessage } from '@/lib/api';
 import { formatBytes } from '@/lib/utils';
 import { openPath, openServiceUrl } from '@/services/drive';
 import { shareService } from '@/services/notifications';
+import { setPageMetadata } from '@/lib/meta';
 
 function DocView({ token, access, fileId }: { token: string; access: string; fileId: string }) {
   const doc = useQuery({ queryKey: ['share', token, 'doc', fileId], queryFn: () => shareService.document(token, access, fileId) });
@@ -129,6 +129,16 @@ export function PublicSharePage() {
   });
 
   const data = unlocked ?? initial.data;
+
+  useEffect(() => {
+    if (data?.name) {
+      setPageMetadata({
+        title: data.name,
+        suiteName: 'Drive',
+        description: data.folder ? 'Folder shared via Qub Drive' : 'File shared via Qub Drive',
+      });
+    }
+  }, [data?.name, data?.folder]);
 
   // Auto-redirect documents directly to Docs editor instead of showing Drive transfer page
   useEffect(() => {

@@ -1,5 +1,7 @@
 node_modules
 dist
+dist-mobile
+apps/web/dist-mobile/
 coverage
 .env
 .env.*
@@ -14,3 +16,7 @@ test-results
 .playwright-mcp
 .superpowers/
 .neon
+android-starter/.gradle/
+android-starter/.idea/
+android-starter/.kotlin/
+android-starter/**/build/

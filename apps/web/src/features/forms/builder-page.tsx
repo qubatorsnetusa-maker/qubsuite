@@ -1,3 +1,4 @@
+import { AiAssistIcon } from '@/components/ai-assist-icon';
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -5,8 +6,8 @@ import type { FormDto, FormFieldDto, FormFieldType } from '@qub/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { addFieldTx, fieldSetTx, formSetTx, moveFieldTx, QUESTION_TYPES, validateDefinition, type DefinitionIssue } from '@qub/shared/forms';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
-import { Eye, FolderInput, GripVertical, Link2, PanelsTopLeft, Plus, Redo2, Settings2, Trash2, Undo2, Variable } from 'lucide-react';
-import { useMemo, useState, type ReactNode } from 'react';
+import { Bot, Eye, FolderInput, Globe, GripVertical, Link2, PanelsTopLeft, Plus, Redo2, Rows, Settings2, Trash2, Type, Undo2, Variable } from 'lucide-react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { EditorHeader, SaveIndicator, type SaveStatus } from '@/components/editor-header';
 import { ErrorState, FullPageSpinner } from '@/components/states';
@@ -33,6 +34,7 @@ import { VariablesPanel } from './builder/variables-panel';
 import { FIELD_UI } from './registry';
 import { RendererBoundary } from './renderer/renderer-boundary';
 import { useFormRoom } from './use-form-room';
+import { createCountryFieldOptions } from './countries';
 
 export function BuilderPage() {
   const { formId } = useParams({ from: '/_authenticated/forms/$formId/edit' });
@@ -116,8 +118,8 @@ export function FormTopBar({
                 </Link>
               </Button>
             </Tooltip>
-            <Tooltip content="Open in Forms v2">
-              <Button asChild variant="subtle" size="icon" aria-label="Open in Forms v2">
+            <Tooltip content="Switch to conversational mode">
+              <Button asChild variant="subtle" size="icon" aria-label="Switch to conversational mode">
                 <Link to="/formsv2/$formId/content" params={{ formId: form.id }}>
                   <PanelsTopLeft />
                 </Link>
@@ -193,20 +195,175 @@ function Builder() {
   const canEdit = form.capabilities.canEdit && !form.isTrashed && !ops.readOnly;
   const [active, setActive] = useState<string | null>(form.fields[0]?.id ?? null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
   const onDragEnd = (e: DragEndEvent) => {
     if (!e.over || e.active.id === e.over.id) return;
-    // The drop target's index, kept inside the list (moveFieldTx expects an index it can splice at).
     const to = form.fields.findIndex((f) => f.id === e.over!.id);
     if (to < 0) return;
     ops.apply(moveFieldTx(form, String(e.active.id), Math.min(to, form.fields.length - 1)));
   };
 
-  const addField = (type: FormFieldType) => {
-    const { tx, fieldId } = addFieldTx(form, type, active);
+  const addField = (type: FormFieldType, afterId?: string | null) => {
+    const { tx, fieldId } = addFieldTx(form, type, afterId ?? active);
     ops.apply(tx);
     setActive(fieldId);
+  };
+
+  const addCountryField = (afterId?: string | null) => {
+    const { tx, fieldId } = addFieldTx(form, 'DROPDOWN', afterId ?? active, 'Country');
+    ops.apply(tx);
+    const countryOpts = createCountryFieldOptions();
+    const updateTx = fieldSetTx(ops.form, fieldId, {
+      label: 'Country',
+      settings: { ...ops.form.fields.find((f) => f.id === fieldId)?.settings, searchable: true },
+      options: countryOpts,
+    });
+    if (updateTx) ops.apply(updateTx);
+    setActive(fieldId);
+    toast.success('Added Country question with ~195 countries prefilled');
+  };
+
+  const [aiBuilding, setAiBuilding] = useState<{
+    total: number;
+    current: number;
+    currentLabel: string;
+    stage: 'title' | 'description' | 'questions' | 'done';
+  } | null>(null);
+
+  const abortAiBuildingRef = useRef<(() => void) | null>(null);
+
+  const handleApplyAiFields = (
+    data: {
+      title?: string;
+      description?: string;
+      fields: Array<{ label: string; type: FormFieldType; required: boolean; options?: string[] }>;
+    },
+    live = true
+  ) => {
+    if (!live) {
+      if (data.title && !form.title) ops.apply(formSetTx(ops.form, { title: data.title }));
+      if (data.description && !form.description) ops.apply(formSetTx(ops.form, { description: data.description }));
+      let lastId: string | null = active;
+      data.fields.forEach((field) => {
+        const { tx, fieldId } = addFieldTx(ops.form, field.type, lastId, field.label);
+        ops.apply(tx);
+        if (field.required || field.options?.length) {
+          const updateTx = fieldSetTx(ops.form, fieldId, {
+            required: field.required,
+            options: field.options?.map((opt, idx) => ({ id: crypto.randomUUID(), label: opt, kind: 'option', position: idx })),
+          });
+          if (updateTx) ops.apply(updateTx);
+        }
+        lastId = fieldId;
+      });
+      if (lastId) setActive(lastId);
+      toast.success(`Generated ${data.fields.length} questions with AI!`);
+      return;
+    }
+
+    // Live visual building sequence
+    let cancelled = false;
+    let pendingFields = [...data.fields];
+    let currentLastId = active;
+
+    const skipToFinish = () => {
+      cancelled = true;
+      pendingFields.forEach((field) => {
+        const { tx, fieldId } = addFieldTx(ops.form, field.type, currentLastId, field.label);
+        ops.apply(tx);
+        if (field.required || field.options?.length) {
+          const updateTx = fieldSetTx(ops.form, fieldId, {
+            required: field.required,
+            options: field.options?.map((opt, idx) => ({ id: crypto.randomUUID(), label: opt, kind: 'option', position: idx })),
+          });
+          if (updateTx) ops.apply(updateTx);
+        }
+        currentLastId = fieldId;
+      });
+      if (currentLastId) setActive(currentLastId);
+      setAiBuilding({
+        total: data.fields.length,
+        current: data.fields.length,
+        currentLabel: 'Completed',
+        stage: 'done',
+      });
+      setTimeout(() => setAiBuilding(null), 1800);
+      toast.success(`🎉 AI finished building all ${data.fields.length} questions!`);
+    };
+
+    abortAiBuildingRef.current = skipToFinish;
+
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    (async () => {
+      if (data.title && !form.title) {
+        setAiBuilding({
+          total: data.fields.length,
+          current: 0,
+          currentLabel: data.title,
+          stage: 'title',
+        });
+        ops.apply(formSetTx(ops.form, { title: data.title }));
+        await sleep(350);
+        if (cancelled) return;
+      }
+
+      if (data.description && !form.description) {
+        setAiBuilding({
+          total: data.fields.length,
+          current: 0,
+          currentLabel: data.description,
+          stage: 'description',
+        });
+        ops.apply(formSetTx(ops.form, { description: data.description }));
+        await sleep(300);
+        if (cancelled) return;
+      }
+
+      for (let i = 0; i < data.fields.length; i++) {
+        if (cancelled) return;
+        const field = data.fields[i]!;
+        pendingFields = data.fields.slice(i + 1);
+
+        setAiBuilding({
+          total: data.fields.length,
+          current: i + 1,
+          currentLabel: field.label,
+          stage: 'questions',
+        });
+
+        const { tx, fieldId } = addFieldTx(ops.form, field.type, currentLastId, field.label);
+        ops.apply(tx);
+        currentLastId = fieldId;
+        setActive(fieldId);
+
+        if (field.required || field.options?.length) {
+          const updateTx = fieldSetTx(ops.form, fieldId, {
+            required: field.required,
+            options: field.options?.map((opt, idx) => ({ id: crypto.randomUUID(), label: opt, kind: 'option', position: idx })),
+          });
+          if (updateTx) ops.apply(updateTx);
+        }
+
+        setTimeout(() => {
+          document.getElementById(`q-${fieldId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 50);
+
+        await sleep(450);
+      }
+
+      setAiBuilding({
+        total: data.fields.length,
+        current: data.fields.length,
+        currentLabel: 'All questions generated',
+        stage: 'done',
+      });
+      toast.success(`🎉 AI finished building all ${data.fields.length} questions!`);
+      await sleep(2000);
+      setAiBuilding(null);
+    })();
   };
 
   const undoRedo = canEdit && (
@@ -237,12 +394,48 @@ function Builder() {
   }, [issues]);
 
   return (
-    <div className="flex h-full flex-col" style={{ background: form.theme.backgroundColor }}>
+    <div className="flex h-full flex-col relative" style={{ background: form.theme.backgroundColor }}>
+      {aiBuilding && (
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3.5 rounded-full border border-purple-500/40 bg-slate-900/95 px-5 py-2.5 text-white shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-top-3 duration-300">
+          <div className="relative flex items-center justify-center">
+            <AiAssistIcon className="size-4 text-purple-400" />
+            <span className="absolute -inset-1 rounded-full bg-purple-500/20 blur-sm animate-pulse" />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-xs font-semibold text-purple-200">
+              {aiBuilding.stage === 'title' && 'Designing form header…'}
+              {aiBuilding.stage === 'description' && 'Writing form description…'}
+              {aiBuilding.stage === 'questions' && `Building question ${aiBuilding.current} of ${aiBuilding.total}…`}
+              {aiBuilding.stage === 'done' && 'Form created successfully!'}
+            </span>
+            <span className="text-[11px] text-slate-300 max-w-xs truncate font-mono">
+              {aiBuilding.currentLabel}
+            </span>
+          </div>
+          {aiBuilding.stage === 'questions' && (
+            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-700">
+              <div
+                className="h-full bg-gradient-to-r from-purple-500 to-indigo-400 transition-all duration-300"
+                style={{ width: `${(aiBuilding.current / aiBuilding.total) * 100}%` }}
+              />
+            </div>
+          )}
+          {aiBuilding.stage !== 'done' && (
+            <button
+              type="button"
+              onClick={() => abortAiBuildingRef.current?.()}
+              className="ml-1 rounded-full border border-purple-400/40 bg-purple-500/25 px-2.5 py-1 text-[11px] font-semibold text-purple-200 transition hover:bg-purple-500/40"
+            >
+              ⚡ Skip
+            </button>
+          )}
+        </div>
+      )}
       <FormTopBar form={form} tab="questions" status={ops.status} onRetry={ops.retry} onRename={(t) => ops.apply(formSetTx(form, { title: t }, 'Rename form'))} beforePublish={ops.flush} leading={undoRedo} readOnly={ops.readOnly} />
       <div className="flex min-h-0 flex-1">
-        {/* outline */}
-        <aside className="hidden w-64 shrink-0 overflow-y-auto border-r border-border bg-background/80 p-3 lg:block" aria-label="Questions">
-          <h2 className="px-2 pb-2 text-xs font-medium uppercase tracking-wide text-muted">Questions</h2>
+        {/* sidebar / outline */}
+        <aside className="hidden w-64 shrink-0 overflow-y-auto border-r border-border bg-background p-2 md:block">
+          <div className="px-2 py-1 text-xs font-semibold text-muted">Questions</div>
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
             <SortableContext items={form.fields.map((f) => f.id)} strategy={verticalListSortingStrategy}>
               <ol className="space-y-1">
@@ -284,39 +477,96 @@ function Builder() {
               <FormHeaderCard form={form} canEdit={canEdit} />
               <FormIssues issues={issues} />
               {form.fields.map((f) => (
-                <QuestionEditor key={f.id} form={form} field={f} active={active === f.id} onActivate={() => setActive(f.id)} canEdit={canEdit} issues={issuesByField.get(f.id)} />
+                <div key={f.id} className={cn('relative group transition-all duration-300', aiBuilding && active === f.id && 'ring-2 ring-purple-500 rounded-xl shadow-lg shadow-purple-500/10')}>
+                  {aiBuilding && active === f.id && (
+                    <div className="absolute -top-3 left-4 z-30 flex items-center gap-1.5 rounded-full bg-purple-600 px-2.5 py-0.5 text-[10px] font-semibold text-white shadow-md animate-pulse">
+                      <AiAssistIcon className="size-3" /> AI Assist Building...
+                    </div>
+                  )}
+                  <QuestionEditor form={form} field={f} active={active === f.id} onActivate={() => setActive(f.id)} canEdit={canEdit} issues={issuesByField.get(f.id)} />
+                  {active === f.id && canEdit && (
+                    <aside
+                      aria-label="Question actions"
+                      className="absolute -right-14 top-2 hidden md:flex flex-col items-center gap-1 rounded-xl border border-slate-200/90 bg-white p-1.5 shadow-lg shadow-slate-900/10 dark:border-slate-800 dark:bg-surface-1 z-20"
+                    >
+                      <TypePicker
+                        onPick={(t) => addField(t, f.id)}
+                        onPickSpecial={(s) => {
+                          if (s === 'COUNTRY') addCountryField(f.id);
+                        }}
+                        trigger={
+                          <button
+                            type="button"
+                            className="flex size-9 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 transition"
+                            title="Add question"
+                            aria-label="Add question"
+                          >
+                            <Plus className="size-5" />
+                          </button>
+                        }
+                      />
+                      <button
+                        type="button"
+                        onClick={() => addCountryField(f.id)}
+                        className="flex size-9 items-center justify-center rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition"
+                        title="Add Country question (with all countries)"
+                        aria-label="Add Country question"
+                      >
+                        <Globe className="size-5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => addField('STATEMENT', f.id)}
+                        className="flex size-9 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 transition"
+                        title="Add title & description"
+                        aria-label="Add title and description"
+                      >
+                        <Type className="size-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => addField('SECTION', f.id)}
+                        className="flex size-9 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 transition"
+                        title="Add section"
+                        aria-label="Add section"
+                      >
+                        <Rows className="size-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAiOpen(true)}
+                        className="flex size-9 items-center justify-center rounded-lg text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/40 transition"
+                        title="AI Assist"
+                        aria-label="AI Assist"
+                      >
+                        <AiAssistIcon className="size-4" />
+                      </button>
+                    </aside>
+                  )}
+                </div>
               ))}
               {canEdit && (
                 <div className="flex flex-wrap gap-2 pb-20">
                   <FormAiGenerator
                     canEdit={canEdit}
-                    onApplyGeneratedFields={(data) => {
-                      if (data.title && !form.title) ops.apply(formSetTx(ops.form, { title: data.title }));
-                      if (data.description && !form.description) ops.apply(formSetTx(ops.form, { description: data.description }));
-                      let lastId: string | null = active;
-                      data.fields.forEach((field) => {
-                        const { tx, fieldId } = addFieldTx(ops.form, field.type, lastId, field.label);
-                        ops.apply(tx);
-                        if (field.required || field.options?.length) {
-                          const updateTx = fieldSetTx(ops.form, fieldId, {
-                            required: field.required,
-                            options: field.options?.map((opt, idx) => ({ id: crypto.randomUUID(), label: opt, kind: 'option', position: idx })),
-                          });
-                          if (updateTx) ops.apply(updateTx);
-                        }
-                        lastId = fieldId;
-                      });
-                      if (lastId) setActive(lastId);
-                    }}
+                    isOpen={aiOpen}
+                    onOpenChange={setAiOpen}
+                    onApplyGeneratedFields={handleApplyAiFields}
                   />
                   <TypePicker
                     onPick={addField}
+                    onPickSpecial={(s) => {
+                      if (s === 'COUNTRY') addCountryField();
+                    }}
                     trigger={
                       <Button variant="outline" className="bg-background">
                         <Plus /> Add question
                       </Button>
                     }
                   />
+                  <Button variant="outline" className="bg-background" onClick={() => addCountryField()}>
+                    <Globe className="text-blue-500" /> Add Country
+                  </Button>
                   <Button variant="outline" className="bg-background" onClick={() => addField('SECTION')}>
                     <Plus /> Add section
                   </Button>
@@ -378,22 +628,52 @@ function OutlineItem({ field, index, active, hasIssues, onSelect, draggable }: {
 
 function FormHeaderCard({ form, canEdit }: { form: FormDto; canEdit: boolean }) {
   const ops = useBuilderOps();
-  const [desc, setDesc, flush] = useDebouncedCommit(form.description ?? '', (v) => ops.apply(formSetTx(form, { description: v || null }, 'Edit form description'), { mergeKey: 'form-description' }));
+  const [title, setTitle, flushTitle] = useDebouncedCommit(
+    form.title ?? '',
+    (v) => ops.apply(formSetTx(form, { title: v || 'Untitled form' }, 'Rename form'), { mergeKey: 'form-title' })
+  );
+  const [desc, setDesc, flushDesc] = useDebouncedCommit(
+    form.description ?? '',
+    (v) => ops.apply(formSetTx(form, { description: v || null }, 'Edit form description'), { mergeKey: 'form-description' })
+  );
+
   return (
     <section className="overflow-hidden rounded-lg bg-background shadow-card">
       <div className="h-2.5" style={{ background: form.theme.primaryColor }} />
-      <div className="p-6">
-        <h1 className="text-3xl">{form.title}</h1>
+      <div className="p-6 space-y-2">
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onFocus={(e) => {
+            if (!title || /^untitleds+form$/i.test(title.trim())) {
+              e.target.select();
+            }
+          }}
+          onBlur={() => {
+            flushTitle();
+            ops.seal();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
+          disabled={!canEdit}
+          placeholder="Untitled form"
+          className="w-full text-3xl font-semibold bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-primary pb-1 px-0 outline-none focus:ring-0 transition-colors placeholder:text-muted"
+          aria-label="Form title"
+        />
         <Textarea
           value={desc}
           onChange={(e) => setDesc(e.target.value)}
           onBlur={() => {
-            flush();
+            flushDesc();
             ops.seal();
           }}
           disabled={!canEdit}
           placeholder="Form description"
-          className="mt-3 min-h-10 border-0 border-b px-0 focus:ring-0"
+          className="mt-2 min-h-10 border-0 border-b border-transparent hover:border-slate-300 focus:border-border px-0 focus:ring-0"
           aria-label="Form description"
         />
       </div>

@@ -1,6 +1,6 @@
 import type { EndingBadge, FormFieldDto, ThemeButtonRadius } from '@qub/shared';
 import { estimateMinutes } from '@qub/shared/forms';
-import { CheckCircle2, Clock, Heart, Rocket, Sparkles, ThumbsUp } from 'lucide-react';
+import { CheckCircle2, Clock, Heart, Rocket, Star, ThumbsUp } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Button } from '@/components/ui/button';
@@ -49,7 +49,7 @@ export function WelcomeScreen({ form, welcome, session, onStart }: { form: Respo
   );
 }
 
-const BADGES: Record<EndingBadge, LucideIcon> = { check: CheckCircle2, sparkles: Sparkles, heart: Heart, rocket: Rocket, thumbs_up: ThumbsUp };
+const BADGES: Record<EndingBadge, LucideIcon> = { check: CheckCircle2, sparkles: Star, heart: Heart, rocket: Rocket, thumbs_up: ThumbsUp };
 
 /** The ending's badge icon (a tick unless the author chose another). */
 export function EndingBadgeIcon({ badge, color, className }: { badge: EndingBadge | undefined; color: string; className?: string }) {

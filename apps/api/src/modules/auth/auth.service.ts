@@ -513,7 +513,7 @@ ${link}`,
       LIMIT 1
     `)) as unknown as { id: string; token: string; neonUserId: string; email: string; name: string | null }[];
 
-    if (!rows || !rows.length) return null;
+    if (!rows || !rows.length || !rows[0]) return null;
     return this.neonAuthSignIn({ sessionToken: rows[0].token, email: rows[0].email }, ctx);
   }
 

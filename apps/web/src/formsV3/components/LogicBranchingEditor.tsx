@@ -4,7 +4,6 @@ import {
   Plus,
   Trash2,
   ArrowRight,
-  Sparkles,
   HelpCircle,
   AlertCircle,
   CornerDownRight,

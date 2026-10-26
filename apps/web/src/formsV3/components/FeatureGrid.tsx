@@ -1,14 +1,5 @@
 import React from 'react';
-import {
-  Layers,
-  Sparkles,
-  ShieldAlert,
-  Smartphone,
-  CheckCircle,
-  Command,
-  Zap,
-  MousePointerClick,
-} from 'lucide-react';
+import { Layers, ShieldAlert, Smartphone, CheckCircle, Command, Zap, MousePointerClick, Bot } from 'lucide-react';
 
 export const FeatureGrid: React.FC = () => {
   return (
@@ -35,7 +26,7 @@ export const FeatureGrid: React.FC = () => {
           <div className="p-6 rounded-2xl border border-zinc-200/80 bg-zinc-50/50 hover:bg-zinc-50 transition flex flex-col justify-between">
             <div>
               <div className="w-10 h-10 rounded-xl bg-zinc-900 text-white flex items-center justify-center mb-5 shadow-xs">
-                <Sparkles className="w-5 h-5" />
+                <Bot className="w-5 h-5" />
               </div>
               <h3 className="text-lg font-semibold text-zinc-900 mb-2">
                 Fluid Kinetic Transitions

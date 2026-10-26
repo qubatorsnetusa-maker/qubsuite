@@ -1,33 +1,6 @@
 import React, { useState, useRef } from 'react';
 import Markdown from '../lib/markdown';
-import {
-  Sparkles,
-  Image as ImageIcon,
-  Wand2,
-  Layout,
-  Type,
-  Clock,
-  ArrowRight,
-  Bold,
-  Italic,
-  List,
-  ListOrdered,
-  Quote,
-  Code,
-  Link as LinkIcon,
-  RefreshCw,
-  Eye,
-  Edit3,
-  Trash2,
-  Check,
-  Plus,
-  Compass,
-  Upload,
-  ExternalLink,
-  ChevronDown,
-  Layers,
-  HelpCircle,
-} from 'lucide-react';
+import { Image as ImageIcon, Wand2, Layout, Type, Clock, ArrowRight, Bold, Italic, List, ListOrdered, Quote, Code, Link as LinkIcon, RefreshCw, Eye, Edit3, Trash2, Check, Plus, Compass, Upload, ExternalLink, ChevronDown, Layers, HelpCircle, Bot } from 'lucide-react';
 import type { FormConfig, FormStep, HeaderImageLayout, WelcomeScreenConfig } from '../types';
 import {
   AI_HERO_STYLES,
@@ -293,7 +266,7 @@ export const WelcomeScreenEditor: React.FC<WelcomeScreenEditorProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-start gap-3.5">
             <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0 border border-amber-200/60 mt-0.5">
-              <Sparkles className="w-5 h-5" />
+              <Bot className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -363,7 +336,7 @@ export const WelcomeScreenEditor: React.FC<WelcomeScreenEditorProps> = ({
       {!isEnabled && (
         <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-8 sm:p-12 text-center shadow-2xs">
           <div className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-500 flex items-center justify-center mx-auto mb-4 border border-slate-200/80">
-            <Sparkles className="w-7 h-7 text-amber-500" />
+            <Bot className="w-7 h-7 text-amber-500" />
           </div>
           <h3 className="text-base font-bold text-slate-900">Welcome Screen is Disabled</h3>
           <p className="text-xs text-slate-500 max-w-md mx-auto mt-1.5 leading-relaxed">
@@ -860,7 +833,7 @@ export const WelcomeScreenEditor: React.FC<WelcomeScreenEditorProps> = ({
                     {/* Smart Prompt Suggestions */}
                     <div className="mt-2">
                       <div className="text-[11px] font-medium text-slate-500 mb-1.5 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-amber-500" />
+                        <Bot className="w-3 h-3 text-amber-500" />
                         <span>Suggested Prompts:</span>
                       </div>
                       <div className="flex flex-wrap gap-1.5">

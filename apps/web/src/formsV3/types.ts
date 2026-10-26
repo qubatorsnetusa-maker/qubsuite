@@ -148,6 +148,8 @@ export interface FormStep {
   backgroundImage?: string;
   backgroundOpacity?: number; // 0.05 to 1
   backgroundBlur?: BackgroundBlur;
+  points?: number;
+  correctAnswer?: string | string[];
 }
 
 export type HeaderImageLayout = 'banner' | 'inline' | 'split-right' | 'split-left';
@@ -311,6 +313,8 @@ export interface FormConfig {
   showProgressBar: boolean;
   showQuestionNumbers: boolean;
   allowKeyboardShortcuts: boolean;
+  isQuiz?: boolean;
+  showScore?: boolean;
   // Theme Styling Overrides
   primaryColor?: string;
   fontFamily?: FormFontFamily;

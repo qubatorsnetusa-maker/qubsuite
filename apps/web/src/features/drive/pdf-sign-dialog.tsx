@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import * as pdfjsLib from 'pdfjs-dist';
-import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
 import {
   Type,
   PenTool,
@@ -23,10 +22,11 @@ import { toast } from 'sonner';
 import { Dialog as DialogPrimitive } from 'radix-ui';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/form-controls';
+import { SignatureModal } from '@/features/pdf/signature-modal';
 
-// Initialize PDF.js worker with direct bundled Vite URL
+// Initialize PDF.js worker with public static worker
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
 }
 
 export type EditorTool = 'select' | 'text' | 'signature' | 'date';
@@ -35,12 +35,13 @@ export interface AnnotationItem {
   id: string;
   type: 'text' | 'signature' | 'date';
   pageIndex: number;
-  xPercent: number; // 0 - 100 percentage from left of page
-  yPercent: number; // 0 - 100 percentage from top of page
+  xPercent: number;
+  yPercent: number;
   text?: string;
   signatureDataUrl?: string;
   fontSize?: number;
   color?: string;
+  scale?: number;
 }
 
 interface PdfSignDialogProps {
@@ -81,6 +82,7 @@ export function PdfSignDialog({
   // Multi-element document annotations
   const [annotations, setAnnotations] = useState<AnnotationItem[]>([]);
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
+  const [activeFontSize, setActiveFontSize] = useState<number>(14);
 
   // PDF rendering state
   const [pdfDocProxy, setPdfDocProxy] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
@@ -190,7 +192,8 @@ export function PdfSignDialog({
           canvasContext: context,
           transform: transform || undefined,
           viewport: viewport,
-        });
+          canvas: canvas,
+        } as any);
 
         await renderTask.promise;
         if (!isCancelled) {
@@ -256,7 +259,7 @@ export function PdfSignDialog({
       };
       setAnnotations((prev) => [...prev, newAnnotation]);
       setSelectedAnnotationId(newId);
-      toast.success('Text box added. Click and type directly onto the document.');
+      // seamless text insertion
     } else if (activeTool === 'date') {
       const today = new Date().toLocaleDateString('en-US', {
         year: 'numeric',
@@ -333,17 +336,7 @@ export function PdfSignDialog({
     return c.toDataURL('image/png');
   };
 
-  const handleConfirmSignature = () => {
-    const sigData =
-      sigMode === 'draw'
-        ? drawnSigData
-        : generateTypedSignaturePng(typedSigName);
-
-    if (!sigData) {
-      toast.error('Please draw or type your signature first.');
-      return;
-    }
-
+  const handleConfirmSignature = (sigData: string, scale = 1.0, textFallback?: string) => {
     const coords = pendingSigCoords || { xPercent: 50, yPercent: 75 };
     const newId = `sig-${Date.now()}`;
     const newAnnotation: AnnotationItem = {
@@ -353,7 +346,8 @@ export function PdfSignDialog({
       xPercent: coords.xPercent,
       yPercent: coords.yPercent,
       signatureDataUrl: sigData,
-      text: sigMode === 'type' ? typedSigName : undefined,
+      scale,
+      text: textFallback,
     };
 
     setAnnotations((prev) => [...prev, newAnnotation]);
@@ -738,30 +732,42 @@ export function PdfSignDialog({
                           left: `${ann.xPercent}%`,
                           top: `${ann.yPercent}%`,
                         }}
-                        className={`absolute -translate-y-1/2 group transition-shadow ${
-                          isSelected
-                            ? 'ring-2 ring-blue-500 ring-offset-1 ring-offset-transparent bg-white/95 rounded-md shadow-lg z-30 border border-blue-200'
-                            : 'hover:ring-1 hover:ring-blue-400 bg-white/80 rounded border border-slate-200'
-                        }`}
+                        className="absolute -translate-y-1/2 group z-30 bg-transparent border-0 outline-none ring-0 shadow-none"
                       >
-                        <div className="flex items-center gap-1 p-1">
+                        <div className="relative inline-flex items-center">
                           <input
+                            ref={(el) => {
+                              if (isSelected && el && document.activeElement !== el) {
+                                el.focus();
+                              }
+                            }}
                             type="text"
-                            value={ann.text || ''}
+                            value={ann.text ?? ''}
                             onChange={(e) => handleUpdateText(ann.id, e.target.value)}
                             onFocus={() => setSelectedAnnotationId(ann.id)}
-                            className="bg-transparent text-slate-900 font-sans text-sm font-normal px-1 py-0.5 outline-none min-w-[120px] max-w-[320px]"
-                            placeholder="Type text..."
+                            onBlur={() => {
+                              if (!ann.text || !ann.text.trim()) {
+                                handleDeleteAnnotation(ann.id);
+                              }
+                            }}
+                            style={{
+                              fontSize: `${ann.fontSize || 14}px`,
+                              color: ann.color || '#0f172a',
+                            }}
+                            className="bg-transparent font-sans font-normal border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus:border-0 shadow-none p-0 m-0 min-w-[20px] max-w-[500px]"
+                            placeholder={isSelected ? 'Type text...' : ''}
                             autoFocus={isSelected}
                           />
-                          <button
-                            type="button"
-                            onClick={(e) => handleDeleteAnnotation(ann.id, e)}
-                            className="p-1 text-slate-400 hover:text-rose-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                            title="Remove text"
-                          >
-                            <Trash2 className="size-3.5" />
-                          </button>
+                          {isSelected && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteAnnotation(ann.id, e)}
+                              className="absolute -top-6 -right-2 p-0.5 text-slate-400 hover:text-rose-600 bg-white rounded shadow-xs border border-slate-200"
+                              title="Remove text"
+                            >
+                              <Trash2 className="size-3" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
@@ -802,6 +808,8 @@ export function PdfSignDialog({
                   }
 
                   if (ann.type === 'signature' && ann.signatureDataUrl) {
+                    const scale = ann.scale || 1.0;
+                    const currentWidth = 140 * scale;
                     return (
                       <div
                         key={ann.id}
@@ -812,32 +820,64 @@ export function PdfSignDialog({
                         style={{
                           left: `${ann.xPercent}%`,
                           top: `${ann.yPercent}%`,
+                          width: `${currentWidth}px`,
                         }}
-                        className={`absolute -translate-x-1/2 -translate-y-1/2 group transition-shadow ${
+                        className={`absolute -translate-x-1/2 -translate-y-1/2 group z-30 transition-shadow ${
                           isSelected
-                            ? 'ring-2 ring-blue-500 ring-offset-1 rounded-lg bg-blue-50/90 shadow-xl z-30 p-1.5 border border-blue-300'
-                            : 'hover:ring-1 hover:ring-blue-400 rounded p-1 bg-white/70 border border-transparent'
+                            ? 'ring-1 ring-blue-500 rounded p-1 bg-blue-50/20 shadow-md'
+                            : 'hover:ring-1 hover:ring-slate-300 rounded p-0.5'
                         }`}
                       >
-                        <div className="relative flex flex-col items-center">
+                        <div className="relative flex flex-col items-center w-full">
                           <img
                             src={ann.signatureDataUrl}
                             alt="Signature"
-                            className="h-11 w-auto max-w-[180px] object-contain pointer-events-none"
+                            className="w-full h-auto object-contain pointer-events-none"
                           />
                           {includeAuditMark && (
-                            <span className="text-[8px] font-bold tracking-wider text-blue-700/80 -mt-0.5 uppercase">
+                            <span className="text-[7.5px] font-bold tracking-wider text-blue-700/80 -mt-0.5 uppercase pointer-events-none">
                               Verified Signature
                             </span>
                           )}
-                          <button
-                            type="button"
-                            onClick={(e) => handleDeleteAnnotation(ann.id, e)}
-                            className="absolute -top-2.5 -right-2.5 p-1 bg-rose-600 text-white rounded-full shadow-md opacity-0 group-hover:opacity-100 hover:bg-rose-700 transition-opacity"
-                            title="Remove signature"
-                          >
-                            <Trash2 className="size-3" />
-                          </button>
+                          {isSelected && (
+                            <div className="absolute -top-7 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-slate-900 text-white px-1 py-0.5 rounded shadow-lg text-[10px]">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setAnnotations((prev) =>
+                                    prev.map((a) => (a.id === ann.id ? { ...a, scale: Math.max(0.5, (a.scale || 1) - 0.25) } : a))
+                                  );
+                                }}
+                                className="px-1 text-slate-300 hover:text-white"
+                                title="Smaller"
+                              >
+                                -
+                              </button>
+                              <span className="font-mono text-slate-300">{Math.round(scale * 100)}%</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setAnnotations((prev) =>
+                                    prev.map((a) => (a.id === ann.id ? { ...a, scale: Math.min(2.5, (a.scale || 1) + 0.25) } : a))
+                                  );
+                                }}
+                                className="px-1 text-slate-300 hover:text-white"
+                                title="Larger"
+                              >
+                                +
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleDeleteAnnotation(ann.id, e)}
+                                className="p-0.5 text-rose-400 hover:text-rose-300 ml-1"
+                                title="Remove"
+                              >
+                                <Trash2 className="size-2.5" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -849,147 +889,15 @@ export function PdfSignDialog({
             </div>
           </div>
 
-          {/* Signature Creation Modal (Draw / Type) */}
-          {isSigDrawerOpen && (
-            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-              <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 text-slate-900 animate-in zoom-in-95 duration-150">
-                <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <PenTool className="size-5 text-blue-600" />
-                    <h3 className="font-semibold text-base text-slate-900">
-                      Create Your Signature
-                    </h3>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsSigDrawerOpen(false);
-                      setPendingSigCoords(null);
-                    }}
-                    className="p-1 rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                  >
-                    <X className="size-5" />
-                  </button>
-                </div>
-
-                {/* Mode Selector: Draw vs Type */}
-                <div className="grid grid-cols-2 gap-2 my-4 bg-slate-100 p-1 rounded-xl">
-                  <button
-                    type="button"
-                    onClick={() => setSigMode('draw')}
-                    className={`flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition-all ${
-                      sigMode === 'draw'
-                        ? 'bg-white shadow-xs text-blue-700 font-bold'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <PenTool className="size-3.5" />
-                    <span>Draw Signature</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSigMode('type')}
-                    className={`flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition-all ${
-                      sigMode === 'type'
-                        ? 'bg-white shadow-xs text-blue-700 font-bold'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <Type className="size-3.5" />
-                    <span>Type Signature</span>
-                  </button>
-                </div>
-
-                {/* Draw mode canvas */}
-                {sigMode === 'draw' && (
-                  <div className="space-y-3">
-                    <div className="relative rounded-xl border border-dashed border-slate-300 bg-slate-50 overflow-hidden">
-                      <canvas
-                        ref={sigCanvasRef}
-                        width={460}
-                        height={160}
-                        onMouseDown={startDraw}
-                        onMouseMove={draw}
-                        onMouseUp={stopDraw}
-                        onMouseLeave={stopDraw}
-                        onTouchStart={startDraw}
-                        onTouchMove={draw}
-                        onTouchEnd={stopDraw}
-                        className="w-full h-36 cursor-crosshair touch-none"
-                      />
-                      <div className="pointer-events-none absolute bottom-3 left-4 right-4 border-b border-slate-300/80 pb-0.5 flex justify-between text-[10px] text-slate-400">
-                        <span>Sign above line</span>
-                        <span>Legal Blue ink</span>
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-500">Draw using mouse or finger</span>
-                      <button
-                        type="button"
-                        onClick={clearCanvas}
-                        className="flex items-center gap-1 text-slate-500 hover:text-rose-600"
-                      >
-                        <RotateCcw className="size-3" />
-                        <span>Clear</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Type mode */}
-                {sigMode === 'type' && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                        Your Full Name
-                      </label>
-                      <Input
-                        value={typedSigName}
-                        onChange={(e) => setTypedSigName(e.target.value)}
-                        placeholder="e.g. John Doe"
-                        className="text-sm"
-                        autoFocus
-                      />
-                    </div>
-                    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 flex flex-col items-center justify-center">
-                      <span
-                        className="text-3xl text-blue-900"
-                        style={{ fontFamily: '"Brush Script MT", "Caveat", "Segoe Script", cursive' }}
-                      >
-                        {typedSigName || 'Your Signature'}
-                      </span>
-                      <span className="text-[10px] text-slate-400 mt-2">
-                        Official cursive rendering
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Action buttons */}
-                <div className="flex justify-end gap-2.5 mt-6 pt-4 border-t border-slate-100">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setIsSigDrawerOpen(false);
-                      setPendingSigCoords(null);
-                    }}
-                    className="text-xs h-9"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={handleConfirmSignature}
-                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-9 gap-1.5"
-                  >
-                    <Check className="size-4" />
-                    <span>Place on Document</span>
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Enhanced 3-tab Signature Modal (Draw / Type / Upload Image) */}
+          <SignatureModal
+            open={isSigDrawerOpen}
+            onClose={() => {
+              setIsSigDrawerOpen(false);
+              setPendingSigCoords(null);
+            }}
+            onConfirm={handleConfirmSignature}
+          />
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

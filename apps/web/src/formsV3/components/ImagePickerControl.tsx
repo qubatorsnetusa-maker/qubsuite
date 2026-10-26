@@ -1,17 +1,5 @@
 import React, { useState, useRef } from 'react';
-import {
-  Image as ImageIcon,
-  Upload,
-  Link2,
-  Sparkles,
-  X,
-  Check,
-  RefreshCw,
-  Eye,
-  Sliders,
-  Maximize2,
-  AlertCircle,
-} from 'lucide-react';
+import { Image as ImageIcon, Upload, Link2, X, Check, RefreshCw, Eye, Sliders, Maximize2, AlertCircle, Bot } from 'lucide-react';
 import {
   BACKGROUND_PRESETS,
   HEADER_PRESETS,
@@ -130,7 +118,7 @@ export const ImagePickerControl: React.FC<ImagePickerControlProps> = ({
             onClick={() => setIsOpen(!isOpen)}
             className="text-xs font-medium px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
           >
-            <Sparkles className="w-3 h-3" />
+            <Bot className="w-3 h-3" />
             <span>Choose Image</span>
           </button>
         )}
@@ -235,7 +223,7 @@ export const ImagePickerControl: React.FC<ImagePickerControlProps> = ({
                   : 'text-zinc-600 hover:text-zinc-900'
               }`}
             >
-              <Sparkles className="w-3 h-3 text-amber-500" />
+              <Bot className="w-3 h-3 text-amber-500" />
               <span>Curated Presets</span>
             </button>
             <button

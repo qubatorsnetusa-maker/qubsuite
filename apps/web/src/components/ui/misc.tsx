@@ -7,14 +7,16 @@ export const TooltipProvider = TooltipPrimitive.Provider;
 
 export function Tooltip({ content, children, side = 'bottom' }: { content: ReactNode; children: ReactNode; side?: 'top' | 'bottom' | 'left' | 'right' }) {
   return (
-    <TooltipPrimitive.Root delayDuration={400}>
-      <TooltipPrimitive.Trigger asChild>{children}</TooltipPrimitive.Trigger>
-      <TooltipPrimitive.Portal>
-        <TooltipPrimitive.Content side={side} sideOffset={6} className="z-[60] rounded bg-[#3c4043] px-2 py-1 text-xs text-white shadow animate-fade-in">
-          {content}
-        </TooltipPrimitive.Content>
-      </TooltipPrimitive.Portal>
-    </TooltipPrimitive.Root>
+    <TooltipPrimitive.Provider delayDuration={400}>
+      <TooltipPrimitive.Root delayDuration={400}>
+        <TooltipPrimitive.Trigger asChild>{children}</TooltipPrimitive.Trigger>
+        <TooltipPrimitive.Portal>
+          <TooltipPrimitive.Content side={side} sideOffset={6} className="z-[60] rounded bg-[#3c4043] px-2 py-1 text-xs text-white shadow animate-fade-in">
+            {content}
+          </TooltipPrimitive.Content>
+        </TooltipPrimitive.Portal>
+      </TooltipPrimitive.Root>
+    </TooltipPrimitive.Provider>
   );
 }
 

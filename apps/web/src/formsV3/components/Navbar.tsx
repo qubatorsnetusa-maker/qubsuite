@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Layers, Play, Inbox, Plus, ArrowUpRight, FolderKanban, WifiOff, Wifi } from 'lucide-react';
+import { Layers, Play, Inbox, Plus, ArrowUpRight, FolderKanban, WifiOff, Wifi } from 'lucide-react';
 import type { ActiveView } from '../types';
 import { PWAInstallButton } from './PWAInstallButton';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';

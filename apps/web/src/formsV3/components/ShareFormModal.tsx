@@ -9,7 +9,6 @@ import {
   X,
   Mail,
   CheckCircle2,
-  Sparkles,
   QrCode,
   Globe,
   Layers,

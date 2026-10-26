@@ -1,5 +1,6 @@
+import { AiAssistIcon } from '@/components/ai-assist-icon';
 import { useState } from 'react';
-import { PenTool, Sparkles, Loader2, Plus, Wand2, Mic, MicOff } from 'lucide-react';
+import { PenTool, Loader2, Plus, Wand2, Mic, MicOff, Bot } from 'lucide-react';
 import { useSpeechInput } from '@/hooks/use-speech-input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog';
@@ -10,14 +11,26 @@ import type { FormFieldType } from '@qub/shared';
 
 interface FormAiProps {
   canEdit: boolean;
-  onApplyGeneratedFields: (data: { title?: string; description?: string; fields: Array<{ label: string; type: FormFieldType; required: boolean; options?: string[] }> }) => void;
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onApplyGeneratedFields: (
+    data: {
+      title?: string;
+      description?: string;
+      fields: Array<{ label: string; type: FormFieldType; required: boolean; options?: string[] }>;
+    },
+    live?: boolean
+  ) => void;
 }
 
-export function FormAiGenerator({ canEdit, onApplyGeneratedFields }: FormAiProps) {
-  const [open, setOpen] = useState(false);
+export function FormAiGenerator({ canEdit, isOpen, onOpenChange, onApplyGeneratedFields }: FormAiProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = isOpen !== undefined ? isOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
   const [prompt, setPrompt] = useState('');
   const [questionCount, setQuestionCount] = useState(5);
   const [loading, setLoading] = useState(false);
+  const [loadStep, setLoadStep] = useState(0);
   const [preview, setPreview] = useState<{ title: string; description: string; fields: any[] } | null>(null);
   const { isListening, toggleListening, isSupported: voiceSupported } = useSpeechInput({
     onTranscript: (spokenText) => {
@@ -32,6 +45,10 @@ export function FormAiGenerator({ canEdit, onApplyGeneratedFields }: FormAiProps
 
     setLoading(true);
     setPreview(null);
+    setLoadStep(0);
+    const stepInterval = setInterval(() => {
+      setLoadStep((prev) => (prev + 1) % 4);
+    }, 850);
 
     try {
       const res = await api<{ title: string; description: string; fields: any[] }>('/ai/forms/generate', {
@@ -47,7 +64,7 @@ export function FormAiGenerator({ canEdit, onApplyGeneratedFields }: FormAiProps
       } else {
         toast.error('AI could not generate questions. Try a more detailed prompt.');
       }
-    } catch (err: any) {
+    } catch {
       // Local fallback template
       setPreview({
         title: textToSubmit.length > 40 ? textToSubmit.slice(0, 40) + '...' : textToSubmit,
@@ -61,11 +78,12 @@ export function FormAiGenerator({ canEdit, onApplyGeneratedFields }: FormAiProps
         ].slice(0, questionCount),
       });
     } finally {
+      clearInterval(stepInterval);
       setLoading(false);
     }
   };
 
-  const handleApply = () => {
+  const handleApply = (live = true) => {
     if (!preview) return;
 
     // Map AI types to valid FormFieldType
@@ -89,13 +107,15 @@ export function FormAiGenerator({ canEdit, onApplyGeneratedFields }: FormAiProps
       };
     });
 
-    onApplyGeneratedFields({
-      title: preview.title,
-      description: preview.description,
-      fields: mappedFields,
-    });
+    onApplyGeneratedFields(
+      {
+        title: preview.title,
+        description: preview.description,
+        fields: mappedFields,
+      },
+      live
+    );
 
-    toast.success(`Generated ${mappedFields.length} questions with AI!`);
     setOpen(false);
     setPreview(null);
     setPrompt('');
@@ -110,12 +130,12 @@ export function FormAiGenerator({ canEdit, onApplyGeneratedFields }: FormAiProps
         onClick={() => setOpen(true)}
         className="gap-1.5 border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 hover:text-purple-800 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300"
       >
-        <PenTool className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-        <span>Generate with AI</span>
+        <AiAssistIcon className="size-4 text-purple-600 dark:text-purple-400" />
+        <span>AI Assist</span>
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent title="Generate Form with AI" className="max-w-lg">
+        <DialogContent title="AI Assist" className="max-w-lg">
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
@@ -196,9 +216,25 @@ export function FormAiGenerator({ canEdit, onApplyGeneratedFields }: FormAiProps
             </div>
 
             {loading && (
-              <div className="flex flex-col items-center justify-center py-6 text-xs text-muted-foreground">
-                <Loader2 className="mb-2 h-6 w-6 animate-spin text-purple-600" />
-                <span>Designing form questions and options...</span>
+              <div className="flex flex-col items-center justify-center py-7 px-4 text-center rounded-xl border border-purple-200/80 bg-purple-50/60 dark:border-purple-900/40 dark:bg-purple-950/25 space-y-3">
+                <div className="relative flex items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-purple-600 dark:text-purple-400" />
+                  <AiAssistIcon className="absolute size-4 text-purple-500 animate-pulse" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-xs font-semibold text-purple-900 dark:text-purple-200">
+                    AI Assist is designing your form…
+                  </h4>
+                  <p className="text-[11px] text-purple-700/90 dark:text-purple-300/90 font-medium">
+                    {loadStep === 0 && '🧠 Analyzing form concept & target audience…'}
+                    {loadStep === 1 && '📋 Structuring logical question flow & categories…'}
+                    {loadStep === 2 && '🎯 Selecting optimal field types (Ratings, Choices, Dates)…'}
+                    {loadStep === 3 && '✨ Crafting realistic options & validation rules…'}
+                  </p>
+                </div>
+                <div className="h-1.5 w-48 overflow-hidden rounded-full bg-purple-200/80 dark:bg-purple-900/60">
+                  <div className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 animate-pulse w-full" />
+                </div>
               </div>
             )}
 
@@ -222,14 +258,27 @@ export function FormAiGenerator({ canEdit, onApplyGeneratedFields }: FormAiProps
             )}
           </div>
 
-          <DialogFooter className="flex justify-end gap-2 pt-2">
+          <DialogFooter className="flex flex-wrap items-center justify-end gap-2 pt-2">
             <Button variant="ghost" onClick={() => setOpen(false)}>
               Cancel
             </Button>
             {preview ? (
-              <Button onClick={handleApply} className="bg-purple-600 text-white hover:bg-purple-700">
-                Add to Form
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => handleApply(false)}
+                  className="gap-1.5 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  <span>⚡ Instant Insert</span>
+                </Button>
+                <Button
+                  onClick={() => handleApply(true)}
+                  className="gap-1.5 bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 text-white shadow-md shadow-purple-500/25 hover:from-purple-700 hover:to-indigo-700"
+                >
+                  <AiAssistIcon className="size-3.5" />
+                  <span>Watch AI Assist Build Live</span>
+                </Button>
+              </>
             ) : (
               <Button
                 onClick={() => handleGenerate()}

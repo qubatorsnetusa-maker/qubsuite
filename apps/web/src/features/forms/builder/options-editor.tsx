@@ -1,9 +1,11 @@
 import type { FormFieldDto, FormFieldType, OptionKind, UpdateFieldInput } from '@qub/shared';
 import { QUESTION_TYPES } from '@qub/shared/forms';
-import { X } from 'lucide-react';
+import { Globe, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { Input } from '@/components/ui/form-controls';
 import { cn } from '@/lib/utils';
+import { createCountryFieldOptions } from '../countries';
 
 /** One option (or matrix row/column) being edited, before it is committed. */
 export type OptionDraft = { id: string | undefined; label: string; kind: OptionKind; imageUrl: string | null; value: string | null };
@@ -103,10 +105,32 @@ export function OptionsEditor({ field, canEdit, onUpdate }: { field: FormFieldDt
                 </li>
               ))}
               {canEdit && (
-                <li>
-                  <button type="button" className="ml-7 text-sm text-muted hover:text-foreground" onClick={() => add(kind)}>
+                <li className="flex flex-wrap items-center gap-3">
+                  <button type="button" className="ml-7 text-sm text-primary hover:underline" onClick={() => add(kind)}>
                     Add {NOUN[kind].toLowerCase()}
                   </button>
+                  {kind === 'option' && (
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-800 dark:bg-surface-2 dark:text-slate-300 dark:hover:bg-surface-3 transition"
+                      onClick={() => {
+                        const countryOpts = createCountryFieldOptions();
+                        const next = countryOpts.map((c) => ({
+                          id: c.id,
+                          label: c.label,
+                          kind: 'option' as OptionKind,
+                          imageUrl: null,
+                          value: null,
+                        }));
+                        setDrafts(next);
+                        commit(next);
+                        toast.success('Prefilled with all world countries + Other');
+                      }}
+                    >
+                      <Globe className="size-3.5 text-blue-500" />
+                      Prefill with world countries
+                    </button>
+                  )}
                 </li>
               )}
             </ol>

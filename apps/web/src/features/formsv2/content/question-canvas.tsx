@@ -1,6 +1,6 @@
 import type { FormDto, FormFieldDto, FormFieldType, UpdateFieldInput } from '@qub/shared';
 import { addFieldTx, estimateMinutes, fieldSetTx, formSetTx, QUESTION_TYPES } from '@qub/shared/forms';
-import { ArrowRight, Clock, CornerDownLeft, EyeOff, ImageIcon, Plus, Sparkles, Video } from 'lucide-react';
+import { ArrowRight, Clock, CornerDownLeft, EyeOff, ImageIcon, Plus, Video } from 'lucide-react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { useBuilderOps } from '@/features/forms/builder/ops/builder-ops';
@@ -64,7 +64,7 @@ function EmptyForm({ form, canEdit, onSelect }: { form: FormDto; canEdit: boolea
   return (
     <div className="flex flex-col items-center gap-5 text-center">
       <span className="grid size-14 place-items-center rounded-full text-white" style={{ background: color }} aria-hidden>
-        <Sparkles className="size-6" />
+        <Plus className="size-6" />
       </span>
       <h2 className="text-3xl sm:text-4xl">Start with a question</h2>
       <p className="max-w-md text-lg text-muted">Add your first question to get started. It appears here exactly as respondents will see it, and you edit it in place.</p>

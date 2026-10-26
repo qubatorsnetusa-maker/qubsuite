@@ -9,7 +9,6 @@ import {
   Layers,
   ArrowLeft,
   ChevronRight,
-  Sparkles,
   BarChart2,
   Eye,
   EyeOff,

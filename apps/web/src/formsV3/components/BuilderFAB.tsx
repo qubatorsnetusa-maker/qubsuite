@@ -11,7 +11,6 @@ import {
   ChevronUp,
   Cloud,
   ExternalLink,
-  Sparkles,
   Plus,
 } from 'lucide-react';
 import { formatRelativeDraftTime } from '../utils/draftUtils';

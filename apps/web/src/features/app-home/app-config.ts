@@ -66,4 +66,4 @@ export const FORMS_V2_APP: AppConfig = {
 };
 
 /** Apps in the Qub launcher, in order. */
-export const LAUNCHER_APPS: AppConfig[] = [APPS.DOCUMENT, APPS.SPREADSHEET, APPS.FORM, FORMS_V2_APP];
+export const LAUNCHER_APPS: AppConfig[] = [APPS.DOCUMENT, APPS.SPREADSHEET, APPS.FORM];

@@ -101,6 +101,42 @@ export function FormSettingsFields({ form, disabled }: { form: FormDto; disabled
           <Switch checked={s.quiz.showScore} disabled={disabled} onCheckedChange={(v) => save({ settings: { quiz: { ...s.quiz, showScore: v } } })} />
         </label>
       )}
+
+      {/* Live Stream to QubSheet */}
+      <div className="rounded-lg border border-border bg-surface p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="block text-sm font-medium">Link to QubSheets</span>
+            <span className="text-xs text-muted">Stream responses into a spreadsheet in real-time.</span>
+          </div>
+          {s.linkedSpreadsheetId && (
+            <a
+              href={`/sheets/${s.linkedSpreadsheetId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-primary font-medium hover:underline inline-flex items-center gap-1"
+            >
+              Open Sheet ↗
+            </a>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            className="flex-1 rounded border border-border bg-background px-2.5 py-1 text-xs"
+            placeholder="Spreadsheet ID (from URL /sheets/ID)"
+            defaultValue={s.linkedSpreadsheetId ?? ''}
+            disabled={disabled}
+            onBlur={(e) => {
+              const val = e.target.value.trim();
+              const id = val.includes('/sheets/') ? val.split('/sheets/')[1]?.split('/')[0] : val;
+              if ((id || null) !== s.linkedSpreadsheetId) {
+                save({ settings: { linkedSpreadsheetId: id || null } });
+              }
+            }}
+          />
+        </div>
+      </div>
     </div>
   );
 }

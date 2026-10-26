@@ -1,21 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Wifi,
-  WifiOff,
-  Database,
-  History,
-  HardDrive,
-  Download,
-  Trash2,
-  RotateCcw,
-  CheckCircle2,
-  X,
-  Clock,
-  Sparkles,
-  Layers,
-  ArrowDownToLine,
-  RefreshCw
-} from 'lucide-react';
+import { Wifi, WifiOff, Database, History, HardDrive, Download, Trash2, RotateCcw, CheckCircle2, X, Clock, Layers, ArrowDownToLine, RefreshCw, Bot } from 'lucide-react';
 import type { FormConfig, DraftRevision } from '../types';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
@@ -259,7 +243,7 @@ export function OfflineDraftManagerModal({
                     onClick={handleManualCheckpoint}
                     className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs shadow-indigo-600/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2"
                   >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <Bot className="w-3.5 h-3.5 text-amber-400" />
                     <span>Create Checkpoint Now</span>
                   </button>
                   <button
@@ -319,7 +303,7 @@ export function OfflineDraftManagerModal({
                     onClick={handleManualCheckpoint}
                     className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold cursor-pointer shadow-xs shadow-indigo-600/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2"
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
+                    <Bot className="w-3.5 h-3.5" />
                     <span>Create Snapshot Now</span>
                   </button>
                 </div>

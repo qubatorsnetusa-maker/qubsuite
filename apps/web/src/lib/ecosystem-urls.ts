@@ -1,4 +1,4 @@
-export type EcosystemService = 'drive' | 'docs' | 'sheets' | 'forms' | 'pdf';
+export type EcosystemService = 'drive' | 'docs' | 'sheets' | 'forms' | 'pdf' | 'slides';
 
 /**
  * Returns the canonical origin for the specified service in the QubDocs ecosystem.
@@ -21,6 +21,8 @@ export function getServiceOrigin(service: EcosystemService): string {
         return 'https://forms.qubdocs.online';
       case 'pdf':
         return 'https://pdf.qubdocs.online';
+      case 'slides':
+        return 'https://slides.qubdocs.online';
     }
   }
 

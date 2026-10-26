@@ -1,16 +1,5 @@
 import React, { useState } from 'react';
-import {
-  X,
-  Settings,
-  Plus,
-  Trash2,
-  Download,
-  RotateCcw,
-  Check,
-  FolderKanban,
-  Sparkles,
-  Loader2,
-} from 'lucide-react';
+import { X, Settings, Plus, Trash2, Download, RotateCcw, Check, FolderKanban, Loader2, Bot } from 'lucide-react';
 import type { Workspace } from '../../types';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
@@ -217,7 +206,7 @@ export const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
             <div className="flex items-center justify-between p-3.5 rounded-2xl bg-indigo-50/50 border border-indigo-200/70 shadow-2xs">
               <div>
                 <div className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                  <Bot className="w-3.5 h-3.5 text-indigo-600" />
                   <span>Curated Form Templates</span>
                 </div>
                 <div className="text-[11px] text-indigo-700/80">Add 6 production templates and folders to this workspace</div>

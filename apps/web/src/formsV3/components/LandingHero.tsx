@@ -1,17 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from '../lib/motion';
-import {
-  ArrowRight,
-  Layers,
-  Sparkles,
-  Smartphone,
-  Monitor,
-  CheckCircle2,
-  Sliders,
-  Keyboard,
-  ShieldCheck,
-  FolderKanban,
-} from 'lucide-react';
+import { ArrowRight, Layers, Smartphone, Monitor, CheckCircle2, Sliders, Keyboard, ShieldCheck, FolderKanban, Bot } from 'lucide-react';
 import type { FormConfig, PreviewDevice } from '../types';
 import { FormRespondent } from './FormRespondent';
 import { DevicePreviewFrame } from './DevicePreviewFrame';
@@ -94,7 +83,7 @@ export const LandingHero: React.FC<LandingHeroProps> = ({
           {/* Core Feature Badges */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-10 pt-8 border-t border-zinc-200/80 text-xs text-zinc-600 font-medium">
             <div className="flex items-center justify-center gap-2">
-              <Sparkles className="w-4 h-4 text-zinc-700" />
+              <Bot className="w-4 h-4 text-zinc-700" />
               <span>Kinetic Transitions</span>
             </div>
             <div className="flex items-center justify-center gap-2">

@@ -1,6 +1,6 @@
 import { ENDING_BADGES, type EndingBadge, type FieldSettings, type FieldValidation, type FormDto, type FormFieldDto } from '@qub/shared';
 import { fieldSetTx, PATTERN_PRESETS, PRESET_CATEGORIES, presetForPattern, QUESTION_TYPES } from '@qub/shared/forms';
-import { CheckCircle2, Heart, Rocket, Sparkles, ThumbsUp, type LucideIcon } from 'lucide-react';
+import { CheckCircle2, Heart, Rocket, Star, ThumbsUp, type LucideIcon } from 'lucide-react';
 import { useId } from 'react';
 import { useBuilderOps } from '@/features/forms/builder/ops/builder-ops';
 import { cn } from '@/lib/utils';
@@ -8,7 +8,7 @@ import { Section } from './sidebar-section';
 
 const BADGE_UI: Record<EndingBadge, { icon: LucideIcon; label: string }> = {
   check: { icon: CheckCircle2, label: 'Check' },
-  sparkles: { icon: Sparkles, label: 'Sparkles' },
+  sparkles: { icon: Star, label: 'Star' },
   heart: { icon: Heart, label: 'Heart' },
   rocket: { icon: Rocket, label: 'Rocket' },
   thumbs_up: { icon: ThumbsUp, label: 'Thumbs up' },

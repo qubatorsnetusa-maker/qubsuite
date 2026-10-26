@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import {
   ArrowRight,
+  Bot,
   ListChecks,
   LockKeyhole,
-  Sparkles,
   SplitSquareHorizontal,
   Tally5,
 } from 'lucide-react'
@@ -57,7 +57,7 @@ function SignInPage() {
         <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent-indigo-subtle border border-primary/20 text-primary font-label-sm text-label-sm font-semibold mb-4">
-              <Sparkles size={14} />
+              <Bot size={14} />
               <span>Workspace access</span>
             </div>
 

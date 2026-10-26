@@ -1,6 +1,7 @@
 import type { Editor } from '@tiptap/react';
 import { useEditorState } from '@tiptap/react';
 import {
+  Presentation,
   Download,
   FileText,
   FilePlus,
@@ -36,6 +37,7 @@ import {
 import { errorMessage } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import mammoth from 'mammoth';
+import { markdownToHtml } from '@qub/editor-schema';
 import { documentFile, saveFile, type DownloadFormat } from './download';
 import { TableGridPicker } from './table-grid-picker';
 
@@ -61,6 +63,7 @@ export interface DocMenusProps {
   onFind(replace: boolean): void;
   onToggleOutline(): void;
   onWordCount(): void;
+  onPresentSlides?(): void;
   onComment(): void;
   onInsertImage(): void;
   /** Prints the document only (see `printDocument`). */
@@ -132,9 +135,18 @@ export function DocMenus(p: DocMenusProps) {
 
                 const ext = file.name.split('.').pop()?.toLowerCase();
                 try {
-                  if (ext === 'txt' || ext === 'md' || ext === 'markdown') {
+                  if (ext === 'md' || ext === 'markdown') {
                     const text = await file.text();
-                    editor.chain().focus().setContent(text).run();
+                    const html = markdownToHtml(text);
+                    editor.chain().focus().setContent(html).run();
+                    toast.success(`Imported ${file.name}`);
+                  } else if (ext === 'txt') {
+                    const text = await file.text();
+                    const paragraphs = text
+                      .split(/\r?\n\r?\n/)
+                      .map((p) => `<p>${p.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\r?\n/g, '<br>')}</p>`)
+                      .join('');
+                    editor.chain().focus().setContent(paragraphs || '<p></p>').run();
                     toast.success(`Imported ${file.name}`);
                   } else if (ext === 'html' || ext === 'htm') {
                     const html = await file.text();
@@ -198,7 +210,8 @@ export function DocMenus(p: DocMenusProps) {
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger icon={<Download />}>Download</DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
-                  <DropdownMenuItem onSelect={() => void download('doc')}>Microsoft Word (.doc)</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => void download('docx')}>Microsoft Word (.docx)</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => void download('doc')}>Rich text HTML (.doc)</DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => void download('pdf')}>PDF document (.pdf)</DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onSelect={() => void download('md')}>Markdown (.md)</DropdownMenuItem>
@@ -246,6 +259,14 @@ export function DocMenus(p: DocMenusProps) {
       <DropdownMenu>
         <Trigger label="View" className="hidden lg:inline-block" />
         <DropdownMenuContent align="start">
+          {p.onPresentSlides && (
+            <>
+              <DropdownMenuItem icon={<Presentation />} shortcut="F5" onSelect={p.onPresentSlides}>
+                Present as slides
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
           <DropdownMenuCheckboxItem checked={p.outlineOpen} onToggle={p.onToggleOutline} onCheckedChange={p.onToggleOutline}>
             Show outline
           </DropdownMenuCheckboxItem>

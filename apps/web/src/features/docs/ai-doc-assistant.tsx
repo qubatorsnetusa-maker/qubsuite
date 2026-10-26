@@ -1,6 +1,7 @@
+import { AiAssistIcon } from '@/components/ai-assist-icon';
 import { useState } from 'react';
 import type { Editor } from '@tiptap/react';
-import { Sparkles, Loader2, Check, FileText, Maximize2, Minimize2, CheckSquare, MessageSquareCode } from 'lucide-react';
+import { Loader2, Check, FileText, Maximize2, Minimize2, CheckSquare, MessageSquareCode, Bot } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/menu';
@@ -139,21 +140,21 @@ export function AiDocAssistant({ editor }: AiAssistantProps) {
   return (
     <>
       <DropdownMenu>
-        <Tooltip content="Qub AI Assist">
+        <Tooltip content="AI Assist">
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
               size="sm"
               className="h-8 gap-1.5 px-2.5 font-medium text-purple-700 hover:bg-purple-50 hover:text-purple-800 dark:text-purple-400 dark:hover:bg-purple-950/50"
             >
-              <Sparkles className="h-4 w-4 animate-pulse text-purple-600 dark:text-purple-400" />
+              <AiAssistIcon className="size-4 animate-pulse text-purple-600 dark:text-purple-400" />
               <span>AI Assist</span>
             </Button>
           </DropdownMenuTrigger>
         </Tooltip>
 
         <DropdownMenuContent align="start" className="w-64 py-1.5">
-          <DropdownMenuItem icon={<Sparkles className="text-purple-600" />} onClick={() => handleAction('rewrite')}>
+          <DropdownMenuItem icon={<AiAssistIcon className="size-3.5 text-purple-600" />} onClick={() => handleAction('rewrite')}>
             Rewrite & Polish
           </DropdownMenuItem>
           <DropdownMenuItem icon={<FileText />} onClick={() => handleAction('summarize')}>

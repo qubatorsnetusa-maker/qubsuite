@@ -1,13 +1,14 @@
 import { useState } from 'react';
+import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog';
 import { errorMessage } from '@/lib/api';
 import { sheetsService } from '@/services/sheets';
 
-const MAX_BYTES = 10 * 1024 * 1024;
+const MAX_BYTES = 25 * 1024 * 1024;
 
-/** File → Import: a CSV into a new sheet, or over the current sheet (a version is saved first by the server). */
+/** File → Import: CSV or Excel (.xlsx) into a new sheet, or over current sheet. */
 export function ImportDialog({
   open,
   spreadsheetId,
@@ -36,12 +37,24 @@ export function ImportDialog({
   };
 
   const submit = async () => {
-    if (!file) return setError('Choose a CSV file.');
-    if (file.size > MAX_BYTES) return setError('File is larger than 10 MB.');
+    if (!file) return setError('Choose an Excel (.xlsx) or CSV file.');
+    if (file.size > MAX_BYTES) return setError('File is larger than 25 MB.');
     setBusy(true);
     setError(null);
     try {
-      const res = await sheetsService.importCsv(spreadsheetId, file, mode, mode === 'replace_sheet' ? currentSheet.id : undefined);
+      let fileToUpload = file;
+      if (file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')) {
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        if (!sheetName || !workbook.Sheets[sheetName]) {
+          throw new Error('No worksheets found in this Excel workbook.');
+        }
+        const csvContent = XLSX.utils.sheet_to_csv(workbook.Sheets[sheetName]);
+        fileToUpload = new File([csvContent], file.name.replace(/\.[^/.]+$/, '.csv'), { type: 'text/csv' });
+      }
+
+      const res = await sheetsService.importCsv(spreadsheetId, fileToUpload, mode, mode === 'replace_sheet' ? currentSheet.id : undefined);
       toast.success(`Imported ${res.rows.toLocaleString()} row${res.rows === 1 ? '' : 's'}`);
       onImported(res.sheetId);
       reset(false);
@@ -54,11 +67,11 @@ export function ImportDialog({
 
   return (
     <Dialog open={open} onOpenChange={reset}>
-      <DialogContent title="Import CSV">
+      <DialogContent title="Import Excel or CSV">
         <input
           type="file"
-          accept=".csv,text/csv,text/plain"
-          aria-label="CSV file"
+          accept=".xlsx,.xls,.csv,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+          aria-label="Spreadsheet file"
           onChange={(e) => {
             setFile(e.target.files?.[0] ?? null);
             setError(null);

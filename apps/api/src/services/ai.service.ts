@@ -214,7 +214,7 @@ export class AIService {
       (/(?:define|meaning|what is|explanation of|who is|significance of)/i.test(promptText) ||
         promptText.split(' ').length <= 4);
 
-    if (isDefinitionQuery && dictEntries.length > 0) {
+    if (isDefinitionQuery && dictEntries.length > 0 && dictEntries[0]) {
       const primary = dictEntries[0];
       let defHtml = `<div style="margin-bottom:1em;"><p><strong>${primary.term}</strong>: ${primary.def}</p></div>`;
       if (dictEntries.length > 1) {
@@ -331,7 +331,7 @@ FORMATTING RULES:
     const jsonMatch = raw.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/i);
     if (jsonMatch) {
       try {
-        const parsed = JSON.parse(jsonMatch[1]);
+        const parsed = JSON.parse(jsonMatch[1] || "{}");
         if (parsed && typeof parsed.formula === 'string') {
           return {
             formula: parsed.formula.startsWith('=') ? parsed.formula : `=${parsed.formula}`,
@@ -344,7 +344,7 @@ FORMATTING RULES:
     // 3. Extract formula in excel/sheets code fence
     const fenceMatch = raw.match(/```(?:excel|sheets)?\s*(=[^\n`]+)\s*```/i);
     if (fenceMatch) {
-      const formula = fenceMatch[1].trim();
+      const formula = (fenceMatch[1] || "").trim();
       const explanation = raw.replace(fenceMatch[0], '').trim() || 'Formula generated from your instructions.';
       return { formula, explanation };
     }
@@ -352,7 +352,7 @@ FORMATTING RULES:
     // 4. Look for an explicit formula line starting with =
     const lineMatch = raw.match(/(?:^|\n)\s*(=[A-Z0-9_]+(?:\([^)]*\)|[^\n]*))/i);
     if (lineMatch) {
-      const formula = lineMatch[1].trim();
+      const formula = (lineMatch[1] || "").trim();
       const explanation = raw.replace(lineMatch[0], '').trim() || 'Formula generated from your instructions.';
       return { formula, explanation };
     }
@@ -361,7 +361,7 @@ FORMATTING RULES:
     const lower = input.instruction.toLowerCase();
     if (lower.includes('average') && (lower.includes('col') || lower.includes('c'))) {
       const colMatch = lower.match(/col(?:umn)?\s*([a-z]+)/i);
-      const col = colMatch ? colMatch[1].toUpperCase() : 'C';
+      const col = (colMatch && colMatch[1]) ? colMatch[1].toUpperCase() : 'C';
       return {
         formula: `=AVERAGE(${col}:${col})`,
         explanation: `Calculates the average of all numerical entries in column ${col}.`,
@@ -422,7 +422,7 @@ Do not include code markdown formatting or explanation.`;
     const jsonMatch = raw.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/i);
     if (jsonMatch) {
       try {
-        const parsed = JSON.parse(jsonMatch[1]);
+        const parsed = JSON.parse(jsonMatch[1] || "{}");
         if (parsed && Array.isArray(parsed.fields) && parsed.fields.length > 0) return parsed;
       } catch {}
     }
@@ -464,6 +464,6 @@ Do not include code markdown formatting or explanation.`;
       '@cf/baai/bge-large-en-v1.5',
       { text: [text] }
     );
-    return result.data[0];
+    return result.data[0] || [];
   }
 }

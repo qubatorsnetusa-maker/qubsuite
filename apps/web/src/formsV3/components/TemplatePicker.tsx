@@ -8,7 +8,6 @@ import {
   Link2,
   Check,
   GitBranch,
-  Sparkles,
   Search,
 } from 'lucide-react';
 import type { FormConfig } from '../types';

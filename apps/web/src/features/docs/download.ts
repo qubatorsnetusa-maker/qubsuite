@@ -1,8 +1,9 @@
+import { Document, HeadingLevel, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } from 'docx';
 import { toMarkdown, toPlainText } from '@qub/editor-schema';
 import { getHTMLFromFragment, type Editor, type JSONContent } from '@tiptap/core';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
-export type DownloadFormat = 'md' | 'html' | 'txt' | 'doc' | 'pdf';
+export type DownloadFormat = 'md' | 'html' | 'txt' | 'doc' | 'docx' | 'pdf';
 export interface DownloadFile {
   filename: string;
   mime: string;
@@ -211,6 +212,16 @@ pre {
     return { filename: `${base}.doc`, mime: 'application/msword;charset=utf-8', content: wordHtml, failedImages: failed };
   }
 
+  if (format === 'docx') {
+    const docxBytes = await buildDocx(doc, title);
+    return {
+      filename: `${base}.docx`,
+      mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      content: docxBytes,
+      failedImages: failed,
+    };
+  }
+
   if (format === 'pdf') {
     const pdfDoc = await PDFDocument.create();
     const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -305,3 +316,106 @@ export function saveFile(file: DownloadFile) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+function buildTextRun(node: JSONContent): TextRun {
+  const marks = node.marks ?? [];
+  const bold = marks.some((m) => m.type === 'bold');
+  const italic = marks.some((m) => m.type === 'italic');
+  const strike = marks.some((m) => m.type === 'strike');
+  const underline = marks.some((m) => m.type === 'underline');
+
+  return new TextRun({
+    text: node.text ?? '',
+    bold,
+    italics: italic,
+    strike,
+    underline: underline ? {} : undefined,
+  });
+}
+
+export async function buildDocx(docJson: JSONContent, title: string): Promise<Uint8Array> {
+  const paragraphs: (Paragraph | Table)[] = [];
+
+  if (title) {
+    paragraphs.push(
+      new Paragraph({
+        text: title,
+        heading: HeadingLevel.TITLE,
+        spacing: { after: 200 },
+      })
+    );
+  }
+
+  const nodes = docJson.content ?? [];
+
+  for (const node of nodes) {
+    if (node.type === 'heading') {
+      const level = node.attrs?.level === 1 ? HeadingLevel.HEADING_1 : node.attrs?.level === 2 ? HeadingLevel.HEADING_2 : HeadingLevel.HEADING_3;
+      const runs = (node.content ?? []).map(buildTextRun);
+      paragraphs.push(new Paragraph({ children: runs, heading: level, spacing: { before: 240, after: 120 } }));
+    } else if (node.type === 'paragraph') {
+      const runs = (node.content ?? []).map(buildTextRun);
+      paragraphs.push(new Paragraph({ children: runs, spacing: { after: 120 } }));
+    } else if (node.type === 'blockquote') {
+      const innerNodes = node.content ?? [];
+      for (const inner of innerNodes) {
+        const runs = (inner.content ?? []).map(buildTextRun);
+        paragraphs.push(
+          new Paragraph({
+            children: runs,
+            spacing: { after: 120 },
+            indent: { left: 720 },
+          })
+        );
+      }
+    } else if (node.type === 'bulletList' || node.type === 'orderedList') {
+      const items = node.content ?? [];
+      items.forEach((item) => {
+        const itemParas = item.content ?? [];
+        for (const p of itemParas) {
+          const runs = (p.content ?? []).map(buildTextRun);
+          paragraphs.push(
+            new Paragraph({
+              children: runs,
+              bullet: node.type === 'bulletList' ? { level: 0 } : undefined,
+              spacing: { after: 80 },
+            })
+          );
+        }
+      });
+    } else if (node.type === 'table') {
+      const tableRows: TableRow[] = [];
+      const rows = node.content ?? [];
+      for (const row of rows) {
+        const cells: TableCell[] = [];
+        for (const cell of row.content ?? []) {
+          const cellParas: Paragraph[] = [];
+          for (const cp of cell.content ?? []) {
+            cellParas.push(new Paragraph({ children: (cp.content ?? []).map(buildTextRun) }));
+          }
+          cells.push(
+            new TableCell({
+              children: cellParas.length ? cellParas : [new Paragraph('')],
+              width: { size: 100 / (row.content?.length || 1), type: WidthType.PERCENTAGE },
+            })
+          );
+        }
+        tableRows.push(new TableRow({ children: cells }));
+      }
+      paragraphs.push(new Table({ rows: tableRows }));
+    }
+  }
+
+  const doc = new Document({
+    sections: [
+      {
+        properties: {},
+        children: paragraphs.length ? paragraphs : [new Paragraph('Empty document')],
+      },
+    ],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  return new Uint8Array(await blob.arrayBuffer());
+}
+

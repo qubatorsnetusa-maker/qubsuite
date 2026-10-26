@@ -1,5 +1,6 @@
 import type { FormFieldType } from '@qub/shared';
 import { QUESTION_TYPE_LIST, type TypeCategory } from '@qub/shared/forms';
+import { Globe } from 'lucide-react';
 import { Fragment, type ReactNode } from 'react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/menu';
 import { FIELD_UI } from '../registry';
@@ -13,7 +14,15 @@ const GROUPS: { category: TypeCategory; label: string }[] = [
 ];
 
 /** "Add question" menu grouped by category. Sections and screens have their own buttons. */
-export function TypePicker({ onPick, trigger }: { onPick(type: FormFieldType): void; trigger: ReactNode }) {
+export function TypePicker({
+  onPick,
+  onPickSpecial,
+  trigger,
+}: {
+  onPick(type: FormFieldType): void;
+  onPickSpecial?(special: 'COUNTRY'): void;
+  trigger: ReactNode;
+}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
@@ -22,6 +31,11 @@ export function TypePicker({ onPick, trigger }: { onPick(type: FormFieldType): v
           <Fragment key={g.category}>
             {i > 0 && <DropdownMenuSeparator />}
             <DropdownMenuLabel>{g.label}</DropdownMenuLabel>
+            {g.category === 'basic' && onPickSpecial && (
+              <DropdownMenuItem icon={<Globe className="size-4 text-blue-500" />} onSelect={() => onPickSpecial('COUNTRY')}>
+                Country (All countries)
+              </DropdownMenuItem>
+            )}
             {QUESTION_TYPE_LIST.filter((d) => d.category === g.category).map((d) => {
               const Icon = FIELD_UI[d.type].icon;
               return (

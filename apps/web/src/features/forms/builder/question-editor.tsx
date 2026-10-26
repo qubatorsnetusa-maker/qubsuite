@@ -15,6 +15,7 @@ import { DefaultAnswerSetting, PlaceholderSetting, ScorePanel, SETTINGS_PANELS }
 import { useDebouncedCommit } from './use-debounced-commit';
 import { useDeleteQuestion } from './use-delete-question';
 
+import { createCountryFieldOptions } from '../countries';
 export { ANSWER_COUNT_TIMEOUT_MS } from './use-delete-question';
 
 export function QuestionEditor({
@@ -72,7 +73,26 @@ export function QuestionEditor({
             className={cn('border-0 border-b bg-surface px-3 text-base', isSection && 'text-xl')}
           />
           {!isSection && !isScreen && (
-            <NativeSelect aria-label="Question type" value={field.type} disabled={!canEdit} onChange={(e) => update({ type: e.target.value as FormFieldType }, 'Change question type')} className="h-10 w-48">
+            <NativeSelect
+              aria-label="Question type"
+              value={field.type}
+              disabled={!canEdit}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === 'COUNTRY') {
+                  update({
+                    type: 'DROPDOWN',
+                    label: field.label && field.label !== 'Question' ? field.label : 'Country',
+                    settings: { ...field.settings, searchable: true },
+                    options: createCountryFieldOptions(),
+                  }, 'Set question to Country');
+                } else {
+                  update({ type: val as FormFieldType }, 'Change question type');
+                }
+              }}
+              className="h-10 w-48"
+            >
+              <option value="COUNTRY">Country (All countries)</option>
               {QUESTION_TYPE_LIST.filter((d) => !['SECTION', 'WELCOME', 'ENDING'].includes(d.type)).map((d) => (
                 <option key={d.type} value={d.type}>
                   {d.label}

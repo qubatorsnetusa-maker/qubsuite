@@ -1,25 +1,5 @@
 import React, { useState } from 'react';
-import {
-  Palette,
-  Sparkles,
-  Sliders,
-  Layers,
-  Image as ImageIcon,
-  Grid,
-  Sun,
-  Eye,
-  Check,
-  RotateCcw,
-  Maximize2,
-  Type,
-  Square,
-  Circle,
-  ChevronRight,
-  CheckCircle2,
-  Wand2,
-  Paintbrush,
-  ArrowRight,
-} from 'lucide-react';
+import { Palette, Sliders, Layers, Image as ImageIcon, Grid, Sun, Eye, Check, RotateCcw, Maximize2, Type, Square, Circle, ChevronRight, CheckCircle2, Wand2, Paintbrush, ArrowRight, Bot } from 'lucide-react';
 import type {
   FormConfig,
   FormTheme,
@@ -451,7 +431,7 @@ export const ThemeDesignEditor: React.FC<ThemeDesignEditorProps> = ({
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+          <Bot className="w-3.5 h-3.5 text-emerald-600" />
           <span>Presets</span>
         </button>
       </div>
@@ -949,7 +929,7 @@ export const ThemeDesignEditor: React.FC<ThemeDesignEditorProps> = ({
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                <Bot className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Designer Theme Presets</span>
               </label>
             </div>

@@ -41,6 +41,10 @@ describe('documentFile', () => {
     expect(html.filename).toBe('My_ plan.html');
     expect(html.content).toContain('<h1>Plan</h1>');
     expect(html.content).toContain('<title>My: plan</title>');
+    const docx = await documentFile(editor, 'My: plan', 'docx');
+    expect(docx.filename).toBe('My_ plan.docx');
+    expect(docx.mime).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    expect(docx.content).toBeInstanceOf(Uint8Array);
   });
 });
 

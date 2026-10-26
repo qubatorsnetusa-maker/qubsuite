@@ -152,4 +152,4 @@ export type { JSONContent };
 export { BlockLineHeight, LINE_HEIGHTS, type LineHeight } from './block-line-height';
 export { PageBreak, PageBreakShortcut } from './page-break';
 export { countWords, extractMentions, extractPlainText, textStats, toPlainText } from './text';
-export { toMarkdown } from './markdown';
+export { toMarkdown, markdownToHtml, inlineMarkdownToHtml } from './markdown';

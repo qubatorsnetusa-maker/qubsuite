@@ -1,0 +1,53 @@
+{
+  "name": "QubSuite Workspace",
+  "short_name": "QubSuite",
+  "description": "Collaborative cloud office suite for documents, spreadsheets, and forms.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1a56db",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/qubators-logo-white.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "QubDocs",
+      "short_name": "Docs",
+      "description": "Open QubDocs document editor",
+      "url": "/docs",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "QubSheets",
+      "short_name": "Sheets",
+      "description": "Open QubSheets spreadsheet editor",
+      "url": "/sheets",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "QubForms",
+      "short_name": "Forms",
+      "description": "Open QubForms form builder",
+      "url": "/forms",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "QubDrive",
+      "short_name": "Drive",
+      "description": "Open QubDrive file explorer",
+      "url": "/drive",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
+    }
+  ]
+}

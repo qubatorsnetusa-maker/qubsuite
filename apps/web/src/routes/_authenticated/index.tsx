@@ -7,8 +7,9 @@ function resolveSubdomainDestination(): string {
     if (host.startsWith('docs.')) return '/docs';
     if (host.startsWith('sheets.')) return '/sheets';
     if (host.startsWith('forms.')) return '/forms';
+    if (host.startsWith('slides.')) return '/slides';
     if (host.startsWith('drive.')) return '/drive';
-    if (host.startsWith('pdf.')) return '/drive?filter=pdf';
+    if (host.startsWith('pdf.')) return '/pdf';
   }
   return startPagePath();
 }

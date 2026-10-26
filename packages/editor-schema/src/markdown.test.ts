@@ -1,6 +1,6 @@
 import type { JSONContent } from '@tiptap/core';
 import { describe, expect, it } from 'vitest';
-import { toMarkdown } from './index';
+import { toMarkdown, markdownToHtml } from './index';
 
 type Mark = { type: string; attrs?: Record<string, unknown> };
 const t = (text: string, ...marks: Mark[]): JSONContent => ({ type: 'text', text, ...(marks.length ? { marks } : {}) });
@@ -67,3 +67,39 @@ describe('toMarkdown', () => {
     expect(toMarkdown({ type: 'doc', content: [{ type: 'paragraph' }] })).toBe('');
   });
 });
+
+describe('markdownToHtml', () => {
+  it('parses headings and inline formatting', () => {
+    const md = '# Title\n\nThis is **bold**, *italic*, ~~strike~~, and `code`.';
+    const html = markdownToHtml(md);
+    expect(html).toContain('<h1>Title</h1>');
+    expect(html).toContain('<strong>bold</strong>');
+    expect(html).toContain('<em>italic</em>');
+    expect(html).toContain('<s>strike</s>');
+    expect(html).toContain('<code>code</code>');
+  });
+
+  it('parses links and images', () => {
+    const md = 'Check [Link](https://example.com) and ![Pic](https://example.com/pic.png)';
+    const html = markdownToHtml(md);
+    expect(html).toContain('<a href="https://example.com">Link</a>');
+    expect(html).toContain('<img src="https://example.com/pic.png" alt="Pic">');
+  });
+
+  it('parses bullet, task, and ordered lists', () => {
+    const md = '- Item 1\n- Item 2\n\n- [ ] Todo\n- [x] Done\n\n1. First\n2. Second';
+    const html = markdownToHtml(md);
+    expect(html).toContain('<ul><li><p>Item 1</p></li><li><p>Item 2</p></li></ul>');
+    expect(html).toContain('<ul data-type="taskList"><li data-type="taskItem" data-checked="false"><p>Todo</p></li><li data-type="taskItem" data-checked="true"><p>Done</p></li></ul>');
+    expect(html).toContain('<ol><li><p>First</p></li><li><p>Second</p></li></ol>');
+  });
+
+  it('parses tables and blockquotes and codeblocks', () => {
+    const md = '> Notable quote\n\n| H1 | H2 |\n| --- | --- |\n| D1 | D2 |\n\n```js\nconst a = 1;\n```';
+    const html = markdownToHtml(md);
+    expect(html).toContain('<blockquote><p>Notable quote</p></blockquote>');
+    expect(html).toContain('<table><thead><tr><th><p>H1</p></th><th><p>H2</p></th></tr></thead><tbody><tr><td><p>D1</p></td><td><p>D2</p></td></tr></tbody></table>');
+    expect(html).toContain('<pre><code class="language-js">const a = 1;</code></pre>');
+  });
+});
+

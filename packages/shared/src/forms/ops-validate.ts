@@ -123,6 +123,8 @@ const formSettingsSnapshotSchema = z
     autoAdvance: z.boolean(),
     saveProgress: z.boolean(),
     quiz: z.object({ enabled: z.boolean(), showScore: z.boolean() }).strict(),
+    linkedSpreadsheetId: uuidSchema.nullable().optional(),
+    linkedSheetId: z.string().max(100).nullable().optional(),
   })
   .strict();
 

@@ -50,10 +50,14 @@ import { Route as AuthenticatedFormsv2FormIdRouteImport } from './routes/_authen
 import { Route as AuthenticatedFormsv2NewRouteImport } from './routes/_authenticated/formsv2/new'
 import { Route as AuthenticatedFormsv2TemplatesRouteImport } from './routes/_authenticated/formsv2/templates'
 import { Route as AuthenticatedFormsv3IndexRouteImport } from './routes/_authenticated/formsv3/index'
+import { Route as AuthenticatedPdfIndexRouteImport } from './routes/_authenticated/pdf/index'
+import { Route as AuthenticatedPdfFileIdRouteImport } from './routes/_authenticated/pdf/$fileId'
 import { Route as AuthenticatedSheetsIndexRouteImport } from './routes/_authenticated/sheets/index'
 import { Route as AuthenticatedSheetsSpreadsheetIdRouteImport } from './routes/_authenticated/sheets/$spreadsheetId'
 import { Route as AuthenticatedSheetsNewRouteImport } from './routes/_authenticated/sheets/new'
 import { Route as AuthenticatedSheetsTemplatesRouteImport } from './routes/_authenticated/sheets/templates'
+import { Route as AuthenticatedSlidesIndexRouteImport } from './routes/_authenticated/slides/index'
+import { Route as AuthenticatedSlidesDeckIdRouteImport } from './routes/_authenticated/slides/$deckId'
 import { Route as FormsFormIdFillRouteImport } from './routes/forms/$formId/fill'
 import { Route as Formsv2FFormIdRouteImport } from './routes/formsv2/f/$formId'
 import { Route as Formsv3FFormIdRouteImport } from './routes/formsv3/f/$formId'
@@ -294,6 +298,16 @@ const AuthenticatedFormsv3IndexRoute =
     path: '/formsv3/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedPdfIndexRoute = AuthenticatedPdfIndexRouteImport.update({
+  id: '/pdf/',
+  path: '/pdf/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPdfFileIdRoute = AuthenticatedPdfFileIdRouteImport.update({
+  id: '/pdf/$fileId',
+  path: '/pdf/$fileId',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedSheetsIndexRoute =
   AuthenticatedSheetsIndexRouteImport.update({
     id: '/sheets/',
@@ -315,6 +329,18 @@ const AuthenticatedSheetsTemplatesRoute =
   AuthenticatedSheetsTemplatesRouteImport.update({
     id: '/sheets/templates',
     path: '/sheets/templates',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedSlidesIndexRoute =
+  AuthenticatedSlidesIndexRouteImport.update({
+    id: '/slides/',
+    path: '/slides/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedSlidesDeckIdRoute =
+  AuthenticatedSlidesDeckIdRouteImport.update({
+    id: '/slides/$deckId',
+    path: '/slides/$deckId',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const FormsFormIdFillRoute = FormsFormIdFillRouteImport.update({
@@ -458,9 +484,11 @@ export interface FileRoutesByFullPath {
   '/formsv2/$formId': typeof AuthenticatedFormsv2FormIdRouteWithChildren
   '/formsv2/new': typeof AuthenticatedFormsv2NewRoute
   '/formsv2/templates': typeof AuthenticatedFormsv2TemplatesRoute
+  '/pdf/$fileId': typeof AuthenticatedPdfFileIdRoute
   '/sheets/$spreadsheetId': typeof AuthenticatedSheetsSpreadsheetIdRoute
   '/sheets/new': typeof AuthenticatedSheetsNewRoute
   '/sheets/templates': typeof AuthenticatedSheetsTemplatesRoute
+  '/slides/$deckId': typeof AuthenticatedSlidesDeckIdRoute
   '/forms/$formId/fill': typeof FormsFormIdFillRoute
   '/formsv2/f/$formId': typeof Formsv2FFormIdRoute
   '/formsv3/f/$formId': typeof Formsv3FFormIdRoute
@@ -470,7 +498,9 @@ export interface FileRoutesByFullPath {
   '/forms/': typeof AuthenticatedFormsIndexRoute
   '/formsv2/': typeof AuthenticatedFormsv2IndexRoute
   '/formsv3/': typeof AuthenticatedFormsv3IndexRoute
+  '/pdf/': typeof AuthenticatedPdfIndexRoute
   '/sheets/': typeof AuthenticatedSheetsIndexRoute
+  '/slides/': typeof AuthenticatedSlidesIndexRoute
   '/drive/file/$fileId': typeof AuthenticatedDriveFileFileIdRoute
   '/drive/folder/$folderId': typeof AuthenticatedDriveFolderFolderIdRoute
   '/forms/$formId/edit': typeof AuthenticatedFormsFormIdEditRoute
@@ -519,9 +549,11 @@ export interface FileRoutesByTo {
   '/forms/templates': typeof AuthenticatedFormsTemplatesRoute
   '/formsv2/new': typeof AuthenticatedFormsv2NewRoute
   '/formsv2/templates': typeof AuthenticatedFormsv2TemplatesRoute
+  '/pdf/$fileId': typeof AuthenticatedPdfFileIdRoute
   '/sheets/$spreadsheetId': typeof AuthenticatedSheetsSpreadsheetIdRoute
   '/sheets/new': typeof AuthenticatedSheetsNewRoute
   '/sheets/templates': typeof AuthenticatedSheetsTemplatesRoute
+  '/slides/$deckId': typeof AuthenticatedSlidesDeckIdRoute
   '/forms/$formId/fill': typeof FormsFormIdFillRoute
   '/formsv2/f/$formId': typeof Formsv2FFormIdRoute
   '/formsv3/f/$formId': typeof Formsv3FFormIdRoute
@@ -531,7 +563,9 @@ export interface FileRoutesByTo {
   '/forms': typeof AuthenticatedFormsIndexRoute
   '/formsv2': typeof AuthenticatedFormsv2IndexRoute
   '/formsv3': typeof AuthenticatedFormsv3IndexRoute
+  '/pdf': typeof AuthenticatedPdfIndexRoute
   '/sheets': typeof AuthenticatedSheetsIndexRoute
+  '/slides': typeof AuthenticatedSlidesIndexRoute
   '/drive/file/$fileId': typeof AuthenticatedDriveFileFileIdRoute
   '/drive/folder/$folderId': typeof AuthenticatedDriveFolderFolderIdRoute
   '/forms/$formId/edit': typeof AuthenticatedFormsFormIdEditRoute
@@ -585,9 +619,11 @@ export interface FileRoutesById {
   '/_authenticated/formsv2/$formId': typeof AuthenticatedFormsv2FormIdRouteWithChildren
   '/_authenticated/formsv2/new': typeof AuthenticatedFormsv2NewRoute
   '/_authenticated/formsv2/templates': typeof AuthenticatedFormsv2TemplatesRoute
+  '/_authenticated/pdf/$fileId': typeof AuthenticatedPdfFileIdRoute
   '/_authenticated/sheets/$spreadsheetId': typeof AuthenticatedSheetsSpreadsheetIdRoute
   '/_authenticated/sheets/new': typeof AuthenticatedSheetsNewRoute
   '/_authenticated/sheets/templates': typeof AuthenticatedSheetsTemplatesRoute
+  '/_authenticated/slides/$deckId': typeof AuthenticatedSlidesDeckIdRoute
   '/forms/$formId/fill': typeof FormsFormIdFillRoute
   '/formsv2/f/$formId': typeof Formsv2FFormIdRoute
   '/formsv3/f/$formId': typeof Formsv3FFormIdRoute
@@ -597,7 +633,9 @@ export interface FileRoutesById {
   '/_authenticated/forms/': typeof AuthenticatedFormsIndexRoute
   '/_authenticated/formsv2/': typeof AuthenticatedFormsv2IndexRoute
   '/_authenticated/formsv3/': typeof AuthenticatedFormsv3IndexRoute
+  '/_authenticated/pdf/': typeof AuthenticatedPdfIndexRoute
   '/_authenticated/sheets/': typeof AuthenticatedSheetsIndexRoute
+  '/_authenticated/slides/': typeof AuthenticatedSlidesIndexRoute
   '/_authenticated/drive/file/$fileId': typeof AuthenticatedDriveFileFileIdRoute
   '/_authenticated/drive/folder/$folderId': typeof AuthenticatedDriveFolderFolderIdRoute
   '/_authenticated/forms/$formId/edit': typeof AuthenticatedFormsFormIdEditRoute
@@ -651,9 +689,11 @@ export interface FileRouteTypes {
     | '/formsv2/$formId'
     | '/formsv2/new'
     | '/formsv2/templates'
+    | '/pdf/$fileId'
     | '/sheets/$spreadsheetId'
     | '/sheets/new'
     | '/sheets/templates'
+    | '/slides/$deckId'
     | '/forms/$formId/fill'
     | '/formsv2/f/$formId'
     | '/formsv3/f/$formId'
@@ -663,7 +703,9 @@ export interface FileRouteTypes {
     | '/forms/'
     | '/formsv2/'
     | '/formsv3/'
+    | '/pdf/'
     | '/sheets/'
+    | '/slides/'
     | '/drive/file/$fileId'
     | '/drive/folder/$folderId'
     | '/forms/$formId/edit'
@@ -712,9 +754,11 @@ export interface FileRouteTypes {
     | '/forms/templates'
     | '/formsv2/new'
     | '/formsv2/templates'
+    | '/pdf/$fileId'
     | '/sheets/$spreadsheetId'
     | '/sheets/new'
     | '/sheets/templates'
+    | '/slides/$deckId'
     | '/forms/$formId/fill'
     | '/formsv2/f/$formId'
     | '/formsv3/f/$formId'
@@ -724,7 +768,9 @@ export interface FileRouteTypes {
     | '/forms'
     | '/formsv2'
     | '/formsv3'
+    | '/pdf'
     | '/sheets'
+    | '/slides'
     | '/drive/file/$fileId'
     | '/drive/folder/$folderId'
     | '/forms/$formId/edit'
@@ -777,9 +823,11 @@ export interface FileRouteTypes {
     | '/_authenticated/formsv2/$formId'
     | '/_authenticated/formsv2/new'
     | '/_authenticated/formsv2/templates'
+    | '/_authenticated/pdf/$fileId'
     | '/_authenticated/sheets/$spreadsheetId'
     | '/_authenticated/sheets/new'
     | '/_authenticated/sheets/templates'
+    | '/_authenticated/slides/$deckId'
     | '/forms/$formId/fill'
     | '/formsv2/f/$formId'
     | '/formsv3/f/$formId'
@@ -789,7 +837,9 @@ export interface FileRouteTypes {
     | '/_authenticated/forms/'
     | '/_authenticated/formsv2/'
     | '/_authenticated/formsv3/'
+    | '/_authenticated/pdf/'
     | '/_authenticated/sheets/'
+    | '/_authenticated/slides/'
     | '/_authenticated/drive/file/$fileId'
     | '/_authenticated/drive/folder/$folderId'
     | '/_authenticated/forms/$formId/edit'
@@ -1110,6 +1160,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFormsv3IndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/pdf/': {
+      id: '/_authenticated/pdf/'
+      path: '/pdf'
+      fullPath: '/pdf/'
+      preLoaderRoute: typeof AuthenticatedPdfIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/pdf/$fileId': {
+      id: '/_authenticated/pdf/$fileId'
+      path: '/pdf/$fileId'
+      fullPath: '/pdf/$fileId'
+      preLoaderRoute: typeof AuthenticatedPdfFileIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/sheets/': {
       id: '/_authenticated/sheets/'
       path: '/sheets'
@@ -1136,6 +1200,20 @@ declare module '@tanstack/react-router' {
       path: '/sheets/templates'
       fullPath: '/sheets/templates'
       preLoaderRoute: typeof AuthenticatedSheetsTemplatesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/slides/': {
+      id: '/_authenticated/slides/'
+      path: '/slides'
+      fullPath: '/slides/'
+      preLoaderRoute: typeof AuthenticatedSlidesIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/slides/$deckId': {
+      id: '/_authenticated/slides/$deckId'
+      path: '/slides/$deckId'
+      fullPath: '/slides/$deckId'
+      preLoaderRoute: typeof AuthenticatedSlidesDeckIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/forms/$formId/fill': {
@@ -1371,14 +1449,18 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedFormsv2FormIdRoute: typeof AuthenticatedFormsv2FormIdRouteWithChildren
   AuthenticatedFormsv2NewRoute: typeof AuthenticatedFormsv2NewRoute
   AuthenticatedFormsv2TemplatesRoute: typeof AuthenticatedFormsv2TemplatesRoute
+  AuthenticatedPdfFileIdRoute: typeof AuthenticatedPdfFileIdRoute
   AuthenticatedSheetsSpreadsheetIdRoute: typeof AuthenticatedSheetsSpreadsheetIdRoute
   AuthenticatedSheetsNewRoute: typeof AuthenticatedSheetsNewRoute
   AuthenticatedSheetsTemplatesRoute: typeof AuthenticatedSheetsTemplatesRoute
+  AuthenticatedSlidesDeckIdRoute: typeof AuthenticatedSlidesDeckIdRoute
   AuthenticatedDocsIndexRoute: typeof AuthenticatedDocsIndexRoute
   AuthenticatedFormsIndexRoute: typeof AuthenticatedFormsIndexRoute
   AuthenticatedFormsv2IndexRoute: typeof AuthenticatedFormsv2IndexRoute
   AuthenticatedFormsv3IndexRoute: typeof AuthenticatedFormsv3IndexRoute
+  AuthenticatedPdfIndexRoute: typeof AuthenticatedPdfIndexRoute
   AuthenticatedSheetsIndexRoute: typeof AuthenticatedSheetsIndexRoute
+  AuthenticatedSlidesIndexRoute: typeof AuthenticatedSlidesIndexRoute
   AuthenticatedFormsFormIdEditRoute: typeof AuthenticatedFormsFormIdEditRoute
   AuthenticatedFormsFormIdPreviewRoute: typeof AuthenticatedFormsFormIdPreviewRoute
   AuthenticatedFormsFormIdResponsesRoute: typeof AuthenticatedFormsFormIdResponsesRoute
@@ -1401,14 +1483,18 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFormsv2FormIdRoute: AuthenticatedFormsv2FormIdRouteWithChildren,
   AuthenticatedFormsv2NewRoute: AuthenticatedFormsv2NewRoute,
   AuthenticatedFormsv2TemplatesRoute: AuthenticatedFormsv2TemplatesRoute,
+  AuthenticatedPdfFileIdRoute: AuthenticatedPdfFileIdRoute,
   AuthenticatedSheetsSpreadsheetIdRoute: AuthenticatedSheetsSpreadsheetIdRoute,
   AuthenticatedSheetsNewRoute: AuthenticatedSheetsNewRoute,
   AuthenticatedSheetsTemplatesRoute: AuthenticatedSheetsTemplatesRoute,
+  AuthenticatedSlidesDeckIdRoute: AuthenticatedSlidesDeckIdRoute,
   AuthenticatedDocsIndexRoute: AuthenticatedDocsIndexRoute,
   AuthenticatedFormsIndexRoute: AuthenticatedFormsIndexRoute,
   AuthenticatedFormsv2IndexRoute: AuthenticatedFormsv2IndexRoute,
   AuthenticatedFormsv3IndexRoute: AuthenticatedFormsv3IndexRoute,
+  AuthenticatedPdfIndexRoute: AuthenticatedPdfIndexRoute,
   AuthenticatedSheetsIndexRoute: AuthenticatedSheetsIndexRoute,
+  AuthenticatedSlidesIndexRoute: AuthenticatedSlidesIndexRoute,
   AuthenticatedFormsFormIdEditRoute: AuthenticatedFormsFormIdEditRoute,
   AuthenticatedFormsFormIdPreviewRoute: AuthenticatedFormsFormIdPreviewRoute,
   AuthenticatedFormsFormIdResponsesRoute:

@@ -1,8 +1,9 @@
+import { AiAssistIcon } from '@/components/ai-assist-icon';
 import { useState, useRef } from 'react';
 import type { Editor } from '@tiptap/react';
 import {
   Loader2,
-  Sparkles,
+  Bot,
   ArrowUp,
   MoreVertical,
   Check,
@@ -215,7 +216,7 @@ export function FloatingAiBar({ editor, mode, onModeChange }: FloatingAiBarProps
               disabled={!prompt.trim() || loading}
               className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-white disabled:opacity-40"
             >
-              {loading ? <Sparkles className="h-3.5 w-3.5 animate-spin" /> : <ArrowUp className="h-3.5 w-3.5" />}
+              {loading ? <AiAssistIcon className="size-3.5 animate-spin" /> : <ArrowUp className="h-3.5 w-3.5" />}
             </button>
           </div>
         </div>

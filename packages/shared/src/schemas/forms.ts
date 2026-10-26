@@ -49,6 +49,8 @@ export const formSettingsSchema = z.object({
   /** Keep respondents' unfinished answers in their browser. */
   saveProgress: z.boolean().optional(),
   quiz: quizSettingsSchema.optional(),
+  linkedSpreadsheetId: uuidSchema.nullable().optional(),
+  linkedSheetId: uuidSchema.nullable().optional(),
 });
 export type FormSettings = z.infer<typeof formSettingsSchema>;
 
@@ -65,6 +67,8 @@ export const DEFAULT_FORM_SETTINGS: Required<FormSettings> = {
   autoAdvance: true,
   saveProgress: true,
   quiz: { enabled: false, showScore: false },
+  linkedSpreadsheetId: null,
+  linkedSheetId: null,
 };
 
 export const updateFormSchema = z.object({

@@ -1,15 +1,6 @@
+import { AiAssistIcon } from '@/components/ai-assist-icon';
 import React, { useState } from 'react';
-import {
-  X,
-  Sparkles,
-  Layers,
-  FileText,
-  UserCheck,
-  Calendar,
-  Bug,
-  Heart,
-  Briefcase,
-} from 'lucide-react';
+import { X, Layers, FileText, UserCheck, Calendar, Bug, Heart, Briefcase, Bot } from 'lucide-react';
 import type { FormConfig, FormStep } from '../../types';
 import { FORM_THEMES } from '../../data/defaultForms';
 import { FORM_TEMPLATE_PRESETS } from '../../data/formTemplates';
@@ -65,7 +56,7 @@ const TEMPLATE_PRESETS: TemplatePreset[] = [
     ],
   },
   ...FORM_TEMPLATE_PRESETS.map((p) => {
-    let icon = <Sparkles className="w-4 h-4 text-amber-600" />;
+    let icon = <AiAssistIcon className="size-4 text-amber-600" />;
     if (p.iconName === 'user-check') icon = <UserCheck className="w-4 h-4 text-blue-600" />;
     else if (p.iconName === 'calendar') icon = <Calendar className="w-4 h-4 text-rose-600" />;
     else if (p.iconName === 'bug') icon = <Bug className="w-4 h-4 text-sky-600" />;

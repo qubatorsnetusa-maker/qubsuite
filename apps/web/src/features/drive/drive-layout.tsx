@@ -1,7 +1,7 @@
 import type { SearchResultDto } from '@qub/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
-import { Clock, Cloud, FileCheck2, FileUp, FolderPlus, FolderUp, HardDrive, Keyboard, Menu, OctagonAlert, Plus, Search, Settings, Star, Trash2, Upload, Users, X } from 'lucide-react';
+import { Clock, Cloud, FileCheck2, FileUp, FolderPlus, FolderUp, HardDrive, Keyboard, Menu, OctagonAlert, Plus, Presentation, Search, Settings, Star, Trash2, Upload, Users, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { FileIcon } from '@/components/file-icon';
 import { QubLogo } from '@/components/logo';
@@ -249,6 +249,9 @@ function NewMenu() {
           </DropdownMenuItem>
           <DropdownMenuItem icon={<FileIcon type="SPREADSHEET" size={18} />} onSelect={() => openAppHome('SPREADSHEET', folderId)}>
             Sheets
+          </DropdownMenuItem>
+          <DropdownMenuItem icon={<Presentation className="size-[18px] text-amber-500" />} onSelect={() => window.open('/slides', '_blank')}>
+            Slides
           </DropdownMenuItem>
           <DropdownMenuItem icon={<FileIcon type="FORM" size={18} />} onSelect={() => openAppHome('FORM', folderId)}>
             Forms

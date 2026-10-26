@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Sparkles,
+  Bot,
   LayoutTemplate,
   ShieldCheck,
   ExternalLink,
@@ -473,7 +473,7 @@ export const BrandingHeaderFooterEditor: React.FC<BrandingHeaderFooterEditorProp
               {/* Powered By Badge */}
               <label className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 cursor-pointer">
                 <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-slate-500" />
+                  <Bot className="w-4 h-4 text-slate-500" />
                   <div>
                     <span className="font-semibold block">Powered by qub-forms Badge</span>
                     <span className="text-[10px] text-slate-500">

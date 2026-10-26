@@ -1,13 +1,19 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
 import { ErrorState, FullPageSpinner } from '@/components/states';
+import { CommandPalette } from '@/components/command-palette';
 
 export interface RouterContext {
   queryClient: QueryClient;
 }
 
 export const Route = createRootRouteWithContext<RouterContext>()({
-  component: () => <Outlet />,
+  component: () => (
+    <>
+      <Outlet />
+      <CommandPalette />
+    </>
+  ),
   pendingComponent: () => <FullPageSpinner />,
   errorComponent: ({ error, reset }) => <ErrorState error={error} onRetry={reset} />,
   notFoundComponent: () => (

@@ -1,38 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Markdown from '../lib/markdown';
 import { motion, AnimatePresence, useReducedMotion } from '../lib/motion';
-import {
-  ChevronUp,
-  ChevronDown,
-  Check,
-  CheckCircle2,
-  ArrowRight,
-  AlertCircle,
-  RotateCcw,
-  Sparkles,
-  Smartphone,
-  Star,
-  Send,
-  Clock,
-  GitBranch,
-  ExternalLink,
-  Heart,
-  Rocket,
-  ThumbsUp,
-  Link2,
-  Hash,
-  Calendar,
-  ToggleLeft,
-  Upload,
-  Globe,
-  FileText,
-  ShieldCheck,
-  Lock,
-  Mail,
-  Search,
-  X,
-  Building,
-} from 'lucide-react';
+import { ChevronUp, ChevronDown, Check, CheckCircle2, ArrowRight, AlertCircle, RotateCcw, Star, Smartphone, Send, Clock, GitBranch, ExternalLink, Heart, Rocket, ThumbsUp, Link2, Hash, Calendar, ToggleLeft, Upload, Globe, FileText, ShieldCheck, Lock, Mail, Search, X, Building, Award } from 'lucide-react';
 import type { FormConfig, FormStep, FormTheme, BackgroundPattern } from '../types';
 import { FORM_THEMES } from '../data/defaultForms';
 import { resolveFormThemeValues } from '../data/themePresets';
@@ -356,6 +325,33 @@ export const FormRespondent: React.FC<FormRespondentProps> = ({
     }, 280);
   };
 
+  const quizScore = useMemo(() => {
+    let score = 0;
+    let maxScore = 0;
+    steps.forEach((step) => {
+      if (step.points !== undefined && step.points > 0) {
+        maxScore += step.points;
+        const ans = answers[step.id];
+        if (ans !== undefined && ans !== null) {
+          if (Array.isArray(step.correctAnswer)) {
+            const userArr = Array.isArray(ans) ? ans : [ans];
+            if (
+              userArr.length === step.correctAnswer.length &&
+              userArr.every((a) => step.correctAnswer!.includes(a))
+            ) {
+              score += step.points;
+            }
+          } else if (step.correctAnswer !== undefined) {
+            if (String(ans).trim().toLowerCase() === String(step.correctAnswer).trim().toLowerCase()) {
+              score += step.points;
+            }
+          }
+        }
+      }
+    });
+    return { score, maxScore, isQuiz: maxScore > 0 || !!form.isQuiz };
+  }, [steps, answers, form.isQuiz]);
+
   const handleRatingSelect = (score: number) => {
     if (!currentStep || hasCompletedRef.current) return;
     const newAnswers = { ...answers, [currentStep.id]: score };
@@ -514,7 +510,7 @@ export const FormRespondent: React.FC<FormRespondentProps> = ({
   const renderCelebrationIcon = () => {
     const iconMap = {
       check: <Check className="w-8 h-8 text-emerald-600 stroke-[2.5]" />,
-      sparkles: <Sparkles className="w-8 h-8 text-amber-500" />,
+      sparkles: <Star className="w-8 h-8 text-amber-500" />,
       heart: <Heart className="w-8 h-8 text-rose-500 fill-rose-500" />,
       rocket: <Rocket className="w-8 h-8 text-indigo-500" />,
       thumbs_up: <ThumbsUp className="w-8 h-8 text-blue-500" />,
@@ -1655,6 +1651,19 @@ export const FormRespondent: React.FC<FormRespondentProps> = ({
                   {/* 16. THANK YOU / CELEBRATION SCREEN */}
                   {currentStep.type === 'thank_you' && (
                     <div className="flex flex-col items-center justify-center text-center pt-2">
+                      {quizScore.isQuiz && quizScore.maxScore > 0 && (
+                        <div className="mb-6 inline-flex items-center gap-3.5 px-6 py-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 shadow-sm animate-fade-in">
+                          <Award className="w-8 h-8 text-amber-600 dark:text-amber-400 shrink-0" />
+                          <div className="text-left">
+                            <div className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                              Quiz Score
+                            </div>
+                            <div className="text-2xl font-bold font-mono-code">
+                              {quizScore.score} / {quizScore.maxScore} pts ({Math.round((quizScore.score / quizScore.maxScore) * 100)}%)
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       {currentRedirectUrl && currentAutoRedirect && redirectCountdown !== null && (
                         <div className="mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 shadow-2xs">
                           <Clock

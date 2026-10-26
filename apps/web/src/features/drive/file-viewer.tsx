@@ -1,6 +1,6 @@
 import type { DriveFileDto, FileType } from '@qub/shared';
 import { useQuery } from '@tanstack/react-query';
-import { FileCheck2, ArrowLeft, ChevronLeft, ChevronRight, Download, ExternalLink, Info, Maximize, Minus, Plus, Printer, UserPlus, Sparkles, Send } from 'lucide-react';
+import { FileCheck2, ArrowLeft, ChevronLeft, ChevronRight, Download, ExternalLink, Info, Maximize, Minus, Plus, Printer, UserPlus, Send } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { FileIcon, FILE_TYPE_LABEL } from '@/components/file-icon';
 import { Tooltip } from '@/components/ui/misc';

@@ -1,5 +1,6 @@
+import { AiAssistIcon } from '@/components/ai-assist-icon';
 import { useState } from 'react';
-import { PenTool, Sparkles, Loader2, Check, ArrowRight, Mic, MicOff } from 'lucide-react';
+import { PenTool, Loader2, Check, ArrowRight, Mic, MicOff, Bot } from 'lucide-react';
 import { useSpeechInput } from '@/hooks/use-speech-input';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/misc';
@@ -91,17 +92,17 @@ export function SheetAiAssistant({ canEdit, onApplyFormula, selectedRangeText, s
         <button
           type="button"
           className="flex h-7 items-center gap-1.5 rounded-md bg-blue-50 px-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 hover:text-blue-800 transition-colors dark:bg-blue-950/60 dark:text-blue-400 dark:hover:bg-blue-900/60"
-          title="Ask AI to write a formula"
+          title="AI Assist"
         >
-          <PenTool className="h-3.5 w-3.5" />
-          <span>AI Formula</span>
+          <AiAssistIcon className="size-3.5" />
+          <span>AI Assist</span>
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-3 shadow-xl" align="start">
         <div className="space-y-3">
           <div className="flex items-center justify-between border-b border-border pb-2">
             <span className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400">
-              <PenTool className="h-3.5 w-3.5" /> AI Formula Generator
+              <AiAssistIcon className="size-3.5" /> AI Assist
             </span>
           </div>
 

@@ -1,19 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import {
-  ShieldAlert,
-  CheckCircle2,
-  AlertCircle,
-  HelpCircle,
-  Sparkles,
-  Sliders,
-  Type,
-  Hash,
-  FileCode2,
-  Check,
-  RotateCcw,
-  Eye,
-  Info,
-} from 'lucide-react';
+import { ShieldAlert, CheckCircle2, AlertCircle, HelpCircle, Sliders, Type, Hash, FileCode2, Check, RotateCcw, Eye, Info, Bot } from 'lucide-react';
 import type { FormStep, RegexPresetId, ValidationRule } from '../types';
 import { REGEX_PRESETS, testRegexPattern } from '../utils/validationUtils';
 
@@ -219,7 +205,7 @@ export const StepValidationEditor: React.FC<StepValidationEditorProps> = ({
                 onClick={t.apply}
                 className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-slate-300 text-xs font-medium text-slate-700 hover:bg-slate-50 transition cursor-pointer flex items-center gap-1.5 shadow-2xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-1"
               >
-                <Sparkles className="w-3 h-3 text-emerald-600" />
+                <Bot className="w-3 h-3 text-emerald-600" />
                 <span>{t.label}</span>
               </button>
             ))}

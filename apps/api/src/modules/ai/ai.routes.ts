@@ -114,7 +114,7 @@ export async function aiRoutes(app: FastifyInstance) {
       // Check dictionary definitions as PRIMARY source first
       const dictHits = lookupDictionary(prompt);
       const isDefQuery = dictHits.length > 0 && (/^(?:define|what is|meaning of)/i.test(prompt) || prompt.split(' ').length <= 4);
-      if (isDefQuery) {
+      if (isDefQuery && dictHits[0]) {
         const top = dictHits[0];
         let html = `<p><strong>${top.term}</strong>: ${top.def}</p>`;
         if (dictHits.length > 1) {
@@ -132,7 +132,7 @@ export async function aiRoutes(app: FastifyInstance) {
         return { success: true, data: res };
       } catch (err: any) {
         req.log.warn({ err }, 'AI doc assist fallback triggered');
-        if (dictHits.length > 0) {
+        if (dictHits.length > 0 && dictHits[0]) {
           const top = dictHits[0];
           return {
             success: true,
@@ -169,7 +169,7 @@ export async function aiRoutes(app: FastifyInstance) {
         const lower = (req.body.instruction || '').toLowerCase();
         if (lower.includes('average')) {
           const m = lower.match(/col(?:umn)?\s*([a-z]+)/i);
-          const col = m ? m[1].toUpperCase() : 'C';
+          const col = m?.[1] ? m[1].toUpperCase() : 'C';
           return {
             success: true,
             data: {
@@ -180,7 +180,7 @@ export async function aiRoutes(app: FastifyInstance) {
         }
         if (lower.includes('sum')) {
           const m = lower.match(/col(?:umn)?\s*([a-z]+)/i);
-          const col = m ? m[1].toUpperCase() : 'B';
+          const col = m?.[1] ? m[1].toUpperCase() : 'B';
           return {
             success: true,
             data: {

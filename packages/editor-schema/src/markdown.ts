@@ -147,3 +147,189 @@ export function toMarkdown(doc: JSONContent): string {
   const out = blocks(doc.content);
   return out ? `${out}\n` : '';
 }
+
+
+/** Converts inline Markdown syntax into semantic HTML */
+export function inlineMarkdownToHtml(text: string): string {
+  let s = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_m, alt, url) => `<img src="${url.trim()}" alt="${alt}">`);
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, linkText, url) => `<a href="${url.trim()}">${linkText}</a>`);
+  s = s.replace(/`([^`]+)`/g, (_m, code) => `<code>${code}</code>`);
+  s = s.replace(/(\*{3}|_{3})(.*?)\1/g, '<strong><em>$2</em></strong>');
+  s = s.replace(/(\*{2}|_{2})(.*?)\1/g, '<strong>$2</strong>');
+  s = s.replace(/(\*{1}|_{1})(.*?)\1/g, '<em>$2</em>');
+  s = s.replace(/~~(.*?)~~/g, '<s>$1</s>');
+  s = s.replace(/\\\n/g, '<br>');
+  return s;
+}
+
+/** Converts CommonMark + GFM Markdown into clean semantic HTML suitable for TipTap / ProseMirror */
+export function markdownToHtml(md: string): string {
+  if (!md || !md.trim()) return '';
+  const lines = md.replace(/\r\n/g, '\n').split('\n');
+  const html: string[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i] ?? '';
+
+    // Fenced Code Block
+    const fenceMatch = line.match(/^```(\w*)/);
+    if (fenceMatch) {
+      const lang = fenceMatch[1] ?? '';
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !(lines[i] ?? '').startsWith('```')) {
+        codeLines.push(lines[i] ?? '');
+        i++;
+      }
+      i++; // skip closing fence
+      const escaped = codeLines.join('\n').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      html.push(`<pre><code${lang ? ` class="language-${lang}"` : ''}>${escaped}</code></pre>`);
+      continue;
+    }
+
+    // Horizontal Rule
+    if (/^(\s*[-*_]\s*){3,}$/.test(line)) {
+      html.push('<hr>');
+      i++;
+      continue;
+    }
+
+    // Headings
+    const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+    if (headingMatch && headingMatch[1] && headingMatch[2] !== undefined) {
+      const level = Math.min(4, headingMatch[1].length);
+      const text = inlineMarkdownToHtml(headingMatch[2].trim());
+      html.push(`<h${level}>${text}</h${level}>`);
+      i++;
+      continue;
+    }
+
+    // Blockquote
+    if (/^>\s?/.test(line)) {
+      const quoteLines: string[] = [];
+      while (i < lines.length && /^>\s?/.test(lines[i] ?? '')) {
+        quoteLines.push((lines[i] ?? '').replace(/^>\s?/, ''));
+        i++;
+      }
+      const quoteHtml = markdownToHtml(quoteLines.join('\n'));
+      html.push(`<blockquote>${quoteHtml}</blockquote>`);
+      continue;
+    }
+
+    // GFM Table
+    const nextLine = lines[i + 1] ?? '';
+    if (line.includes('|') && i + 1 < lines.length && /^\s*\|?(\s*:?-+:?\s*\|)+\s*:?-+:?\s*\|?\s*$/.test(nextLine)) {
+      const headerLine = line;
+      i += 2;
+      const parseCells = (row: string) =>
+        row
+          .trim()
+          .replace(/^\|/, '')
+          .replace(/\|$/, '')
+          .split('|')
+          .map((c) => inlineMarkdownToHtml(c.trim()));
+
+      const headers = parseCells(headerLine);
+      const rows: string[][] = [];
+      while (i < lines.length && (lines[i] ?? '').includes('|') && (lines[i] ?? '').trim().length > 0) {
+        rows.push(parseCells(lines[i] ?? ''));
+        i++;
+      }
+
+      let tbl = '<table><thead><tr>';
+      for (const h of headers) tbl += `<th><p>${h}</p></th>`;
+      tbl += '</tr></thead><tbody>';
+      for (const row of rows) {
+        tbl += '<tr>';
+        for (let c = 0; c < headers.length; c++) {
+          tbl += `<td><p>${row[c] || ''}</p></td>`;
+        }
+        tbl += '</tr>';
+      }
+      tbl += '</tbody></table>';
+      html.push(tbl);
+      continue;
+    }
+
+    // Task List
+    if (/^\s*-\s*\[([ xX])\]\s+(.*)$/.test(line)) {
+      let taskListHtml = '<ul data-type="taskList">';
+      while (i < lines.length) {
+        const curLine = lines[i] ?? '';
+        const m = curLine.match(/^\s*-\s*\[([ xX])\]\s+(.*)$/);
+        if (!m || !m[1] || m[2] === undefined) break;
+        const checked = m[1].toLowerCase() === 'x';
+        taskListHtml += `<li data-type="taskItem" data-checked="${checked}"><p>${inlineMarkdownToHtml(m[2])}</p></li>`;
+        i++;
+      }
+      taskListHtml += '</ul>';
+      html.push(taskListHtml);
+      continue;
+    }
+
+    // Bullet List
+    if (/^\s*[-*+]\s+(.*)$/.test(line)) {
+      let listHtml = '<ul>';
+      while (i < lines.length) {
+        const curLine = lines[i] ?? '';
+        const m = curLine.match(/^\s*[-*+]\s+(.*)$/);
+        if (!m || m[1] === undefined) break;
+        listHtml += `<li><p>${inlineMarkdownToHtml(m[1])}</p></li>`;
+        i++;
+      }
+      listHtml += '</ul>';
+      html.push(listHtml);
+      continue;
+    }
+
+    // Ordered List
+    if (/^\s*\d+\.\s+(.*)$/.test(line)) {
+      let listHtml = '<ol>';
+      while (i < lines.length) {
+        const curLine = lines[i] ?? '';
+        const m = curLine.match(/^\s*\d+\.\s+(.*)$/);
+        if (!m || m[1] === undefined) break;
+        listHtml += `<li><p>${inlineMarkdownToHtml(m[1])}</p></li>`;
+        i++;
+      }
+      listHtml += '</ol>';
+      html.push(listHtml);
+      continue;
+    }
+
+    // Blank line
+    if (!line.trim()) {
+      i++;
+      continue;
+    }
+
+    // Paragraph
+    const paraLines: string[] = [];
+    while (i < lines.length) {
+      const cur = lines[i] ?? '';
+      if (
+        !cur.trim() ||
+        cur.startsWith('#') ||
+        cur.startsWith('```') ||
+        /^(\s*[-*_]\s*){3,}$/.test(cur) ||
+        /^>\s?/.test(cur) ||
+        /^\s*[-*+]\s+/.test(cur) ||
+        /^\s*\d+\.\s+/.test(cur)
+      ) {
+        break;
+      }
+      paraLines.push(cur);
+      i++;
+    }
+    html.push(`<p>${inlineMarkdownToHtml(paraLines.join(' '))}</p>`);
+  }
+
+  return html.join('\n');
+}
+

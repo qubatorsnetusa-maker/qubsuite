@@ -32,6 +32,8 @@ export interface CurrentUser extends UserSummary {
   rootFolderId: string;
   platformRole: PlatformRole;
   isPro?: boolean;
+  hasPassword?: boolean;
+  kingschat?: { username: string | null } | null;
 }
 
 export interface AuthResult {

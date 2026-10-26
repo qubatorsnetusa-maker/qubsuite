@@ -6,7 +6,6 @@ import {
   Inbox,
   Search,
   Filter,
-  Sparkles,
   ArrowRight,
   FolderOpen,
   RotateCcw,

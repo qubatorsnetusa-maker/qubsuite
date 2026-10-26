@@ -98,10 +98,10 @@ describe('ResultsTab — summary', () => {
     expect(screen.queryByText('Hello there')).not.toBeInTheDocument();
   });
 
-  it('links Export CSV to the existing export endpoint', async () => {
+  it('renders Export CSV button', async () => {
     mockPages();
     renderTab(makeForm());
-    expect(screen.getByRole('link', { name: 'Export CSV' })).toHaveAttribute('href', `/api/forms/${FORM_ID}/responses/export`);
+    expect(screen.getByRole('button', { name: /Export CSV/i })).toBeInTheDocument();
   });
 
   it('shows a waiting state when there are no responses', async () => {

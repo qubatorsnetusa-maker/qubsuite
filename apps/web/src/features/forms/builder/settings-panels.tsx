@@ -2,6 +2,8 @@ import type { AnswerValue, FieldSettings, FieldValidation, FormFieldDto, FormFie
 import { DEFAULT_ANSWER_TYPES, deepEqual, validateFieldAnswer } from '@qub/shared/forms';
 import { useEffect, useId, useState, type ComponentType, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
+import { Info } from 'lucide-react';
+import { Tooltip } from '@/components/ui/misc';
 import { Input, NativeSelect, Switch, Textarea } from '@/components/ui/form-controls';
 import { FIELD_UI } from '../registry';
 
@@ -12,11 +14,20 @@ export interface PanelProps {
   quiz?: boolean;
 }
 
-function NumberSetting({ label, value, onChange, min, max, step, disabled }: { label: string; value: number | undefined; onChange(v: number | undefined): void; min?: number; max?: number; step?: number | 'any'; disabled?: boolean }) {
+function NumberSetting({ label, value, onChange, min, max, step, disabled, info }: { label: string; value: number | undefined; onChange(v: number | undefined): void; min?: number; max?: number; step?: number | 'any'; disabled?: boolean; info?: string }) {
   const id = useId();
   return (
     <span className="flex items-center gap-2 text-sm text-muted">
-      <label htmlFor={id}>{label}</label>
+      <span className="flex items-center gap-1">
+        <label htmlFor={id}>{label}</label>
+        {info && (
+          <Tooltip content={info}>
+            <span tabIndex={0} className="cursor-help text-muted hover:text-foreground">
+              <Info className="size-3.5" />
+            </span>
+          </Tooltip>
+        )}
+      </span>
       <Input
         id={id}
         key={String(value ?? '')}
@@ -36,11 +47,20 @@ function NumberSetting({ label, value, onChange, min, max, step, disabled }: { l
   );
 }
 
-function TextSetting({ label, value, onCommit, placeholder, disabled, multiline, mono, type = 'text' }: { label: string; value: string | undefined | null; onCommit(v: string): void; placeholder?: string; disabled?: boolean; multiline?: boolean; mono?: boolean; type?: string }) {
+function TextSetting({ label, value, onCommit, placeholder, disabled, multiline, mono, type = 'text', info }: { label: string; value: string | undefined | null; onCommit(v: string): void; placeholder?: string; disabled?: boolean; multiline?: boolean; mono?: boolean; type?: string; info?: string }) {
   const id = useId();
   return (
     <span className="flex flex-col gap-1 text-sm text-muted">
-      <label htmlFor={id}>{label}</label>
+      <span className="flex items-center gap-1">
+        <label htmlFor={id}>{label}</label>
+        {info && (
+          <Tooltip content={info}>
+            <span tabIndex={0} className="cursor-help text-muted hover:text-foreground">
+              <Info className="size-3.5" />
+            </span>
+          </Tooltip>
+        )}
+      </span>
       {multiline ? (
         <Textarea id={id} key={value ?? ''} disabled={disabled} defaultValue={value ?? ''} placeholder={placeholder} onBlur={(e) => e.target.value !== (value ?? '') && onCommit(e.target.value)} />
       ) : (
@@ -69,18 +89,51 @@ function TextPanel(p: PanelProps) {
   const { setV } = setters(p);
   const v = p.field.validation;
   return (
-    <div className="space-y-3">
-      <Row>
-        <NumberSetting label="Min length" value={v.minLength} min={0} disabled={!p.canEdit} onChange={(x) => setV({ minLength: x })} />
-        <NumberSetting label="Max length" value={v.maxLength} min={1} disabled={!p.canEdit} onChange={(x) => setV({ maxLength: x })} />
-      </Row>
-      {p.field.type === 'SHORT_ANSWER' && (
+    <details className="text-sm">
+      <summary className="cursor-pointer text-muted font-medium hover:text-foreground py-1">
+        Advanced validation & character limits
+      </summary>
+      <div className="mt-2 space-y-3 pl-3 border-l-2 border-border/70">
         <Row>
-          <TextSetting label="Pattern (regex)" mono value={v.pattern} placeholder="^[A-Z]{3}-\d+$" disabled={!p.canEdit} onCommit={(x) => setV({ pattern: x || undefined })} />
-          <TextSetting label="Pattern error message" value={v.patternMessage} disabled={!p.canEdit} onCommit={(x) => setV({ patternMessage: x || undefined })} />
+          <NumberSetting
+            label="Min length"
+            info="The minimum number of characters the respondent must enter."
+            value={v.minLength}
+            min={0}
+            disabled={!p.canEdit}
+            onChange={(x) => setV({ minLength: x })}
+          />
+          <NumberSetting
+            label="Max length"
+            info="The maximum character limit allowed for this answer."
+            value={v.maxLength}
+            min={1}
+            disabled={!p.canEdit}
+            onChange={(x) => setV({ maxLength: x })}
+          />
         </Row>
-      )}
-    </div>
+        {p.field.type === 'SHORT_ANSWER' && (
+          <Row>
+            <TextSetting
+              label="Pattern (regex)"
+              info="A regular expression pattern the answer must match (e.g. postal code or specific code). Leave blank if not needed."
+              mono
+              value={v.pattern}
+              placeholder="^[A-Z]{3}-\d+$"
+              disabled={!p.canEdit}
+              onCommit={(x) => setV({ pattern: x || undefined })}
+            />
+            <TextSetting
+              label="Pattern error message"
+              info="The custom message shown to respondents if their answer does not match the required pattern."
+              value={v.patternMessage}
+              disabled={!p.canEdit}
+              onCommit={(x) => setV({ patternMessage: x || undefined })}
+            />
+          </Row>
+        )}
+      </div>
+    </details>
   );
 }
 
