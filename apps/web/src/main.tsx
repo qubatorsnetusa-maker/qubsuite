@@ -19,6 +19,20 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
+// Auto-recover from stale chunks when a new deployment occurs
+if (typeof window !== 'undefined') {
+  window.addEventListener('vite:preloadError', (event) => {
+    event.preventDefault();
+    const key = 'qub_preload_reload';
+    const last = sessionStorage.getItem(key);
+    const now = Date.now();
+    if (!last || now - parseInt(last, 10) > 10000) {
+      sessionStorage.setItem(key, String(now));
+      window.location.reload();
+    }
+  });
+}
+
 // Register PWA service worker in production builds
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {

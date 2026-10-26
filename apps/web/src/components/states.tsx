@@ -14,7 +14,7 @@ export function EmptyState({ icon, title, description, action }: { icon: ReactNo
   );
 }
 
-export function ErrorState({ error, onRetry, title = 'Something went wrong' }: { error: unknown; onRetry?: () => void; title?: string }) {
+export function ErrorState({ error, onRetry, retryLabel = 'Try again', title = 'Something went wrong' }: { error: unknown; onRetry?: () => void; retryLabel?: string; title?: string }) {
   return (
     <div role="alert" className="flex flex-col items-center justify-center px-6 py-16 text-center">
       <div className="mb-4 flex size-16 items-center justify-center rounded-full bg-danger-soft text-danger">
@@ -24,7 +24,7 @@ export function ErrorState({ error, onRetry, title = 'Something went wrong' }: {
       <p className="mt-1 max-w-md text-sm text-muted">{errorMessage(error)}</p>
       {onRetry && (
         <Button variant="outline" className="mt-5" onClick={onRetry}>
-          <RefreshCw /> Try again
+          <RefreshCw /> {retryLabel}
         </Button>
       )}
     </div>
