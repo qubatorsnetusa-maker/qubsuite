@@ -239,6 +239,13 @@ class MainActivity : ComponentActivity() {
                                     }
 
                                     webViewClient = object : WebViewClient() {
+                                        override fun shouldInterceptRequest(
+                                            view: WebView?,
+                                            request: WebResourceRequest?
+                                        ): WebResourceResponse? {
+                                            return interceptLocalAssets(request)
+                                        }
+
                                         override fun shouldOverrideUrlLoading(
                                             view: WebView?,
                                             request: WebResourceRequest?
@@ -301,10 +308,32 @@ class MainActivity : ComponentActivity() {
                             }
 
                             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-                                val url = request?.url?.toString() ?: return false
-                                val host = request.url?.host ?: ""
+                                val uri = request?.url ?: return false
+                                val url = uri.toString()
+                                val host = uri.host ?: ""
+
+                                // Normalize sibling subdomains (drive.qubdocs.online, etc.) back to docs.qubdocs.online
+                                if (request.isForMainFrame && (
+                                    host.equals("drive.qubdocs.online", ignoreCase = true) ||
+                                    host.equals("qubdocs.online", ignoreCase = true) ||
+                                    host.equals("sheet.qubdocs.online", ignoreCase = true) ||
+                                    host.equals("sheets.qubdocs.online", ignoreCase = true) ||
+                                    host.equals("forms.qubdocs.online", ignoreCase = true) ||
+                                    host.equals("pdf.qubdocs.online", ignoreCase = true) ||
+                                    host.equals("slides.qubdocs.online", ignoreCase = true)
+                                )) {
+                                    val path = uri.path ?: "/drive"
+                                    val query = if (uri.query != null) "?${uri.query}" else ""
+                                    view?.loadUrl("https://docs.qubdocs.online$path$query")
+                                    return true
+                                }
+
                                 // Keep internal qubdocs URLs AND KingsChat login inside the app
-                                return if (host.contains("qubdocs.online") || host.contains("kingsch.at") || host.contains("kingschat") || host.contains("localhost") || host.contains("10.0.2.2")) {
+                                return if (host.endsWith("qubdocs.online", ignoreCase = true) ||
+                                    host.contains("kingsch.at") ||
+                                    host.contains("kingschat") ||
+                                    host.contains("localhost") ||
+                                    host.contains("10.0.2.2")) {
                                     false
                                 } else {
                                     try {
@@ -488,17 +517,27 @@ class MainActivity : ComponentActivity() {
 
         // Clean relative path without leading slash
         val relativePath = reqPath.trimStart('/')
-        val assetPath = if (relativePath.isEmpty()) "www/index.html" else "www/$relativePath"
 
-        val responseHeaders = mapOf(
+        // Any request targeting an asset file in Vite's assets directory
+        val assetPath = when {
+            relativePath.isEmpty() -> "www/index.html"
+            relativePath.contains("assets/") -> "www/assets/" + relativePath.substringAfter("assets/")
+            else -> "www/$relativePath"
+        }
+
+        val mime = getMimeType(assetPath)
+        val isTextOrJs = mime.startsWith("text/") || mime == "application/javascript" || mime == "application/json"
+        val encoding = if (isTextOrJs) "UTF-8" else null
+        val responseHeaders = mutableMapOf(
             "Access-Control-Allow-Origin" to "*",
-            "Cache-Control" to "no-cache"
+            "Access-Control-Allow-Methods" to "GET, HEAD, OPTIONS",
+            "Cache-Control" to "no-cache",
+            "Content-Type" to if (isTextOrJs) "$mime; charset=utf-8" else mime
         )
 
         try {
             val stream = assets.open(assetPath)
-            val mime = getMimeType(assetPath)
-            return WebResourceResponse(mime, "UTF-8", 200, "OK", responseHeaders, stream)
+            return WebResourceResponse(mime, encoding, 200, "OK", responseHeaders, stream)
         } catch (_: Exception) {
             // Not found as a direct file in assets
         }
@@ -508,7 +547,13 @@ class MainActivity : ComponentActivity() {
         if (!hasExtension || request.isForMainFrame) {
             try {
                 val htmlStream = assets.open("www/index.html")
-                return WebResourceResponse("text/html", "UTF-8", 200, "OK", responseHeaders, htmlStream)
+                val htmlHeaders = mutableMapOf(
+                    "Access-Control-Allow-Origin" to "*",
+                    "Access-Control-Allow-Methods" to "GET, HEAD, OPTIONS",
+                    "Cache-Control" to "no-cache",
+                    "Content-Type" to "text/html; charset=utf-8"
+                )
+                return WebResourceResponse("text/html", "UTF-8", 200, "OK", htmlHeaders, htmlStream)
             } catch (_: Exception) {
                 return null
             }

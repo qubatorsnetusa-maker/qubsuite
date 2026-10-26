@@ -5,6 +5,9 @@ import { ensureSession } from '@/hooks/use-auth';
 /** Signed-in users visiting /login go straight to their Drive. */
 function defaultDestination(): string {
   if (typeof window !== 'undefined') {
+    if (typeof navigator !== 'undefined' && /QubDocsAndroid|Android|iPhone|iPad/i.test(navigator.userAgent)) {
+      return '/drive';
+    }
     const host = window.location.hostname.toLowerCase();
     if (host.startsWith('docs.')) return '/docs';
     if (host.startsWith('sheets.')) return '/sheets';

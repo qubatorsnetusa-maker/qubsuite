@@ -7,8 +7,8 @@ export type EcosystemService = 'drive' | 'docs' | 'sheets' | 'forms' | 'pdf' | '
  */
 export function getServiceOrigin(service: EcosystemService): string {
   if (typeof window === 'undefined') return '';
-  // In the mobile Android native wrapper, stay on the current origin to avoid cross-subdomain page reloads
-  if (typeof navigator !== 'undefined' && navigator.userAgent.includes('QubDocsAndroid')) {
+  // In mobile, Android webview, or when already running unified under docs.qubdocs.online, stay on the current origin
+  if (typeof navigator !== 'undefined' && (/QubDocsAndroid|Android|iPhone|iPad/i.test(navigator.userAgent) || window.location.hostname === 'docs.qubdocs.online')) {
     return window.location.origin;
   }
   const host = window.location.hostname.toLowerCase();

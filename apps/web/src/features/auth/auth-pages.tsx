@@ -39,6 +39,9 @@ function FormError({ error }: { error: unknown }) {
 /** Only allow same-origin, relative redirect targets (prevents open redirects). */
 function defaultDestination(): string {
   if (typeof window !== 'undefined') {
+    if (typeof navigator !== 'undefined' && /QubDocsAndroid|Android|iPhone|iPad/i.test(navigator.userAgent)) {
+      return '/drive';
+    }
     const host = window.location.hostname.toLowerCase();
     if (host.startsWith('docs.')) return '/docs';
     if (host.startsWith('sheets.')) return '/sheets';
@@ -49,12 +52,12 @@ function defaultDestination(): string {
   return '/drive';
 }
 
-/** Only allow same-origin, relative redirect targets (prevents open redirects). */
+/** Only allow relative redirect paths (prevents open redirects and cross-subdomain hops). */
 function safeRedirect(target: string | undefined): string {
   if (!target) return defaultDestination();
   try {
     const url = new URL(target, window.location.origin);
-    return url.origin === window.location.origin ? url.pathname + url.search + url.hash : defaultDestination();
+    return url.pathname + url.search + url.hash;
   } catch {
     return defaultDestination();
   }
