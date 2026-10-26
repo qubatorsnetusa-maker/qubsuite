@@ -81,8 +81,13 @@ export function ItemActionsProvider({ children, inlinePreview = false }: { child
         return;
       }
       if (inlinePreview && item.kind === 'file' && !NATIVE.includes(item.fileType)) return preview(item);
+      const isMobileApp = typeof navigator !== 'undefined' && (/QubDocsAndroid|Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth < 768);
       if (item.kind === 'file' && NATIVE.includes(item.fileType)) {
-        window.open(openServiceUrl({ kind: item.kind, id: item.id, fileType: item.fileType, resourceId: item.resourceId }), '_blank', 'noopener');
+        if (isMobileApp) {
+          void navigate({ href: openPath({ kind: item.kind, id: item.id, fileType: item.fileType, resourceId: item.resourceId }) });
+        } else {
+          window.open(openServiceUrl({ kind: item.kind, id: item.id, fileType: item.fileType, resourceId: item.resourceId }), '_blank', 'noopener');
+        }
         return;
       }
       void navigate({ href: openPath({ kind: item.kind, id: item.id, fileType: item.kind === 'file' ? item.fileType : undefined, resourceId: item.kind === 'file' ? item.resourceId : undefined }) });

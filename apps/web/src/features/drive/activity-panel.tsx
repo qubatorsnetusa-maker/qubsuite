@@ -95,7 +95,8 @@ export function ActivityPanel({ onClose }: { onClose(): void }) {
   const open = (a: DriveActivityItemDto) => {
     const i = a.item;
     if (!i?.available) return;
-    if (i.kind === 'file' && (i.fileType === 'DOCUMENT' || i.fileType === 'SPREADSHEET' || i.fileType === 'FORM')) {
+    const isMobileApp = typeof navigator !== 'undefined' && (/QubDocsAndroid|Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth < 768);
+    if (!isMobileApp && i.kind === 'file' && (i.fileType === 'DOCUMENT' || i.fileType === 'SPREADSHEET' || i.fileType === 'FORM')) {
       window.open(openServiceUrl({ kind: i.kind, id: i.id, fileType: i.fileType, resourceId: i.resourceId }), '_blank', 'noopener');
     } else {
       void navigate({ href: openPath({ kind: i.kind, id: i.id, fileType: i.fileType === 'FOLDER' ? undefined : i.fileType, resourceId: i.resourceId }) });

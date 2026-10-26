@@ -74,7 +74,8 @@ function SearchBox() {
   const items = results.data?.items ?? [];
   const go = async (r: SearchResultDto) => {
     setOpen(false);
-    if (r.kind === 'file' && (r.fileType === 'DOCUMENT' || r.fileType === 'SPREADSHEET' || r.fileType === 'FORM')) {
+    const isMobileApp = typeof navigator !== 'undefined' && (/QubDocsAndroid|Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth < 768);
+    if (!isMobileApp && r.kind === 'file' && (r.fileType === 'DOCUMENT' || r.fileType === 'SPREADSHEET' || r.fileType === 'FORM')) {
       window.open(openServiceUrl(r), '_blank', 'noopener');
     } else {
       await navigate({ href: openPath({ kind: r.kind, id: r.id, fileType: r.fileType, resourceId: r.resourceId }) });

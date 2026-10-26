@@ -41,6 +41,7 @@ class AuthStore {
   }
 
   setSession(result: AuthResult) {
+    if (typeof localStorage !== 'undefined') localStorage.setItem('qub_has_session', 'true');
     this.set({ status: 'authenticated', accessToken: result.accessToken, expiresAt: Date.parse(result.accessTokenExpiresAt), user: result.user });
   }
 
@@ -49,6 +50,7 @@ class AuthStore {
   }
 
   clear(broadcast = true) {
+    if (typeof localStorage !== 'undefined') localStorage.removeItem('qub_has_session');
     this.set({ status: 'anonymous', accessToken: null, expiresAt: 0, user: null });
     if (broadcast) this.channel?.postMessage({ type: 'logout' });
   }
@@ -58,6 +60,11 @@ class AuthStore {
    * A 409 means another tab is rotating the token right now; wait briefly and retry with the new cookie.
    */
   refresh(): Promise<boolean> {
+    // If device has never signed in, don't stall the UI waiting for a failing network roundtrip
+    if (typeof localStorage !== 'undefined' && !localStorage.getItem('qub_has_session')) {
+      this.clear(false);
+      return Promise.resolve(false);
+    }
     this.refreshing ??= (async () => {
       try {
         for (let attempt = 0; attempt < 3; attempt++) {
