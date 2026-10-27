@@ -42,6 +42,11 @@ class AuthStore {
 
   setSession(result: AuthResult) {
     if (typeof localStorage !== 'undefined') localStorage.setItem('qub_has_session', 'true');
+    if (typeof document !== 'undefined') {
+      const isQubDomain = window.location.hostname.endsWith('qubdocs.online');
+      const domainAttr = isQubDomain ? '; domain=.qubdocs.online' : '';
+      document.cookie = `qub_sso=1; path=/${domainAttr}; max-age=${30 * 24 * 3600}; SameSite=Lax`;
+    }
     this.set({ status: 'authenticated', accessToken: result.accessToken, expiresAt: Date.parse(result.accessTokenExpiresAt), user: result.user });
   }
 
@@ -51,6 +56,11 @@ class AuthStore {
 
   clear(broadcast = true) {
     if (typeof localStorage !== 'undefined') localStorage.removeItem('qub_has_session');
+    if (typeof document !== 'undefined') {
+      const isQubDomain = window.location.hostname.endsWith('qubdocs.online');
+      const domainAttr = isQubDomain ? '; domain=.qubdocs.online' : '';
+      document.cookie = `qub_sso=; path=/${domainAttr}; max-age=0; SameSite=Lax`;
+    }
     this.set({ status: 'anonymous', accessToken: null, expiresAt: 0, user: null });
     if (broadcast) this.channel?.postMessage({ type: 'logout' });
   }
@@ -60,8 +70,12 @@ class AuthStore {
    * A 409 means another tab is rotating the token right now; wait briefly and retry with the new cookie.
    */
   refresh(): Promise<boolean> {
-    // If device has never signed in, don't stall the UI waiting for a failing network roundtrip
-    if (typeof localStorage !== 'undefined' && !localStorage.getItem('qub_has_session')) {
+    const hasLocalSession = typeof localStorage !== 'undefined' && !!localStorage.getItem('qub_has_session');
+    const hasSsoCookie = typeof document !== 'undefined' && document.cookie.includes('qub_sso=1');
+
+    // In Android app wrapper with no session cookies or storage, avoid unnecessary cold-start delay
+    const isAndroid = typeof navigator !== 'undefined' && /QubDocsAndroid/i.test(navigator.userAgent);
+    if (isAndroid && !hasLocalSession && !hasSsoCookie) {
       this.clear(false);
       return Promise.resolve(false);
     }

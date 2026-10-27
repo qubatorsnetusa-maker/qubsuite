@@ -1,6 +1,6 @@
 {
-  "name": "QubSuite Workspace",
-  "short_name": "QubSuite",
+  "name": "QubDocs Workspace",
+  "short_name": "QubDocs",
   "description": "Collaborative cloud office suite for documents, spreadsheets, and forms.",
   "start_url": "/",
   "display": "standalone",

@@ -183,11 +183,6 @@ class MainActivity : ComponentActivity() {
                             userAgentString = "$userAgentString QubDocsAndroid/1.0"
                         }
 
-                        clearCache(true)
-                        try {
-                            WebStorage.getInstance().deleteAllData()
-                        } catch (_: Exception) {}
-
                         val cookieManager = CookieManager.getInstance()
                         cookieManager.setAcceptCookie(true)
                         cookieManager.setAcceptThirdPartyCookies(this, true)
@@ -201,7 +196,7 @@ class MainActivity : ComponentActivity() {
                                     if (!cookies.isNullOrBlank()) {
                                         addRequestHeader("Cookie", cookies)
                                     }
-                                    setDescription("Downloading document from Qub Suite…")
+                                    setDescription("Downloading document from QubDocs…")
                                     val filename = URLUtil.guessFileName(url, contentDisposition, mimetype)
                                     setTitle(filename)
                                     setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
@@ -252,14 +247,59 @@ class MainActivity : ComponentActivity() {
                                     childCookieManager.setAcceptCookie(true)
                                     childCookieManager.setAcceptThirdPartyCookies(this, true)
 
+                                    addJavascriptInterface(object {
+                                        @android.webkit.JavascriptInterface
+                                        fun postMessage(msg: String) {
+                                            currentWebview?.post {
+                                                currentWebview?.evaluateJavascript("window.postMessage($msg, '*');", null)
+                                            }
+                                        }
+                                    }, "AndroidAuthBridge")
+
                                     webChromeClient = object : WebChromeClient() {
                                         override fun onCloseWindow(window: WebView?) {
                                             window?.destroy()
                                             popupWebView = null
+                                            currentWebview?.post {
+                                                currentWebview?.evaluateJavascript("window.dispatchEvent(new CustomEvent('kingschat:closed'));", null)
+                                            }
                                         }
                                     }
 
                                     webViewClient = object : WebViewClient() {
+                                        override fun onPageFinished(view: WebView?, url: String?) {
+                                            super.onPageFinished(view, url)
+                                            val bridgeScript = """
+                                                (function() {
+                                                    if (window.__bridgeInjected) return;
+                                                    window.__bridgeInjected = true;
+                                                    window.addEventListener('message', function(e) {
+                                                        try {
+                                                            if (window.AndroidAuthBridge && e.data) {
+                                                                var str = typeof e.data === 'string' ? e.data : JSON.stringify(e.data);
+                                                                window.AndroidAuthBridge.postMessage(str);
+                                                            }
+                                                        } catch(err){}
+                                                    });
+                                                    if (window.opener) {
+                                                        var origPost = window.opener.postMessage;
+                                                        window.opener.postMessage = function(data, target) {
+                                                            try {
+                                                                if (window.AndroidAuthBridge && data) {
+                                                                    var str = typeof data === 'string' ? data : JSON.stringify(data);
+                                                                    window.AndroidAuthBridge.postMessage(str);
+                                                                }
+                                                            } catch(err){}
+                                                            if (origPost) {
+                                                                try { origPost.call(window.opener, data, target); } catch(err){}
+                                                            }
+                                                        };
+                                                    }
+                                                })();
+                                            """.trimIndent()
+                                            view?.evaluateJavascript(bridgeScript, null)
+                                        }
+
                                         override fun shouldInterceptRequest(
                                             view: WebView?,
                                             request: WebResourceRequest?
@@ -271,8 +311,30 @@ class MainActivity : ComponentActivity() {
                                             view: WebView?,
                                             request: WebResourceRequest?
                                         ): Boolean {
-                                            val url = request?.url?.toString() ?: return false
-                                            val host = request.url?.host ?: ""
+                                            val uri = request?.url ?: return false
+                                            val url = uri.toString()
+                                            val fragment = uri.fragment ?: ""
+                                            val query = uri.query ?: ""
+
+                                            // Extract token if KingsChat redirected with tokens in fragment or query
+                                            val token = when {
+                                                fragment.contains("access_token=") -> fragment.substringAfter("access_token=").substringBefore("&")
+                                                query.contains("access_token=") -> query.substringAfter("access_token=").substringBefore("&")
+                                                query.contains("accessToken=") -> query.substringAfter("accessToken=").substringBefore("&")
+                                                else -> null
+                                            }
+
+                                            if (!token.isNullOrBlank()) {
+                                                val tokenJson = """{"accessToken":"$token"}"""
+                                                currentWebview?.post {
+                                                    currentWebview?.evaluateJavascript("window.postMessage($tokenJson, '*');", null)
+                                                }
+                                                view?.destroy()
+                                                popupWebView = null
+                                                return true
+                                            }
+
+                                            val host = uri.host ?: ""
                                             // Keep KingsChat and Qub inside the popup dialog
                                             return if (host.contains("kingsch.at") || host.contains("kingschat") || host.contains("qubdocs.online")) {
                                                 false
@@ -380,6 +442,9 @@ class MainActivity : ComponentActivity() {
                     onDismissRequest = {
                         popupView.destroy()
                         popupWebView = null
+                        currentWebview?.post {
+                            currentWebview?.evaluateJavascript("window.dispatchEvent(new CustomEvent('kingschat:closed'));", null)
+                        }
                     },
                     properties = DialogProperties(
                         usePlatformDefaultWidth = false,
@@ -415,6 +480,9 @@ class MainActivity : ComponentActivity() {
                                     onClick = {
                                         popupView.destroy()
                                         popupWebView = null
+                                        currentWebview?.post {
+                                            currentWebview?.evaluateJavascript("window.dispatchEvent(new CustomEvent('kingschat:closed'));", null)
+                                        }
                                     },
                                     modifier = Modifier.size(32.dp)
                                 ) {
@@ -474,7 +542,7 @@ class MainActivity : ComponentActivity() {
                         )
 
                         Text(
-                            text = "Unable to connect to Qub Suite. Check your Wi-Fi or mobile data and try again.",
+                            text = "Unable to connect to QubDocs. Check your Wi-Fi or mobile data and try again.",
                             fontSize = 14.sp,
                             color = Color(0xFF64748B),
                             textAlign = TextAlign.Center,

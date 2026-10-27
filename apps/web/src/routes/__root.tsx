@@ -39,7 +39,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       <ErrorState
         error={
           chunkError
-            ? 'A newer version of QubSuite is available. Refreshing will load the latest version.'
+            ? 'A newer version of QubDocs is available. Refreshing will load the latest version.'
             : error
         }
         title={chunkError ? 'Update available' : 'Something went wrong'}

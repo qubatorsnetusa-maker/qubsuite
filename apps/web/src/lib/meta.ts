@@ -14,7 +14,7 @@ export function setPageMetadata(meta: PageMetadata) {
   if (typeof document === 'undefined') return;
 
   const baseTitle = meta.title?.trim() || 'Untitled';
-  const fullTitle = meta.suiteName ? `${baseTitle} – Qub ${meta.suiteName}` : `${baseTitle} – QubSuite`;
+  const fullTitle = meta.suiteName ? `${baseTitle} – Qub ${meta.suiteName}` : `${baseTitle} – QubDocs`;
 
   // 1. Update standard document title
   document.title = fullTitle;
@@ -32,7 +32,7 @@ export function setPageMetadata(meta: PageMetadata) {
 
   // 3. Open Graph meta tags (used by WhatsApp, Telegram, Facebook, LinkedIn, iMessage)
   setMeta('property', 'og:title', fullTitle);
-  setMeta('property', 'og:site_name', meta.suiteName ? `Qub ${meta.suiteName}` : 'QubSuite');
+  setMeta('property', 'og:site_name', meta.suiteName ? `Qub ${meta.suiteName}` : 'QubDocs');
   if (meta.description) {
     setMeta('property', 'og:description', meta.description);
     setMeta('name', 'description', meta.description);

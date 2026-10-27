@@ -42,6 +42,14 @@ export async function authRoutes(app: FastifyInstance) {
       ...domain,
     });
     setMediaCookie(reply, session.user.id, session.sessionId);
+    reply.setCookie('qub_sso', '1', {
+      httpOnly: false,
+      secure: env.cookieSecure,
+      sameSite: 'lax',
+      path: '/',
+      expires: session.refreshTokenExpiresAt,
+      ...domain,
+    });
   }
 
   function setMediaCookie(reply: FastifyReply, userId: string, sessionId: string) {
@@ -58,8 +66,10 @@ export async function authRoutes(app: FastifyInstance) {
   function clearCookies(reply: FastifyReply) {
     reply.clearCookie(REFRESH_COOKIE, { path: '/api/auth', ...domain });
     reply.clearCookie(MEDIA_COOKIE, { path: '/api/', ...domain });
+    reply.clearCookie('qub_sso', { path: '/', ...domain });
     reply.clearCookie(REFRESH_COOKIE, { path: '/api/auth' });
     reply.clearCookie(MEDIA_COOKIE, { path: '/api/' });
+    reply.clearCookie('qub_sso', { path: '/' });
   }
 
   /** CSRF defence for cookie-authenticated endpoints: the Origin (when sent) must be an allowed app origin. */
