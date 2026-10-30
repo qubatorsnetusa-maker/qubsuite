@@ -594,7 +594,7 @@ export function SlidesPage() {
       </header>
 
       {/* Secondary PowerPoint-Style Formatting & Customization Ribbon */}
-      <div className="border-b border-slate-200 bg-slate-50/90 px-4 py-1.5 flex flex-wrap items-center gap-2 text-xs shrink-0 z-20">
+      <div className="border-b border-slate-200 bg-slate-50/90 px-3 sm:px-4 py-1.5 flex items-center gap-2 text-xs shrink-0 z-20 overflow-x-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden flex-nowrap">
         {/* Slide Actions */}
         <div className="flex items-center gap-1 pr-2 border-r border-slate-200">
           <button
@@ -1136,21 +1136,23 @@ export function SlidesPage() {
         </div>
       ) : (
         <div className="flex-1 flex min-h-0 overflow-hidden">
-          {/* Left Rail: Slide Thumbnails */}
-          <SlidesRail
-            slides={deck.slides}
-            theme={deck.theme}
-            currentIndex={currentSlideIndex}
-            onSelectSlide={(idx) => setCurrentSlideIndex(idx)}
-            onAddSlide={handleAddSlide}
-            onDuplicateSlide={handleDuplicateSlide}
-            onDeleteSlide={handleDeleteSlide}
-            onMoveSlide={handleMoveSlide}
-          />
+          {/* Left Rail: Slide Thumbnails (Desktop only) */}
+          <div className="hidden md:flex shrink-0 h-full">
+            <SlidesRail
+              slides={deck.slides}
+              theme={deck.theme}
+              currentIndex={currentSlideIndex}
+              onSelectSlide={(idx) => setCurrentSlideIndex(idx)}
+              onAddSlide={handleAddSlide}
+              onDuplicateSlide={handleDuplicateSlide}
+              onDeleteSlide={handleDeleteSlide}
+              onMoveSlide={handleMoveSlide}
+            />
+          </div>
 
           {/* Center: Slide WYSIWYG Editing Canvas */}
           <main className={cn('flex-1 flex flex-col min-w-0 h-full overflow-hidden', currentTheme.canvasBg)}>
-            <div className="flex-1 flex items-center justify-center overflow-auto p-4 md:p-8">
+            <div className="flex-1 flex items-center justify-center overflow-auto p-2 sm:p-4 md:p-8">
               <SlidesCanvas
                 slide={currentSlide}
                 theme={deck.theme}
@@ -1177,6 +1179,52 @@ export function SlidesPage() {
                 />
               </div>
             )}
+
+            {/* Mobile Slide Navigation Strip */}
+            <div className="md:hidden shrink-0 border-t border-slate-200 bg-white px-3 py-2 flex items-center justify-between shadow-2xs">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={currentSlideIndex <= 0}
+                  onClick={() => setCurrentSlideIndex((i) => Math.max(0, i - 1))}
+                  className="p-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 disabled:opacity-30"
+                  title="Previous slide"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                <span className="text-xs font-semibold text-slate-700 min-w-16 text-center">
+                  Slide {currentSlideIndex + 1} of {deck.slides.length}
+                </span>
+                <button
+                  type="button"
+                  disabled={currentSlideIndex >= deck.slides.length - 1}
+                  onClick={() => setCurrentSlideIndex((i) => Math.min(deck.slides.length - 1, i + 1))}
+                  className="p-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 disabled:opacity-30"
+                  title="Next slide"
+                >
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setSorterView(true)}
+                  className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700"
+                >
+                  <Grid className="w-3.5 h-3.5" />
+                  <span>Sorter</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAddSlide('title-content')}
+                  className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-2xs"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add</span>
+                </button>
+              </div>
+            </div>
           </main>
         </div>
       )}

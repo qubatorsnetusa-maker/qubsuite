@@ -118,13 +118,15 @@ export function FormTopBar({
                 </Link>
               </Button>
             </Tooltip>
-            <Tooltip content="Switch to conversational mode">
-              <Button asChild variant="subtle" size="icon" aria-label="Switch to conversational mode">
-                <Link to="/formsv2/$formId/content" params={{ formId: form.id }}>
-                  <PanelsTopLeft />
-                </Link>
-              </Button>
-            </Tooltip>
+            <div className="hidden sm:inline-flex">
+              <Tooltip content="Switch to conversational mode">
+                <Button asChild variant="subtle" size="icon" aria-label="Switch to conversational mode">
+                  <Link to="/formsv2/$formId/content" params={{ formId: form.id }}>
+                    <PanelsTopLeft />
+                  </Link>
+                </Button>
+              </Tooltip>
+            </div>
             {form.isPublished && (
               <Tooltip content="Copy respondent link">
                 <Button variant="subtle" size="icon" aria-label="Copy respondent link" onClick={() => void navigator.clipboard.writeText(publicUrl).then(() => toast.success('Link copied'))}>

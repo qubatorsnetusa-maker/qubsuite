@@ -161,7 +161,7 @@ export function EditorHeader({
   onAutoSuggestTitle?: () => string | null | undefined;
 }) {
   return (
-    <header className="flex items-center gap-3 px-4 pt-2.5 pb-2">
+    <header className="flex items-center gap-2 sm:gap-3 px-2.5 sm:px-4 pt-2 pb-1.5 sm:pb-2">
       <Link to={serviceHomePath(fileType) as any} aria-label="Back to home" className="shrink-0 rounded-lg p-1 hover:bg-hover">
         <FileIcon type={fileType} size={36} />
       </Link>
@@ -175,9 +175,9 @@ export function EditorHeader({
             </span>
           )}
         </div>
-        {menus && <nav className="flex items-center gap-1 text-[13.5px] mt-1">{menus}</nav>}
+        {menus && <nav className="hidden md:flex items-center gap-1 text-[13.5px] mt-1">{menus}</nav>}
       </div>
-      {presence && presence.length > 0 && <PresenceAvatars users={presence} />}
+      {presence && presence.length > 0 && <div className="hidden sm:flex"><PresenceAvatars users={presence} /></div>}
       {actions}
       {onRequestAccess ? (
         <Button variant="primary" onClick={onRequestAccess} className="ml-1 font-semibold px-4 shadow-sm flex items-center gap-1.5 bg-primary hover:bg-primary-hover text-white">

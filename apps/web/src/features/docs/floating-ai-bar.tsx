@@ -247,7 +247,7 @@ export function FloatingAiBar({ editor, mode, onModeChange }: FloatingAiBarProps
 
   // 3. PERSISTENT BOTTOM DOCKED MODE (Default)
   return (
-    <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-full max-w-[760px] px-4 print:hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
+    <div className="fixed bottom-3 sm:bottom-5 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-1.25rem)] max-w-[760px] print:hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
       {/* Main Pill Input Bar */}
       <div className="relative flex items-center gap-2 rounded-full border border-blue-200/90 bg-white/95 px-3 py-2 shadow-2xl shadow-blue-500/10 ring-4 ring-blue-500/10 backdrop-blur-md transition-all focus-within:border-blue-500 focus-within:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900/95">
         <input
@@ -283,7 +283,7 @@ export function FloatingAiBar({ editor, mode, onModeChange }: FloatingAiBarProps
 
         {/* AI Assist Indicator */}
         <div className="flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-400">
-          <span>AI Assist</span>
+          <span className="hidden sm:inline">AI Assist</span><span className="sm:hidden font-bold">AI</span>
         </div>
 
         {/* 3 Dots Menu: Switch to sidebar or minimize to floating button */}

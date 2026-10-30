@@ -65,7 +65,7 @@ export function SlidesHome() {
   return (
     <div className="min-h-screen bg-surface-1 flex flex-col">
       {/* Top App Bar */}
-      <header className="h-16 border-b border-border bg-surface-2 px-6 flex items-center justify-between shrink-0">
+      <header className="h-16 border-b border-border bg-surface-2 px-3 sm:px-6 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <Link
             to="/drive"
@@ -81,7 +81,7 @@ export function SlidesHome() {
           </div>
           <div>
             <h1 className="font-bold text-base leading-none">QubSlides</h1>
-            <p className="text-xs text-muted mt-0.5">Presentations & Keynotes</p>
+            <p className="text-xs text-muted mt-0.5 hidden sm:block">Presentations & Keynotes</p>
           </div>
         </div>
 
@@ -110,7 +110,7 @@ export function SlidesHome() {
             className="flex items-center gap-2 text-xs font-semibold px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-colors"
           >
             <Plus className="w-4 h-4" />
-            <span>New Presentation</span>
+            <span className="hidden sm:inline">New Presentation</span><span className="sm:hidden">New</span>
           </button>
         </div>
       </header>

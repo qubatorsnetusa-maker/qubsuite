@@ -75,6 +75,30 @@ class MainActivity : ComponentActivity() {
             filePathCallback = null
         }
 
+    private var pendingPermissionRequest: PermissionRequest? = null
+    private val permissionLauncher: ActivityResultLauncher<Array<String>> =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            val audioGranted = permissions[android.Manifest.permission.RECORD_AUDIO] == true
+            val cameraGranted = permissions[android.Manifest.permission.CAMERA] == true
+
+            pendingPermissionRequest?.let { req ->
+                val granted = mutableListOf<String>()
+                for (res in req.resources) {
+                    if (res == PermissionRequest.RESOURCE_AUDIO_CAPTURE && audioGranted) {
+                        granted.add(res)
+                    } else if (res == PermissionRequest.RESOURCE_VIDEO_CAPTURE && cameraGranted) {
+                        granted.add(res)
+                    }
+                }
+                if (granted.isNotEmpty()) {
+                    req.grant(granted.toTypedArray())
+                } else {
+                    req.deny()
+                }
+            }
+            pendingPermissionRequest = null
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -218,6 +242,36 @@ class MainActivity : ComponentActivity() {
                         }
 
                         webChromeClient = object : WebChromeClient() {
+                            override fun onPermissionRequest(request: PermissionRequest?) {
+                                if (request == null) return
+                                val resources = request.resources ?: return
+                                val needed = mutableListOf<String>()
+                                for (res in resources) {
+                                    if (res == PermissionRequest.RESOURCE_AUDIO_CAPTURE) {
+                                        if (androidx.core.content.ContextCompat.checkSelfPermission(this@MainActivity, android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                                            needed.add(android.Manifest.permission.RECORD_AUDIO)
+                                        }
+                                    }
+                                    if (res == PermissionRequest.RESOURCE_VIDEO_CAPTURE) {
+                                        if (androidx.core.content.ContextCompat.checkSelfPermission(this@MainActivity, android.Manifest.permission.CAMERA) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                                            needed.add(android.Manifest.permission.CAMERA)
+                                        }
+                                    }
+                                }
+                                if (needed.isEmpty()) {
+                                    request.grant(resources)
+                                } else {
+                                    pendingPermissionRequest = request
+                                    permissionLauncher.launch(needed.toTypedArray())
+                                }
+                            }
+
+                            override fun onPermissionRequestCanceled(request: PermissionRequest?) {
+                                if (pendingPermissionRequest == request) {
+                                    pendingPermissionRequest = null
+                                }
+                            }
+
                             override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
                                 val level = consoleMessage?.messageLevel()
                                 val msg = "[WebConsole] ${consoleMessage?.message()} (${consoleMessage?.sourceId()}:${consoleMessage?.lineNumber()})"
