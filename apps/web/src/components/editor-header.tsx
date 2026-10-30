@@ -161,11 +161,11 @@ export function EditorHeader({
   onAutoSuggestTitle?: () => string | null | undefined;
 }) {
   return (
-    <header className="flex items-center gap-2 px-3 pb-1 pt-2">
+    <header className="flex items-center gap-3 px-4 pt-2.5 pb-2">
       <Link to={serviceHomePath(fileType) as any} aria-label="Back to home" className="shrink-0 rounded-lg p-1 hover:bg-hover">
         <FileIcon type={fileType} size={36} />
       </Link>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 flex flex-col justify-center">
         <div className="flex min-w-0 items-center gap-3">
           <EditableTitle value={title} onSave={onRename} disabled={!canEdit} onAutoSuggestTitle={onAutoSuggestTitle} />
           {status}
@@ -175,7 +175,7 @@ export function EditorHeader({
             </span>
           )}
         </div>
-        {menus && <nav className="flex items-center gap-0.5 text-sm">{menus}</nav>}
+        {menus && <nav className="flex items-center gap-1 text-[13.5px] mt-1">{menus}</nav>}
       </div>
       {presence && presence.length > 0 && <PresenceAvatars users={presence} />}
       {actions}

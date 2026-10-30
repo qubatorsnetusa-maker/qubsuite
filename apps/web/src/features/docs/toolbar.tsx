@@ -273,7 +273,7 @@ function ToolButton({
   );
 }
 
-const Divider = () => <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden />;
+const Divider = () => <span className="mx-1.5 h-4.5 w-px shrink-0 bg-slate-300/80" aria-hidden />;
 
 function ColorPicker({
   label,
@@ -598,7 +598,7 @@ export function DocToolbar({
     <div
       role="toolbar"
       aria-label="Formatting"
-      className="mx-2 flex h-10 items-center gap-0.5 overflow-x-auto rounded-full bg-[#edf2fa] px-3 sm:mx-4"
+      className="mx-2 flex h-10.5 items-center gap-1 overflow-x-auto rounded-full bg-[#edf2fa] px-3.5 sm:mx-4 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
     >
       <ToolButton
         label="Undo"

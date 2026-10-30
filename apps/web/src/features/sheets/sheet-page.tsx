@@ -1077,7 +1077,7 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
           }
         />
         {/* toolbar */}
-        <div role="toolbar" aria-label="Formatting" className="mx-3 mb-2 flex h-10 items-center gap-0.5 overflow-x-auto rounded-full bg-[#edf2fa] px-3">
+        <div role="toolbar" aria-label="Formatting" className="mx-3 mb-2 flex h-10.5 items-center gap-1 overflow-x-auto rounded-full bg-[#edf2fa] px-3.5 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           <ToolButton label="Undo (Ctrl+Z)" onClick={undo} disabled={!canEdit}>
             <Undo2 />
           </ToolButton>

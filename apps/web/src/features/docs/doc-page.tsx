@@ -455,7 +455,7 @@ function DocEditor({ documentId }: { documentId: string }) {
             </>
           }
         />
-        <div className="pb-2">
+        <div className="pb-2.5 pt-1">
           {editor && (
             <DocToolbar
               editor={editor}

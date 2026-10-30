@@ -92,7 +92,7 @@ export interface DocMenusProps {
 function Trigger({ label, className }: { label: string; className?: string }) {
   return (
     <DropdownMenuTrigger asChild>
-      <button className={cn('rounded px-2 py-0.5 hover:bg-hover', className)}>{label}</button>
+      <button className={cn('rounded-md px-2.5 py-1 text-[13.5px] font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer select-none', className)}>{label}</button>
     </DropdownMenuTrigger>
   );
 }

@@ -248,30 +248,6 @@ export function FloatingAiBar({ editor, mode, onModeChange }: FloatingAiBarProps
   // 3. PERSISTENT BOTTOM DOCKED MODE (Default)
   return (
     <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-full max-w-[760px] px-4 print:hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
-      {/* Quick Suggestion Chips */}
-      {!result && (
-        <div className="mb-2 flex flex-wrap justify-center items-center gap-1.5">
-          {QUICK_CHIPS.map((chip) => {
-            const Icon = chip.icon;
-            return (
-              <button
-                key={chip.id}
-                type="button"
-                onClick={() => {
-                  setPrompt(chip.prompt);
-                  handleGenerate(chip.prompt);
-                }}
-                disabled={loading}
-                className="group flex items-center gap-1.5 rounded-full border border-slate-200/90 bg-white/95 px-3 py-1 text-xs font-medium text-slate-700 shadow-sm backdrop-blur-md transition-all hover:border-blue-400 hover:bg-blue-50/70 hover:text-blue-700 dark:border-slate-700 dark:bg-slate-900/95 dark:text-slate-300 dark:hover:bg-slate-800 disabled:opacity-50"
-              >
-                <Icon className="h-3.5 w-3.5 text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
-                <span>{chip.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       {/* Main Pill Input Bar */}
       <div className="relative flex items-center gap-2 rounded-full border border-blue-200/90 bg-white/95 px-3 py-2 shadow-2xl shadow-blue-500/10 ring-4 ring-blue-500/10 backdrop-blur-md transition-all focus-within:border-blue-500 focus-within:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900/95">
         <input
