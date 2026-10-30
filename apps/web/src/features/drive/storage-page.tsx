@@ -54,7 +54,7 @@ function StorageContent() {
   const chart = d ? [...d.breakdown, ...(free ? [{ key: 'free', label: 'Available', bytes: free }] : [])] : [];
 
   return (
-    <div className="flex h-full min-h-0">
+    <div className="flex h-full min-h-0 flex-1 w-full">
       <div className="min-w-0 flex-1 overflow-y-auto px-4 pb-10 pt-3">
         <h1 className="mx-auto mb-4 max-w-5xl text-[22px]">Storage</h1>
         {!d ? (

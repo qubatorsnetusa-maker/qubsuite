@@ -15,6 +15,10 @@ import {
   Hash,
   Quote,
   Square,
+  LayoutGrid,
+  GitCommit,
+  Table,
+  BarChart3,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -38,6 +42,11 @@ const LAYOUT_ICONS: Record<SlideLayout, React.ReactNode> = {
   title: <Type className="w-4 h-4" />,
   'title-content': <List className="w-4 h-4" />,
   'two-column': <Columns className="w-4 h-4" />,
+  'three-column': <LayoutGrid className="w-4 h-4" />,
+  timeline: <GitCommit className="w-4 h-4" />,
+  'metrics-grid': <Hash className="w-4 h-4" />,
+  'comparison-table': <Table className="w-4 h-4" />,
+  'chart-slide': <BarChart3 className="w-4 h-4" />,
   section: <Layout className="w-4 h-4" />,
   'big-metric': <Hash className="w-4 h-4" />,
   quote: <Quote className="w-4 h-4" />,
@@ -54,13 +63,13 @@ export function SlidesRail({
   onDeleteSlide,
   onMoveSlide,
 }: SlidesRailProps) {
-  const themeConfig = SLIDE_THEMES[theme] || SLIDE_THEMES['dark-modern'];
+  const themeConfig = SLIDE_THEMES[theme] || SLIDE_THEMES['clean-corporate'];
 
   return (
-    <div className="w-56 shrink-0 h-full border-r border-slate-200 dark:border-slate-800 bg-surface-1 flex flex-col justify-between overflow-hidden">
+    <div className="w-56 shrink-0 h-full border-r border-slate-200 bg-white flex flex-col justify-between overflow-hidden">
       {/* Top Header & Add Slide Button */}
-      <div className="p-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+      <div className="p-3 border-b border-slate-200 flex items-center justify-between">
+        <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
           Slides ({slides.length})
         </span>
 
@@ -68,7 +77,7 @@ export function SlidesRail({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
-              className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+              className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-2xs"
               title="Add slide with layout"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -100,29 +109,36 @@ export function SlidesRail({
             <div
               key={slide.id}
               className={cn(
-                'group relative rounded-lg border transition-all p-2 cursor-pointer flex flex-col gap-1.5',
+                'group relative rounded-xl border transition-all p-2 cursor-pointer flex flex-col gap-1.5',
                 isSelected
-                  ? 'border-blue-500 bg-blue-500/10 shadow-sm ring-2 ring-blue-500/20'
-                  : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-surface-2'
+                  ? 'border-blue-500 bg-blue-50/60 shadow-xs ring-2 ring-blue-500/15'
+                  : 'border-slate-200 hover:border-slate-300 bg-slate-50/70'
               )}
               onClick={() => onSelectSlide(idx)}
             >
               {/* Header info */}
-              <div className="flex items-center justify-between text-[11px] font-medium text-muted">
-                <span className="tabular-nums font-semibold">{idx + 1}</span>
+              <div className="flex items-center justify-between text-[11px] font-medium text-slate-500">
+                <span className="tabular-nums font-semibold text-slate-700">{idx + 1}</span>
                 <span className="text-[10px] uppercase opacity-75">{slide.layout}</span>
               </div>
 
               {/* Mini Slide Card Preview */}
               <div
+                style={slide.style?.backgroundColor ? { background: slide.style.backgroundColor } : undefined}
                 className={cn(
-                  'w-full aspect-[16/9] rounded border flex flex-col justify-between p-2 overflow-hidden shadow-inner text-[9px] pointer-events-none select-none',
+                  'w-full aspect-[16/9] rounded-md border flex flex-col justify-between p-2 overflow-hidden shadow-2xs text-[9px] pointer-events-none select-none relative',
                   themeConfig.cardBg
                 )}
               >
-                <div className="truncate font-bold tracking-tight">{slide.title || 'Untitled'}</div>
-                <div className="text-[7px] opacity-60 truncate">
-                  {slide.subtitle || (slide.bullets ? `${slide.bullets.length} items` : '')}
+                <div
+                  className={cn('absolute top-0 left-0 right-0 h-0.5', themeConfig.accentBg)}
+                  style={slide.style?.accentColor ? { backgroundColor: slide.style.accentColor } : undefined}
+                />
+                <div className={cn('truncate font-bold tracking-tight', themeConfig.titleColor)}>
+                  {slide.title || 'Untitled'}
+                </div>
+                <div className={cn('text-[7px] opacity-75 truncate', themeConfig.textColor)}>
+                  {slide.subtitle || (slide.bullets ? `${slide.bullets.length} points` : '')}
                 </div>
               </div>
 

@@ -1,7 +1,7 @@
 import { formSetTx } from '@qub/shared/forms';
 import { Link, Outlet } from '@tanstack/react-router';
 import { Eye, LayoutList, Redo2, Undo2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { EditorHeader, SaveIndicator } from '@/components/editor-header';
 import { ErrorState, FullPageSpinner } from '@/components/states';
 import { Button } from '@/components/ui/button';
@@ -43,6 +43,12 @@ function Frame() {
   const [share, setShare] = useState(false);
   const publish = usePublishFormV2(form, ops);
   const params = { formId: form.id };
+
+  useEffect(() => {
+    if (canEdit && form.settings.layout !== 'conversational') {
+      ops.apply(formSetTx(form, { settings: { layout: 'conversational' } }, 'Switch to conversational layout'));
+    }
+  }, [canEdit, form.id]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="flex h-full flex-col bg-surface-2">
       <div className="border-b border-border bg-background">
@@ -72,7 +78,17 @@ function Frame() {
                 </>
               )}
               <Tooltip content="Open in classic Forms">
-                <Button asChild variant="subtle" size="icon" aria-label="Open in classic Forms">
+                <Button
+                  asChild
+                  variant="subtle"
+                  size="icon"
+                  aria-label="Open in classic Forms"
+                  onClick={() => {
+                    if (canEdit && form.settings.layout !== 'classic') {
+                      ops.apply(formSetTx(form, { settings: { layout: 'classic' } }, 'Switch to classic layout'));
+                    }
+                  }}
+                >
                   <Link to="/forms/$formId/edit" params={params}>
                     <LayoutList />
                   </Link>

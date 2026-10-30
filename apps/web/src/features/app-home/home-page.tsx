@@ -22,6 +22,9 @@ import { AppHeader } from './app-header';
 import { BlankTile, TemplateTile } from './template-tiles';
 import { PreviewThumbnail } from './thumbnails';
 
+import { MobileBottomNav } from '@/components/mobile-bottom-nav';
+import { Plus } from 'lucide-react';
+
 const OWNERS = ['anyone', 'me', 'not_me'] as const;
 type Owner = (typeof OWNERS)[number];
 const OWNER_LABEL: Record<Owner, string> = { anyone: 'Owned by anyone', me: 'Owned by me', not_me: 'Not owned by me' };
@@ -40,14 +43,31 @@ export function AppHomePage({ type, folderId, app: override }: { type: NativeFil
   useEffect(() => {
     document.title = `Qub ${app.product}`;
   }, [app.product]);
+
+  const activeSuite = type === 'DOCUMENT' ? 'docs' : type === 'SPREADSHEET' ? 'sheets' : 'forms';
+
   return (
     <ItemActionsProvider>
-      <div className="flex h-full flex-col bg-background">
+      <div className="flex h-dvh min-h-dvh w-full flex-col bg-background">
         <AppHeader app={app} search={q} onSearch={setQ} />
-        <main className="min-h-0 flex-1 overflow-y-auto">
+        <main className="min-h-[calc(100dvh-3.5rem)] flex-1 overflow-y-auto pb-24 md:min-h-0 md:pb-0">
           {!q && <StartSection app={app} folderId={folderId} />}
           <LibrarySection app={app} q={q} />
         </main>
+
+        {/* Mobile Floating Action Button */}
+        <Link
+          to={app.create}
+          search={folderId ? { folder: folderId } : {}}
+          className="fixed bottom-20 right-4 z-30 flex size-14 items-center justify-center rounded-2xl text-white shadow-pop transition-transform animate-pop-in hover:shadow-xl active:scale-95 md:hidden"
+          style={{ backgroundColor: app.color }}
+          aria-label={`New ${app.noun}`}
+        >
+          <Plus className="size-7" />
+        </Link>
+
+        {/* Unified Mobile Bottom Navigation */}
+        <MobileBottomNav activeSuite={activeSuite} />
       </div>
     </ItemActionsProvider>
   );
@@ -229,10 +249,12 @@ function subtitle(item: LibraryItemDto): string {
 }
 
 function ItemMenu({ app, item }: { app: AppConfig; item: LibraryItemDto }) {
+  const navigate = useNavigate();
   const actions = useItemActions();
   // "File information" needs Drive's details panel, which lives on Drive pages.
   const entries = menuEntries(actions, [item]).filter((e) => e.key !== 'details' && e.key !== 'open');
   const href = openHref(app, item);
+  const isMobileApp = typeof navigator !== 'undefined' && (/QubDocsAndroid|Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth < 1024);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -241,8 +263,17 @@ function ItemMenu({ app, item }: { app: AppConfig; item: LibraryItemDto }) {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem icon={<ExternalLink />} onSelect={() => window.open(href, '_blank', 'noopener')}>
-          Open in new tab
+        <DropdownMenuItem
+          icon={<ExternalLink />}
+          onSelect={() => {
+            if (isMobileApp) {
+              void navigate({ href });
+            } else {
+              window.open(href, '_blank', 'noopener');
+            }
+          }}
+        >
+          {isMobileApp ? 'Open file' : 'Open in new tab'}
         </DropdownMenuItem>
         {entries.map((e) => (
           <Fragment key={e.key}>

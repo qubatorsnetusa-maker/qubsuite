@@ -25,7 +25,10 @@ function withMessageKeys(d: QuestionTypeDef): QuestionTypeDef {
   const keys: (keyof FieldValidation)[] = [...(d.validationKeys as (keyof FieldValidation)[]), 'requiredMessage'];
   if (vk.includes('minLength')) keys.push('lengthMessage');
   if (d.type === 'SLIDER' || vk.some((k) => RANGE_KEYS.has(k))) keys.push('rangeMessage');
-  return { ...d, validationKeys: keys };
+  const sk = [...(d.settingsKeys as string[])];
+  if (!sk.includes('imageUrl')) sk.push('imageUrl');
+  if (!sk.includes('imageAlt')) sk.push('imageAlt');
+  return { ...d, validationKeys: keys, settingsKeys: sk as any };
 }
 
 const ALL = [...BASIC_TYPES, ...CHOICE_TYPES, ...RATING_TYPES, ...ADVANCED_TYPES, ...CONTENT_TYPES].map(withMessageKeys);

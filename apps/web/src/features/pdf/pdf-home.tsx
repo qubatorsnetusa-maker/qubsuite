@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import {
   FileText,
@@ -22,6 +22,7 @@ import { driveService } from '@/services/drive';
 import { getServiceUrl } from '@/lib/ecosystem-urls';
 import { PdfStudio } from './pdf-studio';
 import { cn } from '@/lib/utils';
+import { MobileBottomNav } from '@/components/mobile-bottom-nav';
 
 export function PdfHome() {
   const navigate = useNavigate();
@@ -284,14 +285,14 @@ export function PdfHome() {
       {/* Top Acrobat-Grade App Header */}
       <header className="h-16 border-b border-border bg-surface-2 px-6 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <a
-            href={getServiceUrl('drive', '/drive')}
+          <Link
+            to="/drive"
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-muted hover:text-foreground hover:bg-hover transition-colors text-xs font-medium border border-border/60"
             title="Switch to Qub Drive"
           >
             <HardDrive className="size-4 text-blue-600" />
             <span className="hidden sm:inline">Qub Drive</span>
-          </a>
+          </Link>
           <div className="h-5 w-px bg-border/80 mx-1 hidden sm:block" />
           <div className="p-2 rounded-xl bg-red-600 text-white shadow-md shadow-red-600/20">
             <FileText className="size-5 font-bold" />
@@ -473,6 +474,18 @@ export function PdfHome() {
           )}
         </section>
       </main>
+
+      {/* Mobile Floating Action Button */}
+      <button
+        onClick={() => fileInputRef.current?.click()}
+        className="fixed bottom-20 right-4 z-30 flex size-14 items-center justify-center rounded-2xl bg-red-600 text-white shadow-pop transition-transform animate-pop-in hover:shadow-xl active:scale-95 md:hidden"
+        aria-label="Upload PDF"
+      >
+        <Upload className="size-6" />
+      </button>
+
+      {/* Unified Mobile Bottom Navigation */}
+      <MobileBottomNav activeSuite="pdf" />
     </div>
   );
 }

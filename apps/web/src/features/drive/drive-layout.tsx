@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
 import { Clock, Cloud, FileCheck2, FileUp, FolderPlus, FolderUp, HardDrive, Keyboard, Menu, OctagonAlert, Plus, Presentation, Search, Settings, Star, Trash2, Upload, Users, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
+import { AppLauncher, QUB_SUITE_APPS } from '@/components/app-launcher';
 import { FileIcon } from '@/components/file-icon';
 import { QubLogo } from '@/components/logo';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,8 @@ import { PdfSignDialog } from './pdf-sign-dialog';
 import { useMoveItems, useMyStorage } from './queries';
 import { StorageMeter } from './storage-page';
 import { TransferProvider, useTransferPanelOpen, useTransfers } from './transfer-manager';
+import { MobileBottomNav } from '@/components/mobile-bottom-nav';
+import { MobileCreateSheet } from '@/components/mobile-create-sheet';
 
 /** The folder the user is looking at, so "New" and uploads land there. */
 export function useCurrentFolderId(): string | undefined {
@@ -91,9 +94,9 @@ function SearchBox() {
           setOpen(false);
           void navigate({ to: '/drive/search', search: { q: q.trim() } });
         }}
-        className={cn('flex h-12 items-center gap-2 rounded-full bg-[#e9eef6] px-4 transition-colors focus-within:bg-background focus-within:shadow-card', open && items.length > 0 && 'rounded-b-none rounded-t-3xl bg-background shadow-card')}
+        className={cn('flex h-10 sm:h-12 items-center gap-1.5 sm:gap-2 rounded-full bg-[#e9eef6] px-3 sm:px-4 transition-colors focus-within:bg-background focus-within:shadow-card', open && items.length > 0 && 'rounded-b-none rounded-t-3xl bg-background shadow-card')}
       >
-        <Search className="size-5 shrink-0 text-muted" aria-hidden />
+        <Search className="size-4 sm:size-5 shrink-0 text-muted" aria-hidden />
         <input
           ref={input}
           value={q}
@@ -121,11 +124,11 @@ function SearchBox() {
           aria-controls="search-suggestions"
           role="combobox"
           aria-activedescendant={active >= 0 ? `search-opt-${active}` : undefined}
-          className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted"
+          className="h-full min-w-0 flex-1 bg-transparent text-sm sm:text-base outline-none placeholder:text-muted"
         />
         {q && (
           <button type="button" onClick={() => setQ('')} className="rounded-full p-1 text-muted hover:bg-hover" aria-label="Clear search">
-            <X className="size-5" />
+            <X className="size-4 sm:size-5" />
           </button>
         )}
       </form>
@@ -199,9 +202,10 @@ function NavItem({ to, icon, children, dropFolderId }: { to: string; icon: React
   );
 }
 
-function NewMenu() {
+function NewMenu({ onOpenMobile }: { onOpenMobile?: () => void }) {
   const folderId = useCurrentFolderId();
   const uploads = useTransfers();
+  const navigate = useNavigate();
   const fileInput = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
   const [folderOpen, setFolderOpen] = useState(false);
@@ -224,6 +228,19 @@ function NewMenu() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  if (onOpenMobile) {
+    return (
+      <button
+        type="button"
+        onClick={onOpenMobile}
+        className="mb-4 flex h-14 w-full items-center gap-3 rounded-2xl bg-background pl-4 pr-6 text-sm font-semibold shadow-card transition-all hover:bg-[#edf2fa] hover:shadow-pop active:scale-98"
+        aria-label="New"
+      >
+        <Plus className="size-6 text-primary" /> New
+      </button>
+    );
+  }
 
   return (
     <>
@@ -251,7 +268,17 @@ function NewMenu() {
           <DropdownMenuItem icon={<FileIcon type="SPREADSHEET" size={18} />} onSelect={() => openAppHome('SPREADSHEET', folderId)}>
             Sheets
           </DropdownMenuItem>
-          <DropdownMenuItem icon={<Presentation className="size-[18px] text-amber-500" />} onSelect={() => window.open('/slides', '_blank')}>
+          <DropdownMenuItem
+            icon={<Presentation className="size-[18px] text-amber-500" />}
+            onSelect={() => {
+              const isMobileOrApp = typeof navigator !== 'undefined' && (/QubDocsAndroid|Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth < 1024);
+              if (isMobileOrApp) {
+                void navigate({ to: '/slides' as any });
+              } else {
+                window.open('/slides', '_blank');
+              }
+            }}
+          >
             Slides
           </DropdownMenuItem>
           <DropdownMenuItem icon={<FileIcon type="FORM" size={18} />} onSelect={() => openAppHome('FORM', folderId)}>
@@ -323,8 +350,8 @@ function NewMenu() {
   );
 }
 
-/** Floating upload action on My Drive and folder pages; files land in the folder being viewed. */
-function UploadFab() {
+/** Floating upload action on desktop; primary + FAB on mobile. */
+function UploadFab({ onOpenMobileCreate }: { onOpenMobileCreate?: () => void }) {
   const folderId = useCurrentFolderId();
   const onMyDrive = useRouterState({ select: (s) => s.matches.some((m) => m.routeId === '/_authenticated/drive/' || m.routeId === '/_authenticated/drive/folder/$folderId') });
   const uploads = useTransfers();
@@ -335,10 +362,22 @@ function UploadFab() {
   if (!onMyDrive || panelOpen || activity.open) return null;
   return (
     <>
+      {/* Mobile Primary + FAB */}
+      {onOpenMobileCreate && (
+        <button
+          onClick={onOpenMobileCreate}
+          className="fixed bottom-20 right-4 z-30 flex size-14 items-center justify-center rounded-2xl bg-primary text-white shadow-pop transition-transform animate-pop-in hover:shadow-pop active:scale-95 md:hidden"
+          aria-label="Create new item"
+        >
+          <Plus className="size-7" />
+        </button>
+      )}
+
+      {/* Desktop Upload Button */}
       <Tooltip content="Upload files" side="left">
         <button
           onClick={() => fileInput.current?.click()}
-          className="fixed bottom-8 right-8 z-30 flex size-14 items-center justify-center rounded-2xl bg-primary-soft text-primary shadow-card transition-shadow animate-pop-in hover:shadow-pop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:bottom-10 lg:right-10"
+          className="fixed bottom-8 right-8 z-30 hidden size-14 items-center justify-center rounded-2xl bg-primary-soft text-primary shadow-card transition-shadow animate-pop-in hover:shadow-pop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:flex lg:bottom-10 lg:right-10"
           aria-label="Upload files"
         >
           <Upload className="size-6" />
@@ -376,11 +415,11 @@ function StorageSummary() {
   );
 }
 
-function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+function Sidebar({ onNavigate, onOpenNew }: { onNavigate?: () => void; onOpenNew?: () => void }) {
   const user = useCurrentUser();
   return (
     <nav aria-label="Drive" className="flex h-full flex-col overflow-y-auto px-3 pb-4 pt-2" onClick={(e) => (e.target as HTMLElement).closest('a') && onNavigate?.()}>
-      <NewMenu />
+      <NewMenu onOpenMobile={onOpenNew} />
       <div className="space-y-0.5">
         <NavItem to="/drive" icon={<HardDrive />} dropFolderId={user.rootFolderId}>
           My Drive
@@ -413,6 +452,9 @@ function DriveShell() {
   const [activityOpen, setActivityOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [mobileCreateOpen, setMobileCreateOpen] = useState(false);
+  const currentFolderId = useCurrentFolderId();
+  const navigate = useNavigate();
   useDriveChangesFromOtherTabs();
   const toggleActivity = useCallback(() => setActivityOpen((o) => !o), []);
   const activity = useMemo(() => ({ open: activityOpen, toggle: toggleActivity }), [activityOpen, toggleActivity]);
@@ -435,51 +477,78 @@ function DriveShell() {
 
   return (
     <ActivityPanelContext.Provider value={activity}>
-      <div className="flex h-full flex-col bg-surface">
-        <header className="flex h-16 shrink-0 items-center gap-2 px-2 sm:px-4">
-          <button className="rounded-full p-2.5 text-muted hover:bg-hover lg:hidden" onClick={() => setDrawer(true)} aria-label="Open navigation">
-            <Menu className="size-6" />
+      <div className="flex h-dvh min-h-dvh w-full flex-col bg-surface">
+        <header className="flex h-14 sm:h-16 shrink-0 items-center gap-1.5 sm:gap-2 px-2 sm:px-4 w-full max-w-full overflow-hidden">
+          <button className="flex size-9 sm:size-10 shrink-0 items-center justify-center rounded-full text-muted hover:bg-hover lg:hidden" onClick={() => setDrawer(true)} aria-label="Open navigation">
+            <Menu className="size-5 sm:size-6" />
           </button>
           <Link to="/drive" className="mr-2 hidden w-[232px] shrink-0 pl-2 sm:block" aria-label="QubDocs home">
             <QubLogo product="QubDocs" />
           </Link>
-          <div className="flex flex-1 justify-center lg:justify-start">
+          <div className="flex flex-1 min-w-0 justify-center lg:justify-start">
             <SearchBox />
           </div>
-          <div className="ml-2 flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
             <Tooltip content="Keyboard shortcuts (?)">
-              <button onClick={() => setShortcutsOpen(true)} className="hidden rounded-full p-2.5 text-muted hover:bg-hover md:block" aria-label="Keyboard shortcuts">
+              <button onClick={() => setShortcutsOpen(true)} className="hidden rounded-full p-2 text-muted hover:bg-hover md:block" aria-label="Keyboard shortcuts">
                 <Keyboard className="size-5" />
               </button>
             </Tooltip>
             <Tooltip content="Settings">
-              <button onClick={() => setSettingsOpen(true)} className="rounded-full p-2.5 text-muted hover:bg-hover" aria-label="Drive settings">
+              <button onClick={() => setSettingsOpen(true)} className="hidden rounded-full p-2 text-muted hover:bg-hover sm:block" aria-label="Drive settings">
                 <Settings className="size-5" />
               </button>
             </Tooltip>
+            <AppLauncher />
             <NotificationsBell />
             <UserMenu />
           </div>
         </header>
-        <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-[calc(100dvh-3.5rem)] flex-1 pb-16 md:min-h-0 md:pb-0">
           <aside className="hidden w-[256px] shrink-0 lg:block">
             <Sidebar />
           </aside>
           {drawer && (
             <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
               <div className="absolute inset-0 bg-black/40" onClick={() => setDrawer(false)} />
-              <div className="absolute inset-y-0 left-0 w-[280px] bg-surface pt-4 shadow-pop animate-pop-in">
-                <div className="mb-4 flex items-center justify-between px-4">
+              <div className="absolute inset-y-0 left-0 flex w-[280px] flex-col bg-surface pt-4 shadow-pop animate-pop-in">
+                <div className="mb-3 flex items-center justify-between px-4">
                   <QubLogo product="QubDocs" />
                   <Button variant="subtle" size="icon" onClick={() => setDrawer(false)} aria-label="Close navigation">
                     <X />
                   </Button>
                 </div>
-                <Sidebar onNavigate={() => setDrawer(false)} />
+                <div className="border-b border-border/70 px-3 pb-3">
+                  <div className="mb-1.5 px-2 text-[11px] font-semibold uppercase tracking-wider text-muted">Qub Suite</div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {QUB_SUITE_APPS.map((app) => (
+                      <button
+                        key={app.id}
+                        onClick={() => {
+                          setDrawer(false);
+                          void navigate({ to: app.path as any });
+                        }}
+                        className="flex flex-col items-center justify-center rounded-xl p-2 text-center transition-colors hover:bg-hover active:scale-95"
+                      >
+                        <div className="mb-0.5 scale-90">{app.icon}</div>
+                        <span className="text-[11px] font-medium text-foreground">{app.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  <Sidebar
+                    onNavigate={() => setDrawer(false)}
+                    onOpenNew={() => {
+                      setDrawer(false);
+                      setMobileCreateOpen(true);
+                    }}
+                  />
+                </div>
               </div>
             </div>
           )}
-          <main className="mb-2 mr-2 min-w-0 flex-1 overflow-hidden rounded-2xl bg-background lg:mb-4 lg:mr-4">
+          <main className="m-1.5 sm:m-2 min-w-0 flex-1 flex flex-col min-h-[calc(100dvh-8.5rem)] md:min-h-0 overflow-hidden rounded-2xl bg-background lg:m-0 lg:mb-4 lg:mr-4">
             <Outlet />
           </main>
           {activityOpen && (
@@ -487,9 +556,15 @@ function DriveShell() {
               <ActivityPanel onClose={() => setActivityOpen(false)} />
             </div>
           )}
-          <UploadFab />
+          <UploadFab onOpenMobileCreate={() => setMobileCreateOpen(true)} />
         </div>
       </div>
+      <MobileBottomNav onOpenMenu={() => setDrawer(true)} activeSuite="drive" />
+      <MobileCreateSheet
+        open={mobileCreateOpen}
+        onClose={() => setMobileCreateOpen(false)}
+        folderId={currentFolderId}
+      />
       <DriveSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} onShowShortcuts={() => setShortcutsOpen(true)} />
       <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </ActivityPanelContext.Provider>

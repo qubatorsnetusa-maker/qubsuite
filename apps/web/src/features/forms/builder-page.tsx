@@ -4,9 +4,9 @@ import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalList
 import { CSS } from '@dnd-kit/utilities';
 import type { FormDto, FormFieldDto, FormFieldType } from '@qub/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { addFieldTx, fieldSetTx, formSetTx, moveFieldTx, QUESTION_TYPES, validateDefinition, type DefinitionIssue } from '@qub/shared/forms';
+import { addFieldTx, applyTx, fieldSetTx, formSetTx, moveFieldTx, QUESTION_TYPES, validateDefinition, type DefinitionIssue } from '@qub/shared/forms';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
-import { Bot, Eye, FolderInput, Globe, GripVertical, Link2, PanelsTopLeft, Plus, Redo2, Rows, Settings2, Trash2, Type, Undo2, Variable } from 'lucide-react';
+import { Bot, Eye, FastForward, FolderInput, Globe, GripVertical, Link2, PanelsTopLeft, Plus, Redo2, Rows, Settings2, Trash2, Type, Undo2, Variable } from 'lucide-react';
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { EditorHeader, SaveIndicator, type SaveStatus } from '@/components/editor-header';
@@ -242,19 +242,27 @@ function Builder() {
     },
     live = true
   ) => {
+    let currentForm = ops.form;
+
+    const applyAndTrack = (tx: ReturnType<typeof formSetTx>) => {
+      if (!tx) return;
+      ops.apply(tx);
+      currentForm = applyTx(currentForm, tx);
+    };
+
     if (!live) {
-      if (data.title && !form.title) ops.apply(formSetTx(ops.form, { title: data.title }));
-      if (data.description && !form.description) ops.apply(formSetTx(ops.form, { description: data.description }));
+      if (data.title && !currentForm.title) applyAndTrack(formSetTx(currentForm, { title: data.title }));
+      if (data.description && !currentForm.description) applyAndTrack(formSetTx(currentForm, { description: data.description }));
       let lastId: string | null = active;
       data.fields.forEach((field) => {
-        const { tx, fieldId } = addFieldTx(ops.form, field.type, lastId, field.label);
-        ops.apply(tx);
+        const { tx, fieldId } = addFieldTx(currentForm, field.type, lastId, field.label);
+        applyAndTrack(tx);
         if (field.required || field.options?.length) {
-          const updateTx = fieldSetTx(ops.form, fieldId, {
+          const updateTx = fieldSetTx(currentForm, fieldId, {
             required: field.required,
             options: field.options?.map((opt, idx) => ({ id: crypto.randomUUID(), label: opt, kind: 'option', position: idx })),
           });
-          if (updateTx) ops.apply(updateTx);
+          applyAndTrack(updateTx);
         }
         lastId = fieldId;
       });
@@ -271,14 +279,14 @@ function Builder() {
     const skipToFinish = () => {
       cancelled = true;
       pendingFields.forEach((field) => {
-        const { tx, fieldId } = addFieldTx(ops.form, field.type, currentLastId, field.label);
-        ops.apply(tx);
+        const { tx, fieldId } = addFieldTx(currentForm, field.type, currentLastId, field.label);
+        applyAndTrack(tx);
         if (field.required || field.options?.length) {
-          const updateTx = fieldSetTx(ops.form, fieldId, {
+          const updateTx = fieldSetTx(currentForm, fieldId, {
             required: field.required,
             options: field.options?.map((opt, idx) => ({ id: crypto.randomUUID(), label: opt, kind: 'option', position: idx })),
           });
-          if (updateTx) ops.apply(updateTx);
+          applyAndTrack(updateTx);
         }
         currentLastId = fieldId;
       });
@@ -290,7 +298,7 @@ function Builder() {
         stage: 'done',
       });
       setTimeout(() => setAiBuilding(null), 1800);
-      toast.success(`🎉 AI finished building all ${data.fields.length} questions!`);
+      toast.success(`AI finished building all ${data.fields.length} questions.`);
     };
 
     abortAiBuildingRef.current = skipToFinish;
@@ -298,26 +306,26 @@ function Builder() {
     const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
     (async () => {
-      if (data.title && !form.title) {
+      if (data.title && !currentForm.title) {
         setAiBuilding({
           total: data.fields.length,
           current: 0,
           currentLabel: data.title,
           stage: 'title',
         });
-        ops.apply(formSetTx(ops.form, { title: data.title }));
+        applyAndTrack(formSetTx(currentForm, { title: data.title }));
         await sleep(350);
         if (cancelled) return;
       }
 
-      if (data.description && !form.description) {
+      if (data.description && !currentForm.description) {
         setAiBuilding({
           total: data.fields.length,
           current: 0,
           currentLabel: data.description,
           stage: 'description',
         });
-        ops.apply(formSetTx(ops.form, { description: data.description }));
+        applyAndTrack(formSetTx(currentForm, { description: data.description }));
         await sleep(300);
         if (cancelled) return;
       }
@@ -334,17 +342,17 @@ function Builder() {
           stage: 'questions',
         });
 
-        const { tx, fieldId } = addFieldTx(ops.form, field.type, currentLastId, field.label);
-        ops.apply(tx);
+        const { tx, fieldId } = addFieldTx(currentForm, field.type, currentLastId, field.label);
+        applyAndTrack(tx);
         currentLastId = fieldId;
         setActive(fieldId);
 
         if (field.required || field.options?.length) {
-          const updateTx = fieldSetTx(ops.form, fieldId, {
+          const updateTx = fieldSetTx(currentForm, fieldId, {
             required: field.required,
             options: field.options?.map((opt, idx) => ({ id: crypto.randomUUID(), label: opt, kind: 'option', position: idx })),
           });
-          if (updateTx) ops.apply(updateTx);
+          applyAndTrack(updateTx);
         }
 
         setTimeout(() => {
@@ -360,7 +368,7 @@ function Builder() {
         currentLabel: 'All questions generated',
         stage: 'done',
       });
-      toast.success(`🎉 AI finished building all ${data.fields.length} questions!`);
+      toast.success(`AI finished building all ${data.fields.length} questions.`);
       await sleep(2000);
       setAiBuilding(null);
     })();
@@ -394,28 +402,27 @@ function Builder() {
   }, [issues]);
 
   return (
-    <div className="flex h-full flex-col relative" style={{ background: form.theme.backgroundColor }}>
+    <div className="flex h-dvh min-h-dvh w-full flex-col relative" style={{ background: form.theme.backgroundColor }}>
       {aiBuilding && (
-        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3.5 rounded-full border border-purple-500/40 bg-slate-900/95 px-5 py-2.5 text-white shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-top-3 duration-300">
-          <div className="relative flex items-center justify-center">
-            <AiAssistIcon className="size-4 text-purple-400" />
-            <span className="absolute -inset-1 rounded-full bg-purple-500/20 blur-sm animate-pulse" />
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3.5 rounded-full border border-purple-200 bg-white px-5 py-2.5 text-slate-800 shadow-xl animate-in fade-in slide-in-from-top-3 duration-300">
+          <div className="relative flex size-7 items-center justify-center rounded-full bg-purple-50 border border-purple-100">
+            <AiAssistIcon className="size-4 text-purple-600" />
           </div>
           <div className="flex flex-col">
-            <span className="text-xs font-semibold text-purple-200">
-              {aiBuilding.stage === 'title' && 'Designing form header…'}
-              {aiBuilding.stage === 'description' && 'Writing form description…'}
-              {aiBuilding.stage === 'questions' && `Building question ${aiBuilding.current} of ${aiBuilding.total}…`}
-              {aiBuilding.stage === 'done' && 'Form created successfully!'}
+            <span className="text-xs font-semibold text-purple-900">
+              {aiBuilding.stage === 'title' && 'Designing form header...'}
+              {aiBuilding.stage === 'description' && 'Writing form description...'}
+              {aiBuilding.stage === 'questions' && `Building question ${aiBuilding.current} of ${aiBuilding.total}...`}
+              {aiBuilding.stage === 'done' && 'Form created successfully'}
             </span>
-            <span className="text-[11px] text-slate-300 max-w-xs truncate font-mono">
+            <span className="text-[11px] text-slate-500 max-w-xs truncate font-medium">
               {aiBuilding.currentLabel}
             </span>
           </div>
           {aiBuilding.stage === 'questions' && (
-            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-700">
+            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-purple-100">
               <div
-                className="h-full bg-gradient-to-r from-purple-500 to-indigo-400 transition-all duration-300"
+                className="h-full bg-gradient-to-r from-purple-600 to-indigo-600 transition-all duration-300"
                 style={{ width: `${(aiBuilding.current / aiBuilding.total) * 100}%` }}
               />
             </div>
@@ -424,9 +431,10 @@ function Builder() {
             <button
               type="button"
               onClick={() => abortAiBuildingRef.current?.()}
-              className="ml-1 rounded-full border border-purple-400/40 bg-purple-500/25 px-2.5 py-1 text-[11px] font-semibold text-purple-200 transition hover:bg-purple-500/40"
+              className="ml-1 inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-[11px] font-semibold text-purple-700 transition hover:bg-purple-100"
             >
-              ⚡ Skip
+              <FastForward className="size-3" />
+              <span>Skip</span>
             </button>
           )}
         </div>

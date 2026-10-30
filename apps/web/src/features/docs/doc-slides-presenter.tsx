@@ -27,7 +27,7 @@ export interface DocSlidesPresenterProps {
 export function DocSlidesPresenter({ docContent, docTitle, isOpen, onClose }: DocSlidesPresenterProps) {
   const slides = useMemo(() => extractSlidesFromDoc(docContent, { docTitle }), [docContent, docTitle]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [theme, setTheme] = useState<SlideTheme>('dark-luxe');
+  const [theme, setTheme] = useState<SlideTheme>('clean-light');
   const [showNotes, setShowNotes] = useState(false);
   const [showHud, setShowHud] = useState(true);
   const [secondsElapsed, setSecondsElapsed] = useState(0);

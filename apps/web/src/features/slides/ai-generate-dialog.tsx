@@ -15,7 +15,7 @@ import {
 import { toast } from 'sonner';
 import mammoth from 'mammoth';
 import type { SlideTheme } from './slides-types';
-import { SLIDE_THEMES } from './slides-types';
+import { SLIDE_THEMES, VISIBLE_SLIDE_THEMES } from './slides-types';
 import { generateSlidesWithAi } from './ai-slide-generator';
 import { saveDeck } from './slides-storage';
 import { cn } from '@/lib/utils';
@@ -33,7 +33,7 @@ export function AiGenerateDialog({ isOpen, onClose }: AiGenerateDialogProps) {
   const [text, setText] = useState('');
   const [fileName, setFileName] = useState<string | null>(null);
   const [slideCount, setSlideCount] = useState<number>(5);
-  const [theme, setTheme] = useState<SlideTheme>('dark-modern');
+  const [theme, setTheme] = useState<SlideTheme>('royal-executive');
   const [includeImages, setIncludeImages] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [progressMsg, setProgressMsg] = useState('Analyzing document structure...');
@@ -269,7 +269,7 @@ Complete native mobile PWA deployment, expand AI layout intelligence, and launch
                 onChange={(e) => setTheme(e.target.value as SlideTheme)}
                 className="w-full text-xs p-2.5 rounded-lg border border-border bg-surface-2 focus:outline-none focus:border-blue-500"
               >
-                {(Object.keys(SLIDE_THEMES) as SlideTheme[]).map((thm) => (
+                {VISIBLE_SLIDE_THEMES.map((thm) => (
                   <option key={thm} value={thm}>
                     {SLIDE_THEMES[thm].name}
                   </option>

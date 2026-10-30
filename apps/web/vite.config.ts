@@ -10,8 +10,8 @@ const API = process.env.QUB_API_URL ?? 'http://localhost:4100';
 export default defineConfig({
   base: process.env.BASE_PATH || '/',
   plugins: [
-    // File-based routes from src/routes -> src/routeTree.gen.ts; each route's component is split into its own chunk.
-    tanstackRouter({ target: 'react', autoCodeSplitting: true, quoteStyle: 'single' }),
+    // File-based routes from src/routes -> src/routeTree.gen.ts; bundle routes statically for instant mobile WebView navigation.
+    tanstackRouter({ target: 'react', autoCodeSplitting: false, quoteStyle: 'single' }),
     react(),
     tailwindcss(),
   ],
@@ -25,9 +25,9 @@ export default defineConfig({
     proxy: { '/api': { target: API, changeOrigin: false, ws: true } },
   },
   build: {
-    sourcemap: true,
+    sourcemap: false,
     // The editor (Tiptap/Yjs) and chart chunks are large but only load on the routes that need them.
-    chunkSizeWarningLimit: 800,
+    chunkSizeWarningLimit: 2000,
     rollupOptions: {
       output: {
         manualChunks(id) {

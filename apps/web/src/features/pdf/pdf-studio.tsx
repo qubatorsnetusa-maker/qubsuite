@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { PDFDocument, rgb, StandardFonts, degrees } from 'pdf-lib';
 import * as pdfjsLib from 'pdfjs-dist';
 import {
   FileText,
@@ -16,25 +16,32 @@ import {
   ZoomOut,
   Download,
   Save,
-  Printer,
   MousePointer,
-  RotateCcw,
+  RotateCw,
   ArrowLeft,
-  Sliders,
-  Move,
-  Maximize2,
+  Highlighter,
+  Eraser,
+  Award,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { SignatureModal } from './signature-modal';
 import type { PdfAnnotation, EditorTool } from './pdf-types';
-import { FONT_SIZE_OPTIONS, TEXT_COLOR_OPTIONS, SIGNATURE_SCALE_PRESETS } from './pdf-types';
+import {
+  FONT_SIZE_OPTIONS,
+  TEXT_COLOR_OPTIONS,
+  HIGHLIGHT_COLOR_OPTIONS,
+  STAMP_PRESETS,
+  SIGNATURE_SCALE_PRESETS,
+} from './pdf-types';
 import { cn } from '@/lib/utils';
 import { setPageMetadata } from '@/lib/meta';
 
-// Ensure PDF.js worker is initialized
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+
+// Ensure PDF.js worker is initialized with the matching bundled worker version
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 }
 
 interface PdfStudioProps {
@@ -68,7 +75,10 @@ export function PdfStudio({
   // Active formatting states for new or selected elements
   const [activeFontSize, setActiveFontSize] = useState<number>(14);
   const [activeTextColor, setActiveTextColor] = useState<string>('#0f172a');
+  const [activeHighlightColor, setActiveHighlightColor] = useState<string>('#fde047');
+  const [activeStampPreset, setActiveStampPreset] = useState<(typeof STAMP_PRESETS)[number]>(STAMP_PRESETS[0]);
   const [activeScale, setActiveScale] = useState<number>(1.0);
+  const [pageRotation, setPageRotation] = useState<number>(0);
 
   // PDF Rendering States
   const [pdfProxy, setPdfProxy] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
@@ -87,16 +97,31 @@ export function PdfStudio({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
 
-  // 1. Load PDF document
+  // 1. Load PDF document via ArrayBuffer (works for blob: URLs, relative URLs, and authenticated endpoints)
   useEffect(() => {
     let isCancelled = false;
     async function loadPdf() {
       setPageLoading(true);
       try {
-        const loadingTask = pdfjsLib.getDocument({
-          url: pdfUrl,
-          withCredentials: true,
-        });
+        let pdfBytes: Uint8Array | null = null;
+        try {
+          const isBlobOrData = pdfUrl.startsWith('blob:') || pdfUrl.startsWith('data:');
+          const res = await fetch(pdfUrl, isBlobOrData ? undefined : { credentials: 'include' });
+          if (res.ok) {
+            const arrayBuffer = await res.arrayBuffer();
+            pdfBytes = new Uint8Array(arrayBuffer);
+          }
+        } catch {
+          // Fall back to direct URL if fetch is blocked
+        }
+
+        const loadingTask = pdfBytes
+          ? pdfjsLib.getDocument({ data: pdfBytes })
+          : pdfjsLib.getDocument({
+              url: pdfUrl,
+              withCredentials: !pdfUrl.startsWith('blob:') && !pdfUrl.startsWith('data:'),
+            });
+
         const doc = await loadingTask.promise;
         if (!isCancelled) {
           setPdfProxy(doc);
@@ -129,7 +154,7 @@ export function PdfStudio({
       try {
         const page = await pdfProxy!.getPage(currentPage);
         if (isCancelled) return;
-        const viewport = page.getViewport({ scale: zoomScale });
+        const viewport = page.getViewport({ scale: zoomScale, rotation: pageRotation });
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
@@ -158,7 +183,7 @@ export function PdfStudio({
       isCancelled = true;
       if (renderTask) renderTask.cancel();
     };
-  }, [pdfProxy, currentPage, zoomScale]);
+  }, [pdfProxy, currentPage, zoomScale, pageRotation]);
 
   // Selected annotation helper
   const selectedAnnotation = annotations.find((a) => a.id === selectedId);
@@ -173,6 +198,41 @@ export function PdfStudio({
     },
     [selectedId]
   );
+
+  // Drag-to-reposition any annotation on the PDF overlay
+  const startDragAnnotation = (e: React.MouseEvent, ann: PdfAnnotation) => {
+    e.stopPropagation();
+    setSelectedId(ann.id);
+    const overlay = overlayRef.current;
+    if (!overlay) return;
+    const rect = overlay.getBoundingClientRect();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const origX = ann.xPercent;
+    const origY = ann.yPercent;
+
+    const onMove = (ev: globalThis.MouseEvent) => {
+      const dxPct = ((ev.clientX - startX) / rect.width) * 100;
+      const dyPct = ((ev.clientY - startY) / rect.height) * 100;
+      setAnnotations((prev) =>
+        prev.map((item) =>
+          item.id === ann.id
+            ? {
+                ...item,
+                xPercent: Math.max(2, Math.min(98, origX + dxPct)),
+                yPercent: Math.max(2, Math.min(98, origY + dyPct)),
+              }
+            : item
+        )
+      );
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
 
   const handleFontSizeChange = (size: number) => {
     setActiveFontSize(size);
@@ -192,7 +252,11 @@ export function PdfStudio({
     setActiveScale(scale);
     if (
       selectedAnnotation &&
-      (selectedAnnotation.type === 'signature' || selectedAnnotation.type === 'image')
+      (selectedAnnotation.type === 'signature' ||
+        selectedAnnotation.type === 'image' ||
+        selectedAnnotation.type === 'highlight' ||
+        selectedAnnotation.type === 'whiteout' ||
+        selectedAnnotation.type === 'stamp')
     ) {
       updateSelectedAnnotation({ scale });
     }
@@ -281,6 +345,53 @@ export function PdfStudio({
       };
       setAnnotations((prev) => [...prev, newAnnotation]);
       setSelectedId(newId);
+    } else if (activeTool === 'highlight') {
+      const newId = `hl-${Date.now()}`;
+      const newAnnotation: PdfAnnotation = {
+        id: newId,
+        type: 'highlight',
+        pageIndex: currentPage - 1,
+        xPercent,
+        yPercent,
+        color: activeHighlightColor,
+        width: 180,
+        height: 22,
+        scale: activeScale,
+      };
+      setAnnotations((prev) => [...prev, newAnnotation]);
+      setSelectedId(newId);
+      toast.success('Highlight added — drag to reposition.');
+    } else if (activeTool === 'whiteout') {
+      const newId = `wo-${Date.now()}`;
+      const newAnnotation: PdfAnnotation = {
+        id: newId,
+        type: 'whiteout',
+        pageIndex: currentPage - 1,
+        xPercent,
+        yPercent,
+        color: '#ffffff',
+        width: 160,
+        height: 22,
+        scale: activeScale,
+      };
+      setAnnotations((prev) => [...prev, newAnnotation]);
+      setSelectedId(newId);
+      toast.success('Whiteout block placed — switch to Text tool to type over it.');
+    } else if (activeTool === 'stamp') {
+      const newId = `stamp-${Date.now()}`;
+      const newAnnotation: PdfAnnotation = {
+        id: newId,
+        type: 'stamp',
+        pageIndex: currentPage - 1,
+        xPercent,
+        yPercent,
+        text: activeStampPreset.label,
+        color: activeStampPreset.color,
+        scale: activeScale,
+      };
+      setAnnotations((prev) => [...prev, newAnnotation]);
+      setSelectedId(newId);
+      toast.success(`"${activeStampPreset.label}" stamp placed.`);
     }
   };
 
@@ -356,13 +467,22 @@ export function PdfStudio({
 
     setIsExporting(true);
     try {
-      const existingBytes = await fetch(pdfUrl, { credentials: 'include' }).then((r) =>
+      const isBlobOrData = pdfUrl.startsWith('blob:') || pdfUrl.startsWith('data:');
+      const existingBytes = await fetch(pdfUrl, isBlobOrData ? undefined : { credentials: 'include' }).then((r) =>
         r.arrayBuffer()
       );
       const pdfDoc = await PDFDocument.load(existingBytes);
       const pages = pdfDoc.getPages();
       const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
       const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+      if (pageRotation !== 0) {
+        const activePage = pages[currentPage - 1];
+        if (activePage) {
+          const currentRot = activePage.getRotation().angle;
+          activePage.setRotation(degrees((currentRot + pageRotation) % 360));
+        }
+      }
 
       for (const ann of annotations) {
         const pageIdx = Math.min(Math.max(0, ann.pageIndex), pages.length - 1);
@@ -373,7 +493,69 @@ export function PdfStudio({
         const x = (ann.xPercent / 100) * width;
         const yFromTop = (ann.yPercent / 100) * height;
 
-        if (
+        if (ann.type === 'highlight' || ann.type === 'whiteout') {
+          const scale = ann.scale || 1.0;
+          const w = (ann.width || 160) * scale;
+          const h = (ann.height || 22) * scale;
+          const y = height - yFromTop - h / 2;
+          let fillRgb = rgb(1, 1, 1);
+          if (ann.type === 'highlight' && ann.color?.startsWith('#')) {
+            const hex = ann.color.replace('#', '');
+            if (hex.length === 6) {
+              fillRgb = rgb(
+                parseInt(hex.substring(0, 2), 16) / 255,
+                parseInt(hex.substring(2, 4), 16) / 255,
+                parseInt(hex.substring(4, 6), 16) / 255
+              );
+            }
+          }
+          page.drawRectangle({
+            x: x - w / 2,
+            y,
+            width: w,
+            height: h,
+            color: fillRgb,
+            opacity: ann.type === 'highlight' ? 0.38 : 1.0,
+          });
+        } else if (ann.type === 'stamp') {
+          const scale = ann.scale || 1.0;
+          const stampText = ann.text || 'APPROVED';
+          const fontSize = 11 * scale;
+          const textWidth = helveticaBold.widthOfTextAtSize(stampText, fontSize);
+          const padX = 10 * scale;
+          const padY = 5 * scale;
+          const w = textWidth + padX * 2;
+          const h = fontSize + padY * 2;
+          const y = height - yFromTop - h / 2;
+          let stampRgb = rgb(0.02, 0.59, 0.41);
+          if (ann.color?.startsWith('#')) {
+            const hex = ann.color.replace('#', '');
+            if (hex.length === 6) {
+              stampRgb = rgb(
+                parseInt(hex.substring(0, 2), 16) / 255,
+                parseInt(hex.substring(2, 4), 16) / 255,
+                parseInt(hex.substring(4, 6), 16) / 255
+              );
+            }
+          }
+          page.drawRectangle({
+            x: x - w / 2,
+            y,
+            width: w,
+            height: h,
+            borderColor: stampRgb,
+            borderWidth: 1.8,
+            color: rgb(1, 1, 1),
+            opacity: 0.9,
+          });
+          page.drawText(stampText, {
+            x: x - textWidth / 2,
+            y: y + padY + 1,
+            size: fontSize,
+            font: helveticaBold,
+            color: stampRgb,
+          });
+        } else if (
           (ann.type === 'signature' && ann.signatureDataUrl) ||
           (ann.type === 'image' && ann.imageDataUrl)
         ) {
@@ -474,7 +656,7 @@ export function PdfStudio({
   );
 
   return (
-    <div className="h-screen flex flex-col bg-slate-900 text-slate-100 overflow-hidden select-none">
+    <div className="h-screen flex flex-col bg-slate-100 text-slate-800 overflow-hidden select-none">
       <input
         ref={imageInputRef}
         type="file"
@@ -483,33 +665,33 @@ export function PdfStudio({
         className="hidden"
       />
 
-      {/* Top Acrobat-Style Header */}
-      <header className="h-14 border-b border-slate-800 bg-slate-950 px-4 flex items-center justify-between shrink-0 z-30">
+      {/* Top Clean Light-Themed Header */}
+      <header className="h-14 border-b border-slate-200 bg-white px-4 flex items-center justify-between shrink-0 z-30 shadow-xs">
         <div className="flex items-center gap-3">
           {onBack && (
             <button
               onClick={onBack}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
               title="Back"
             >
               <ArrowLeft className="size-4" />
             </button>
           )}
 
-          {/* Adobe Acrobat Red Brand Badge */}
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-red-600 text-white shadow-md shadow-red-600/30">
+          {/* Qub PDF Brand Badge */}
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 rounded-lg bg-red-600 text-white shadow-sm">
               <FileText className="size-4 font-bold" />
             </div>
             <div className="flex flex-col">
-              <span className="font-bold text-xs tracking-wider uppercase text-red-500 leading-none">
+              <span className="font-bold text-[10px] tracking-wider uppercase text-red-600 leading-none">
                 Qub PDF
               </span>
               <input
                 type="text"
                 value={docName}
                 onChange={(e) => setDocName(e.target.value)}
-                className="bg-transparent text-sm font-semibold text-slate-200 hover:text-white border-0 outline-none p-0 focus:ring-0 w-44 sm:w-64 truncate"
+                className="bg-transparent text-sm font-semibold text-slate-900 hover:text-slate-700 border-0 outline-none p-0 focus:ring-0 w-44 sm:w-64 truncate"
                 title="Rename document"
               />
             </div>
@@ -517,15 +699,15 @@ export function PdfStudio({
         </div>
 
         {/* Primary PDF Tools Center Toolbar */}
-        <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 p-1 rounded-xl shadow-inner">
+        <div className="flex items-center gap-1 bg-slate-100 border border-slate-200/80 p-1 rounded-xl">
           <button
             type="button"
             onClick={() => setActiveTool('select')}
             className={cn(
               'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
               activeTool === 'select'
-                ? 'bg-slate-800 text-white shadow-sm'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
             )}
             title="Select & move items (V)"
           >
@@ -539,8 +721,8 @@ export function PdfStudio({
             className={cn(
               'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
               activeTool === 'text'
-                ? 'bg-red-600 text-white shadow-sm shadow-red-600/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                ? 'bg-red-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
             )}
             title="Click to add seamless text without bounding boxes (T)"
           >
@@ -557,8 +739,8 @@ export function PdfStudio({
             className={cn(
               'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
               activeTool === 'signature'
-                ? 'bg-red-600 text-white shadow-sm shadow-red-600/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                ? 'bg-red-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
             )}
             title="Add signature or seal (S)"
           >
@@ -575,8 +757,8 @@ export function PdfStudio({
             className={cn(
               'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
               activeTool === 'image'
-                ? 'bg-red-600 text-white shadow-sm shadow-red-600/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                ? 'bg-red-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
             )}
             title="Import an image signature or stamp (I)"
           >
@@ -590,8 +772,8 @@ export function PdfStudio({
             className={cn(
               'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
               activeTool === 'date'
-                ? 'bg-red-600 text-white shadow-sm shadow-red-600/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                ? 'bg-red-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
             )}
             title="Stamp current date (D)"
           >
@@ -605,10 +787,10 @@ export function PdfStudio({
             className={cn(
               'p-1.5 rounded-lg text-xs font-semibold transition-all',
               activeTool === 'checkmark'
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-emerald-400 hover:bg-slate-800/50'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-emerald-600 hover:bg-white/60'
             )}
-            title="Form Checkmark (✓)"
+            title="Form Checkmark"
           >
             <Check className="size-3.5" />
           </button>
@@ -619,12 +801,57 @@ export function PdfStudio({
             className={cn(
               'p-1.5 rounded-lg text-xs font-semibold transition-all',
               activeTool === 'cross'
-                ? 'bg-rose-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-rose-400 hover:bg-slate-800/50'
+                ? 'bg-rose-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-rose-600 hover:bg-white/60'
             )}
-            title="Form Cross (✕)"
+            title="Form Cross"
           >
             <X className="size-3.5" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTool('highlight')}
+            className={cn(
+              'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all',
+              activeTool === 'highlight'
+                ? 'bg-amber-500 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+            )}
+            title="Highlight text area"
+          >
+            <Highlighter className="size-3.5" />
+            <span className="hidden lg:inline">Highlight</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTool('whiteout')}
+            className={cn(
+              'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all',
+              activeTool === 'whiteout'
+                ? 'bg-slate-800 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+            )}
+            title="Whiteout / Redact existing PDF text"
+          >
+            <Eraser className="size-3.5" />
+            <span className="hidden lg:inline">Whiteout</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTool('stamp')}
+            className={cn(
+              'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all',
+              activeTool === 'stamp'
+                ? 'bg-red-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+            )}
+            title="Official Approval / Confidential Stamp"
+          >
+            <Award className="size-3.5" />
+            <span className="hidden lg:inline">Stamp</span>
           </button>
         </div>
 
@@ -636,7 +863,7 @@ export function PdfStudio({
               variant="outline"
               onClick={() => handleExportPdf(false)}
               disabled={isExporting}
-              className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 hover:text-white text-xs h-8 gap-1.5"
+              className="border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 text-xs h-8 gap-1.5"
             >
               <Save className="size-3.5" />
               <span className="hidden sm:inline">Save</span>
@@ -647,7 +874,7 @@ export function PdfStudio({
             size="sm"
             onClick={() => handleExportPdf(true)}
             disabled={isExporting}
-            className="bg-red-600 hover:bg-red-700 text-white text-xs h-8 font-semibold shadow-md shadow-red-600/30 gap-1.5"
+            className="bg-red-600 hover:bg-red-700 text-white text-xs h-8 font-semibold shadow-sm gap-1.5"
           >
             <Download className="size-3.5" />
             <span>{isExporting ? 'Exporting...' : 'Download PDF'}</span>
@@ -656,18 +883,18 @@ export function PdfStudio({
       </header>
 
       {/* Secondary Properties & Contextual Toolbar */}
-      <div className="h-10 bg-slate-950/80 border-b border-slate-800/80 px-6 flex items-center justify-between text-xs shrink-0 z-20">
+      <div className="h-10 bg-slate-50 border-b border-slate-200 px-6 flex items-center justify-between text-xs shrink-0 z-20">
         {/* Context-aware item controls: Text Font Size or Signature Scale */}
         <div className="flex items-center gap-4">
           {/* Text Controls */}
           {(activeTool === 'text' || selectedAnnotation?.type === 'text') && (
             <div className="flex items-center gap-2">
-              <span className="text-slate-400 text-[11px] font-medium">Font Size:</span>
-              <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-0.5">
+              <span className="text-slate-500 text-[11px] font-medium">Font Size:</span>
+              <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5 shadow-2xs">
                 <button
                   type="button"
                   onClick={() => handleFontSizeChange(Math.max(10, activeFontSize - 2))}
-                  className="px-1.5 py-0.5 text-slate-300 hover:text-white rounded hover:bg-slate-800 font-bold"
+                  className="px-1.5 py-0.5 text-slate-600 hover:text-slate-900 rounded hover:bg-slate-100 font-bold"
                   title="Smaller"
                 >
                   A-
@@ -676,10 +903,10 @@ export function PdfStudio({
                   value={activeFontSize}
                   onChange={(e) => handleFontSizeChange(Number(e.target.value))}
                   aria-label="Text font size"
-                  className="bg-transparent text-slate-200 font-mono text-xs px-1 border-0 outline-none"
+                  className="bg-transparent text-slate-800 font-mono text-xs px-1 border-0 outline-none"
                 >
                   {FONT_SIZE_OPTIONS.map((size) => (
-                    <option key={size} value={size} className="bg-slate-900 text-white">
+                    <option key={size} value={size} className="bg-white text-slate-900">
                       {size} pt
                     </option>
                   ))}
@@ -687,7 +914,7 @@ export function PdfStudio({
                 <button
                   type="button"
                   onClick={() => handleFontSizeChange(Math.min(44, activeFontSize + 2))}
-                  className="px-1.5 py-0.5 text-slate-300 hover:text-white rounded hover:bg-slate-800 font-bold"
+                  className="px-1.5 py-0.5 text-slate-600 hover:text-slate-900 rounded hover:bg-slate-100 font-bold"
                   title="Larger"
                 >
                   A+
@@ -695,7 +922,7 @@ export function PdfStudio({
               </div>
 
               {/* Color Switcher */}
-              <div className="flex items-center gap-1 ml-2">
+              <div className="flex items-center gap-1.5 ml-2">
                 {TEXT_COLOR_OPTIONS.map((col) => (
                   <button
                     key={col.value}
@@ -703,8 +930,8 @@ export function PdfStudio({
                     onClick={() => handleTextColorChange(col.value)}
                     style={{ backgroundColor: col.value }}
                     className={cn(
-                      'size-4 rounded-full border border-slate-700 transition-transform',
-                      activeTextColor === col.value && 'scale-125 ring-2 ring-white/50'
+                      'size-4 rounded-full border border-slate-300 transition-transform',
+                      activeTextColor === col.value && 'scale-125 ring-2 ring-red-500/40'
                     )}
                     title={col.name}
                   />
@@ -713,14 +940,76 @@ export function PdfStudio({
             </div>
           )}
 
-          {/* Signature / Image Scale Controls */}
+          {/* Highlight Color Controls */}
+          {(activeTool === 'highlight' || selectedAnnotation?.type === 'highlight') && (
+            <div className="flex items-center gap-2">
+              <span className="text-slate-500 text-[11px] font-medium">Highlight Color:</span>
+              <div className="flex items-center gap-1.5">
+                {HIGHLIGHT_COLOR_OPTIONS.map((col) => (
+                  <button
+                    key={col.value}
+                    type="button"
+                    onClick={() => {
+                      setActiveHighlightColor(col.value);
+                      if (selectedAnnotation?.type === 'highlight') {
+                        updateSelectedAnnotation({ color: col.value });
+                      }
+                    }}
+                    style={{ backgroundColor: col.value }}
+                    className={cn(
+                      'size-4 rounded-full border border-slate-300 transition-transform',
+                      activeHighlightColor === col.value && 'scale-125 ring-2 ring-amber-500/50'
+                    )}
+                    title={col.name}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Stamp Preset Controls */}
+          {(activeTool === 'stamp' || selectedAnnotation?.type === 'stamp') && (
+            <div className="flex items-center gap-2">
+              <span className="text-slate-500 text-[11px] font-medium">Stamp Badge:</span>
+              <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5">
+                {STAMP_PRESETS.map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => {
+                      setActiveStampPreset(preset);
+                      if (selectedAnnotation?.type === 'stamp') {
+                        updateSelectedAnnotation({ text: preset.label, color: preset.color });
+                      }
+                    }}
+                    className={cn(
+                      'px-2 py-0.5 rounded text-[10px] font-bold transition-all',
+                      activeStampPreset.label === preset.label
+                        ? 'bg-slate-900 text-white'
+                        : 'text-slate-600 hover:text-slate-900'
+                    )}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Signature / Image / Block Scale Controls */}
           {(activeTool === 'signature' ||
             activeTool === 'image' ||
+            activeTool === 'highlight' ||
+            activeTool === 'whiteout' ||
+            activeTool === 'stamp' ||
             selectedAnnotation?.type === 'signature' ||
-            selectedAnnotation?.type === 'image') && (
+            selectedAnnotation?.type === 'image' ||
+            selectedAnnotation?.type === 'highlight' ||
+            selectedAnnotation?.type === 'whiteout' ||
+            selectedAnnotation?.type === 'stamp') && (
             <div className="flex items-center gap-2">
-              <span className="text-slate-400 text-[11px] font-medium">Size:</span>
-              <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-0.5">
+              <span className="text-slate-500 text-[11px] font-medium">Size:</span>
+              <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5">
                 {SIGNATURE_SCALE_PRESETS.map((preset) => (
                   <button
                     key={preset.label}
@@ -730,7 +1019,7 @@ export function PdfStudio({
                       'px-2 py-0.5 rounded text-[10px] font-semibold transition-all',
                       Math.abs(activeScale - preset.scale) < 0.1
                         ? 'bg-red-600 text-white'
-                        : 'text-slate-400 hover:text-white'
+                        : 'text-slate-600 hover:text-slate-900'
                     )}
                     title={preset.title}
                   >
@@ -746,7 +1035,7 @@ export function PdfStudio({
             <button
               type="button"
               onClick={() => handleDeleteAnnotation(selectedId)}
-              className="flex items-center gap-1 text-rose-400 hover:text-rose-300 text-xs px-2 py-0.5 rounded bg-rose-500/10 border border-rose-500/20"
+              className="flex items-center gap-1 text-rose-600 hover:text-rose-700 text-xs px-2 py-0.5 rounded bg-rose-50 border border-rose-200"
             >
               <Trash2 className="size-3" />
               <span>Delete Item</span>
@@ -756,25 +1045,36 @@ export function PdfStudio({
 
         {/* View & Zoom Controls */}
         <div className="flex items-center gap-3">
+          {/* Rotate Page Button */}
+          <button
+            type="button"
+            onClick={() => setPageRotation((r) => (r + 90) % 360)}
+            className="flex items-center gap-1 bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 shadow-2xs"
+            title="Rotate page 90° clockwise"
+          >
+            <RotateCw className="size-3.5" />
+            <span className="hidden sm:inline">Rotate</span>
+          </button>
+
           {/* Page Navigator */}
-          <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-lg text-xs">
+          <div className="flex items-center gap-1 bg-white border border-slate-200 px-2 py-0.5 rounded-lg text-xs shadow-2xs">
             <button
               type="button"
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage <= 1}
-              className="p-1 text-slate-400 hover:text-white disabled:opacity-30"
+              className="p-1 text-slate-600 hover:text-slate-900 disabled:opacity-30"
               title="Previous Page"
             >
               <ChevronLeft className="size-3.5" />
             </button>
-            <span className="font-mono text-slate-200 px-1">
+            <span className="font-mono text-slate-700 font-medium px-1">
               Page {currentPage} of {numPages}
             </span>
             <button
               type="button"
               onClick={() => setCurrentPage((p) => Math.min(numPages, p + 1))}
               disabled={currentPage >= numPages}
-              className="p-1 text-slate-400 hover:text-white disabled:opacity-30"
+              className="p-1 text-slate-600 hover:text-slate-900 disabled:opacity-30"
               title="Next Page"
             >
               <ChevronRight className="size-3.5" />
@@ -782,22 +1082,22 @@ export function PdfStudio({
           </div>
 
           {/* Zoom controls */}
-          <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-lg text-xs">
+          <div className="flex items-center gap-1 bg-white border border-slate-200 px-2 py-0.5 rounded-lg text-xs shadow-2xs">
             <button
               type="button"
               onClick={() => setZoomScale((z) => Math.max(0.6, z - 0.2))}
-              className="p-1 text-slate-400 hover:text-white"
+              className="p-1 text-slate-600 hover:text-slate-900"
               title="Zoom Out"
             >
               <ZoomOut className="size-3.5" />
             </button>
-            <span className="w-10 text-center font-mono text-slate-300">
+            <span className="w-10 text-center font-mono text-slate-700 font-medium">
               {Math.round(zoomScale * 100)}%
             </span>
             <button
               type="button"
               onClick={() => setZoomScale((z) => Math.min(2.5, z + 0.2))}
-              className="p-1 text-slate-400 hover:text-white"
+              className="p-1 text-slate-600 hover:text-slate-900"
               title="Zoom In"
             >
               <ZoomIn className="size-3.5" />
@@ -808,8 +1108,8 @@ export function PdfStudio({
 
       {/* Main Workspace Body */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Acrobat Page Thumbnails strip */}
-        <aside className="w-20 sm:w-28 bg-slate-950 border-r border-slate-800 p-2 flex flex-col items-center gap-3 overflow-y-auto shrink-0 select-none">
+        {/* Left Page Thumbnails strip (Light Theme) */}
+        <aside className="w-20 sm:w-28 bg-white border-r border-slate-200 p-2 flex flex-col items-center gap-3 overflow-y-auto shrink-0 select-none">
           <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500">
             Pages
           </span>
@@ -821,16 +1121,16 @@ export function PdfStudio({
                 key={pageNum}
                 onClick={() => setCurrentPage(pageNum)}
                 className={cn(
-                  'w-16 h-22 rounded border flex flex-col items-center justify-between p-1.5 cursor-pointer transition-all',
+                  'w-16 h-22 rounded-lg border flex flex-col items-center justify-between p-1.5 cursor-pointer transition-all',
                   isCurrent
-                    ? 'border-red-500 bg-red-500/10 shadow-md ring-1 ring-red-500'
-                    : 'border-slate-800 bg-slate-900 hover:border-slate-600'
+                    ? 'border-red-500 bg-red-50/70 shadow-xs ring-1 ring-red-500/30'
+                    : 'border-slate-200 bg-slate-50 hover:border-slate-300'
                 )}
               >
-                <div className="flex-1 w-full bg-white/90 rounded-xs flex items-center justify-center text-[10px] font-bold text-slate-700">
+                <div className="flex-1 w-full bg-white rounded-xs border border-slate-200/80 flex items-center justify-center text-[10px] font-bold text-slate-700 shadow-2xs">
                   {pageNum}
                 </div>
-                <span className="text-[10px] text-slate-400 font-mono mt-1">
+                <span className={cn('text-[10px] font-mono mt-1', isCurrent ? 'text-red-600 font-semibold' : 'text-slate-500')}>
                   {pageNum}
                 </span>
               </div>
@@ -839,11 +1139,11 @@ export function PdfStudio({
         </aside>
 
         {/* Center PDF Canvas Viewport */}
-        <main className="flex-1 bg-slate-900/90 overflow-auto flex items-center justify-center p-6 sm:p-10 relative">
+        <main className="flex-1 bg-slate-100 overflow-auto flex items-center justify-center p-6 sm:p-10 relative">
           {pageLoading && (
-            <div className="absolute inset-0 z-40 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs">
-              <div className="flex items-center gap-2.5 rounded-xl bg-slate-900 border border-slate-800 px-5 py-3 text-xs text-slate-200 shadow-2xl">
-                <div className="size-4 animate-spin rounded-full border-2 border-red-500 border-t-transparent" />
+            <div className="absolute inset-0 z-40 flex items-center justify-center bg-white/75 backdrop-blur-xs">
+              <div className="flex items-center gap-2.5 rounded-xl bg-white border border-slate-200 px-5 py-3 text-xs text-slate-700 shadow-lg">
+                <div className="size-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
                 <span className="font-medium">Rendering PDF page...</span>
               </div>
             </div>
@@ -852,10 +1152,10 @@ export function PdfStudio({
           {/* Document Canvas + Interactive Overlay container */}
           <div
             className={cn(
-              'relative shadow-2xl transition-all duration-150',
+              'relative shadow-xl border border-slate-300/80 rounded-xs transition-all duration-150',
               activeTool === 'text'
                 ? 'cursor-text'
-                : activeTool === 'signature' || activeTool === 'image' || activeTool === 'date'
+                : activeTool === 'signature' || activeTool === 'image' || activeTool === 'date' || activeTool === 'highlight' || activeTool === 'whiteout' || activeTool === 'stamp'
                 ? 'cursor-crosshair'
                 : 'cursor-default'
             )}
@@ -865,7 +1165,7 @@ export function PdfStudio({
             }}
           >
             {/* Underlying PDF Canvas */}
-            <canvas ref={canvasRef} className="block bg-white shadow-2xl select-none" />
+            <canvas ref={canvasRef} className="block bg-white select-none" />
 
             {/* Interactive Annotation Overlay */}
             <div
@@ -882,6 +1182,7 @@ export function PdfStudio({
                   return (
                     <div
                       key={ann.id}
+                      onMouseDown={(e) => startDragAnnotation(e, ann)}
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedId(ann.id);
@@ -953,6 +1254,7 @@ export function PdfStudio({
                   return (
                     <div
                       key={ann.id}
+                      onMouseDown={(e) => startDragAnnotation(e, ann)}
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedId(ann.id);
@@ -964,7 +1266,7 @@ export function PdfStudio({
                         width: `${currentWidth}px`,
                       }}
                       className={cn(
-                        'absolute -translate-x-1/2 -translate-y-1/2 group z-30 transition-shadow',
+                        'absolute -translate-x-1/2 -translate-y-1/2 group z-30 cursor-move transition-shadow',
                         isSelected
                           ? 'ring-1 ring-red-500 rounded p-1 bg-red-500/5 shadow-md'
                           : 'hover:ring-1 hover:ring-slate-400/40 rounded p-0.5'
@@ -984,19 +1286,19 @@ export function PdfStudio({
 
                         {/* Floating Quick Resize buttons when selected */}
                         {isSelected && (
-                          <div className="absolute -top-7 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-slate-900 border border-slate-800 px-1 py-0.5 rounded shadow-lg">
+                          <div className="absolute -top-7 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white border border-slate-200 px-1.5 py-0.5 rounded-md shadow-md">
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleScaleChange(Math.max(0.5, scale - 0.25));
                               }}
-                              className="px-1 text-[10px] text-slate-300 hover:text-white"
+                              className="px-1 text-[10px] text-slate-600 hover:text-slate-900 font-bold"
                               title="Smaller"
                             >
                               -
                             </button>
-                            <span className="text-[10px] text-slate-400 font-mono">
+                            <span className="text-[10px] text-slate-700 font-mono">
                               {Math.round(scale * 100)}%
                             </span>
                             <button
@@ -1005,7 +1307,7 @@ export function PdfStudio({
                                 e.stopPropagation();
                                 handleScaleChange(Math.min(2.5, scale + 0.25));
                               }}
-                              className="px-1 text-[10px] text-slate-300 hover:text-white"
+                              className="px-1 text-[10px] text-slate-600 hover:text-slate-900 font-bold"
                               title="Larger"
                             >
                               +
@@ -1013,7 +1315,7 @@ export function PdfStudio({
                             <button
                               type="button"
                               onClick={(e) => handleDeleteAnnotation(ann.id, e)}
-                              className="p-0.5 text-rose-400 hover:text-rose-300 ml-1"
+                              className="p-0.5 text-rose-500 hover:text-rose-700 ml-1"
                               title="Remove"
                             >
                               <Trash2 className="size-2.5" />
@@ -1030,6 +1332,7 @@ export function PdfStudio({
                   return (
                     <div
                       key={ann.id}
+                      onMouseDown={(e) => startDragAnnotation(e, ann)}
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedId(ann.id);
@@ -1038,7 +1341,7 @@ export function PdfStudio({
                         left: `${ann.xPercent}%`,
                         top: `${ann.yPercent}%`,
                       }}
-                      className="absolute -translate-y-1/2 group z-30"
+                      className="absolute -translate-y-1/2 cursor-move group z-30"
                     >
                       <div className="flex items-center gap-1 text-slate-900 font-semibold text-xs bg-transparent">
                         <span>{ann.text}</span>
@@ -1061,6 +1364,7 @@ export function PdfStudio({
                   return (
                     <div
                       key={ann.id}
+                      onMouseDown={(e) => startDragAnnotation(e, ann)}
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedId(ann.id);
@@ -1071,7 +1375,7 @@ export function PdfStudio({
                         color: ann.color,
                         fontSize: `${ann.fontSize || 16}px`,
                       }}
-                      className="absolute -translate-x-1/2 -translate-y-1/2 font-bold cursor-pointer group"
+                      className="absolute -translate-x-1/2 -translate-y-1/2 font-bold cursor-move group"
                     >
                       <span>{ann.text}</span>
                       {isSelected && (
@@ -1081,6 +1385,82 @@ export function PdfStudio({
                           className="absolute -top-4 -right-3 p-0.5 text-slate-400 hover:text-rose-600 bg-white rounded shadow-xs"
                         >
                           <Trash2 className="size-2.5" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                }
+
+                /* 5. HIGHLIGHT & WHITEOUT BLOCKS */
+                if (ann.type === 'highlight' || ann.type === 'whiteout') {
+                  const scale = ann.scale || 1.0;
+                  const w = (ann.width || 160) * scale;
+                  const h = (ann.height || 22) * scale;
+                  return (
+                    <div
+                      key={ann.id}
+                      onMouseDown={(e) => startDragAnnotation(e, ann)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedId(ann.id);
+                      }}
+                      style={{
+                        left: `${ann.xPercent}%`,
+                        top: `${ann.yPercent}%`,
+                        width: `${w}px`,
+                        height: `${h}px`,
+                        backgroundColor: ann.type === 'whiteout' ? '#ffffff' : ann.color || '#fde047',
+                        opacity: ann.type === 'highlight' ? 0.42 : 1,
+                      }}
+                      className={cn(
+                        'absolute -translate-x-1/2 -translate-y-1/2 cursor-move rounded-xs z-10',
+                        isSelected && 'ring-2 ring-red-500'
+                      )}
+                    >
+                      {isSelected && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteAnnotation(ann.id, e)}
+                          className="absolute -top-6 right-0 p-0.5 text-slate-500 hover:text-rose-600 bg-white rounded shadow-xs border border-slate-200"
+                        >
+                          <Trash2 className="size-3" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                }
+
+                /* 6. APPROVAL / CONFIDENTIAL STAMP */
+                if (ann.type === 'stamp') {
+                  const scale = ann.scale || 1.0;
+                  return (
+                    <div
+                      key={ann.id}
+                      onMouseDown={(e) => startDragAnnotation(e, ann)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedId(ann.id);
+                      }}
+                      style={{
+                        left: `${ann.xPercent}%`,
+                        top: `${ann.yPercent}%`,
+                        borderColor: ann.color || '#059669',
+                        color: ann.color || '#059669',
+                        transform: `translate(-50%, -50%) scale(${scale})`,
+                      }}
+                      className={cn(
+                        'absolute z-30 cursor-move rounded border-2 bg-white/95 px-3 py-1 text-xs font-extrabold tracking-widest uppercase shadow-xs',
+                        isSelected && 'ring-2 ring-red-500/40'
+                      )}
+                    >
+                      <span>{ann.text || 'APPROVED'}</span>
+                      {isSelected && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteAnnotation(ann.id, e)}
+                          className="ml-2 inline-flex p-0.5 text-slate-400 hover:text-rose-600"
+                        >
+                          <Trash2 className="size-3" />
                         </button>
                       )}
                     </div>

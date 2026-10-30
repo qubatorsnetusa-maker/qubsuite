@@ -159,7 +159,7 @@ function FieldEditor({ form, field, canEdit }: { form: FormDto; field: FormField
   return (
     <section className="space-y-6" aria-label={def.label}>
       {isEnding && <EndingBadgeIcon badge={field.settings.badgeIcon} color={color} className="size-10" />}
-      {(isScreen || field.type === 'STATEMENT') && field.settings.imageUrl && <img src={field.settings.imageUrl} alt={field.settings.imageAlt ?? ''} className="max-h-72 rounded-lg object-contain" />}
+      {!isSection && !isMedia && field.settings.imageUrl && <img src={field.settings.imageUrl} alt={field.settings.imageAlt ?? ''} className="max-h-72 rounded-lg object-contain" />}
 
       <div className="space-y-3">
         <div className="flex items-start gap-3" onKeyDown={noNewline}>

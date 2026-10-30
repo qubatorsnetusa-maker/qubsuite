@@ -28,6 +28,7 @@ function Preview() {
       <FormPreview
         formId={formId}
         bare={inFrame}
+        defaultLayout="conversational"
         backLink={
           <Link to="/formsv2/$formId/content" params={{ formId }} className="underline">
             Back to editing

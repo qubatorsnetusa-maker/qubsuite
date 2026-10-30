@@ -15,6 +15,8 @@ import {
 import { itemNameSchema, templateIdSchema, uuidSchema } from './common';
 
 export function isHttpUrl(s: string): boolean {
+  if (s.startsWith('data:image/')) return true;
+  if (s.length > 2000) return false;
   try {
     const u = new URL(s);
     return u.protocol === 'http:' || u.protocol === 'https:';
@@ -22,7 +24,7 @@ export function isHttpUrl(s: string): boolean {
     return false;
   }
 }
-const httpUrlSchema = z.string().trim().max(2000).refine(isHttpUrl, 'Use a link starting with http:// or https://');
+const httpUrlSchema = z.string().trim().max(2_000_000).refine(isHttpUrl, 'Use a link starting with http://, https://, or an uploaded image');
 
 export const createFormSchema = z.object({
   title: itemNameSchema.optional(),

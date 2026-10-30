@@ -1,15 +1,25 @@
 import { Extension, type Editor } from '@tiptap/core';
 
 export const FONT_FAMILIES = [
+  { label: 'Inter', value: 'Inter, system-ui, sans-serif' },
+  { label: 'DM Sans', value: '"DM Sans", system-ui, sans-serif' },
+  { label: 'Space Grotesk', value: '"Space Grotesk", system-ui, sans-serif' },
+  { label: 'Calibri', value: 'Calibri, Candara, Segoe, sans-serif' },
   { label: 'Arial', value: 'Arial, Helvetica, sans-serif' },
-  { label: 'Georgia', value: 'Georgia, serif' },
-  { label: 'Times New Roman', value: '"Times New Roman", Times, serif' },
-  { label: 'Courier New', value: '"Courier New", Courier, monospace' },
   { label: 'Verdana', value: 'Verdana, Geneva, sans-serif' },
   { label: 'Trebuchet MS', value: '"Trebuchet MS", Helvetica, sans-serif' },
+  { label: 'Tahoma', value: 'Tahoma, Geneva, sans-serif' },
+  { label: 'Lora (Serif)', value: 'Lora, Georgia, serif' },
+  { label: 'Playfair Display', value: '"Playfair Display", Georgia, serif' },
+  { label: 'Georgia', value: 'Georgia, serif' },
+  { label: 'Times New Roman', value: '"Times New Roman", Times, serif' },
+  { label: 'Garamond', value: 'Garamond, Baskerville, serif' },
+  { label: 'Palatino', value: '"Palatino Linotype", Palatino, serif' },
+  { label: 'Space Mono', value: '"Space Mono", monospace' },
+  { label: 'Courier New', value: '"Courier New", Courier, monospace' },
 ] as const;
 
-export const FONT_SIZES = [8, 9, 10, 11, 12, 14, 18, 24, 30, 36, 48, 60, 72] as const;
+export const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 30, 36, 48, 60, 72] as const;
 export const DEFAULT_FONT_SIZE = 11;
 /** Rendered sizes of heading levels (see `index.css`), shown when no explicit size is set. */
 export const HEADING_FONT_SIZES: Record<number, number> = { 1: 20, 2: 16, 3: 14, 4: 12 };

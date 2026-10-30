@@ -226,10 +226,10 @@ export function FormAiGenerator({ canEdit, isOpen, onOpenChange, onApplyGenerate
                     AI Assist is designing your form…
                   </h4>
                   <p className="text-[11px] text-purple-700/90 dark:text-purple-300/90 font-medium">
-                    {loadStep === 0 && '🧠 Analyzing form concept & target audience…'}
-                    {loadStep === 1 && '📋 Structuring logical question flow & categories…'}
-                    {loadStep === 2 && '🎯 Selecting optimal field types (Ratings, Choices, Dates)…'}
-                    {loadStep === 3 && '✨ Crafting realistic options & validation rules…'}
+                    {loadStep === 0 && 'Analyzing form concept and target audience...'}
+                    {loadStep === 1 && 'Structuring logical question flow and categories...'}
+                    {loadStep === 2 && 'Selecting optimal field types (Ratings, Choices, Dates)...'}
+                    {loadStep === 3 && 'Crafting realistic options and validation rules...'}
                   </p>
                 </div>
                 <div className="h-1.5 w-48 overflow-hidden rounded-full bg-purple-200/80 dark:bg-purple-900/60">
@@ -267,9 +267,10 @@ export function FormAiGenerator({ canEdit, isOpen, onOpenChange, onApplyGenerate
                 <Button
                   variant="outline"
                   onClick={() => handleApply(false)}
-                  className="gap-1.5 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                  className="gap-1.5 text-xs text-slate-700 hover:bg-slate-100"
                 >
-                  <span>⚡ Instant Insert</span>
+                  <Plus className="size-3.5 text-slate-600" />
+                  <span>Instant Insert</span>
                 </Button>
                 <Button
                   onClick={() => handleApply(true)}

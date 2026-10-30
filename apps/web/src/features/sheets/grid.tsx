@@ -54,6 +54,10 @@ interface GridProps {
   onPickListValue(row: number, col: number, value: string): void;
   onAutofill(target: CellRange, direction: FillDirection): void;
   conditionalRules?: ConditionalFormatRule[];
+  showGridlines?: boolean;
+  sheetFontFamily?: string;
+  vAlign?: 'top' | 'middle' | 'bottom';
+  showDataBars?: boolean;
 }
 
 function styleFor(
@@ -62,6 +66,8 @@ function styleFor(
   c?: number,
   sheetId?: string,
   conditionalRules?: ConditionalFormatRule[],
+  sheetFontFamily?: string,
+  vAlign?: 'top' | 'middle' | 'bottom',
 ): CSSProperties {
   const s = cell?.style;
   const numeric = cell?.dataType === 'NUMBER';
@@ -69,7 +75,15 @@ function styleFor(
     r !== undefined && c !== undefined && sheetId && conditionalRules
       ? getConditionalStyle(cell, r, c, sheetId, conditionalRules)
       : null;
+  const alignItemsValue = s?.wrap
+    ? 'flex-start'
+    : vAlign === 'top'
+      ? 'flex-start'
+      : vAlign === 'middle'
+        ? 'center'
+        : 'flex-end';
   return {
+    fontFamily: sheetFontFamily || undefined,
     fontWeight: condStyle?.fontWeight ?? (s?.bold ? 600 : undefined),
     fontStyle: condStyle?.fontStyle ?? (s?.italic ? 'italic' : undefined),
     textDecoration:
@@ -82,7 +96,7 @@ function styleFor(
     justifyContent: (s?.align ?? (numeric ? 'right' : 'left')) === 'right' ? 'flex-end' : s?.align === 'center' ? 'center' : 'flex-start',
     whiteSpace: s?.wrap ? 'pre-wrap' : 'nowrap',
     wordBreak: s?.wrap ? 'break-word' : undefined,
-    alignItems: s?.wrap ? 'flex-start' : undefined,
+    alignItems: alignItemsValue,
   };
 }
 
@@ -99,6 +113,7 @@ function edgeStyle(b: Border, x: number, y: number, across: boolean, length: num
  */
 export const Grid = forwardRef<GridHandle, GridProps>(function Grid(props, ref) {
   const { sheet, selection, range, editing, presence, selfClientId, hiddenRows } = props;
+  const showGridlines = props.showGridlines !== false;
   const mainRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLInputElement>(null);
@@ -169,7 +184,6 @@ export const Grid = forwardRef<GridHandle, GridProps>(function Grid(props, ref) 
     ref,
     () => ({
       scrollIntoView,
-      // The open cell editor takes focus (caret at the end), otherwise the grid does.
       focus: () => {
         const ed = editorRef.current;
         if (!ed) return rootRef.current?.focus();
@@ -199,14 +213,13 @@ export const Grid = forwardRef<GridHandle, GridProps>(function Grid(props, ref) 
   const onMouseDown = (e: MouseEvent) => {
     const cell = cellFromEvent(e);
     if (!cell) return;
-    if (e.button === 2 && inRange(cell, range)) return; // keep range for context menu
+    if (e.button === 2 && inRange(cell, range)) return;
     if (editing) props.onEditCommit('none');
     rootRef.current?.focus();
     const anchor = e.shiftKey ? selection.anchor : cell;
     props.onSelect({ active: e.shiftKey ? selection.active : cell, anchor, focus: cell });
     dragging.current = e.button === 0;
   };
-  // Autofill drag: the preview holds only the new cells, extended along the axis the pointer moved furthest on.
   const filling = useRef(false);
   const [fillPreview, setFillPreview] = useState<{ target: CellRange; direction: FillDirection } | null>(null);
   const fillPreviewRef = useRef(fillPreview);
@@ -248,11 +261,6 @@ export const Grid = forwardRef<GridHandle, GridProps>(function Grid(props, ref) 
     return () => window.removeEventListener('mouseup', up);
   }, []);
 
-  /**
-   * Borders are drawn as separate lines over the cells (cells clip their content). Each cell draws its right and
-   * bottom edges, taking the heavier of its own and its neighbour's definition; the first row/column of a pane also
-   * draws its top/left edges, since the neighbour that would draw them may be outside the pane.
-   */
   const renderBorders = (rows: number[], cols: number[], originX: number, originY: number): ReactNode[] => {
     const out: ReactNode[] = [];
     const edges = (r: number, c: number) => props.getCell(r, c)?.style?.borders;
@@ -280,7 +288,6 @@ export const Grid = forwardRef<GridHandle, GridProps>(function Grid(props, ref) 
     return out;
   };
 
-  /** Cell body: text, or a checkbox / dropdown affordance for validated cells, plus the invalid-value marker. */
   const renderContent = (cell: CellDto | undefined, r: number, c: number): ReactNode => {
     const v = cell?.style?.validation;
     const issue = validationIssue(cell);
@@ -305,9 +312,19 @@ export const Grid = forwardRef<GridHandle, GridProps>(function Grid(props, ref) 
         </span>
       );
     }
+    const numVal = typeof cell?.value === 'number' ? cell.value : null;
+    const dataBarPct =
+      props.showDataBars && numVal !== null && numVal > 0 ? Math.min(100, Math.max(6, Math.round(numVal))) : null;
     return (
       <>
-        {cell?.formattedValue}
+        {dataBarPct !== null && (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-y-1 left-0.5 rounded-xs bg-blue-500/15"
+            style={{ width: `calc(${dataBarPct}% - 4px)` }}
+          />
+        )}
+        <span className="relative z-[1]">{cell?.formattedValue}</span>
         {v?.kind === 'list' && props.canEdit && (
           <button
             type="button"
@@ -329,10 +346,6 @@ export const Grid = forwardRef<GridHandle, GridProps>(function Grid(props, ref) 
     );
   };
 
-  /**
-   * Content wider than its (unwrapped) cell: text is drawn across empty neighbours, a number that can't fit shows
-   * ### (as in Google Sheets). Returns the span and what to draw there, or null when the content fits.
-   */
   const overflowOf = (cell: CellDto | undefined, r: number, c: number, minCol: number, maxCol: number) => {
     const s = cell?.style;
     const text = cell?.formattedValue;
@@ -343,7 +356,6 @@ export const Grid = forwardRef<GridHandle, GridProps>(function Grid(props, ref) 
     const align = s?.align ?? (numeric || cell.dataType === 'BOOLEAN' ? 'right' : 'left');
     const span = spillSpan({ col: c, need, align, colW: geo.colW, isEmpty: (k) => isBlank(r, k), minCol, maxCol });
     if (numeric && !span.fits) {
-      // A partly shown number reads as a different number: hashes in its own cell instead.
       const hash = measureText('#', s?.fontSize ?? 13, !!s?.bold) || 8;
       return { from: c, to: c, text: '#'.repeat(Math.max(1, Math.floor((geo.colW(c) - CELL_PADDING_X) / hash))) };
     }
@@ -359,7 +371,6 @@ export const Grid = forwardRef<GridHandle, GridProps>(function Grid(props, ref) 
     const spills: ReactNode[] = [];
     const cells = rows.map((r) => {
       const h = geo.rowH(r);
-      // Gridlines under spilled text are hidden: the right edge of every cell in a span but the last.
       const hideRight = new Set<number>();
       const overflowing = new Set<number>();
       for (const c of cols) {
@@ -373,7 +384,14 @@ export const Grid = forwardRef<GridHandle, GridProps>(function Grid(props, ref) 
             key={`spill-${r}:${c}`}
             aria-hidden
             className="pointer-events-none absolute z-[4] flex items-end overflow-hidden whitespace-nowrap px-[3px] pb-[2px] text-[13px] leading-[16px]"
-            style={{ ...styleFor(cell, r, c, sheet.id, props.conditionalRules), background: undefined, left: geo.colX[o.from]! - originX, top: geo.rowY[r]! - originY, width: geo.colX[o.to + 1]! - geo.colX[o.from]!, height: h }}
+            style={{
+              ...styleFor(cell, r, c, sheet.id, props.conditionalRules, props.sheetFontFamily, props.vAlign),
+              background: undefined,
+              left: geo.colX[o.from]! - originX,
+              top: geo.rowY[r]! - originY,
+              width: geo.colX[o.to + 1]! - geo.colX[o.from]!,
+              height: h,
+            }}
           >
             {o.text}
           </div>,
@@ -389,14 +407,16 @@ export const Grid = forwardRef<GridHandle, GridProps>(function Grid(props, ref) 
             aria-rowindex={r + 1}
             aria-colindex={c + 1}
             aria-selected={inRange({ row: r, col: c }, range)}
-            className="absolute flex items-end overflow-hidden border-b border-r border-[#e2e3e3] px-[3px] pb-[2px] text-[13px] leading-[16px]"
+            className={cn(
+              'absolute flex items-end overflow-hidden px-[3px] pb-[2px] text-[13px] leading-[16px]',
+              showGridlines ? 'border-b border-r border-[#e2e3e3]' : 'border-b border-r border-transparent'
+            )}
             style={{
               left: geo.colX[c]! - originX,
               top: geo.rowY[r]! - originY,
               width: geo.colW(c),
               height: h,
-              ...styleFor(cell, r, c, sheet.id, props.conditionalRules),
-              // The overlay draws overflowing content; the cell keeps its text (for assistive tech) but invisibly.
+              ...styleFor(cell, r, c, sheet.id, props.conditionalRules, props.sheetFontFamily, props.vAlign),
               ...(overflowing.has(c) ? { color: 'transparent' } : null),
               ...(hideRight.has(c) ? { borderRightColor: 'transparent' } : null),
             }}

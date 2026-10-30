@@ -346,7 +346,7 @@ function Listing({
   });
 
   return (
-    <div className="flex h-full min-h-0">
+    <div className="flex h-full min-h-0 flex-1 w-full">
       <div className="flex min-w-0 flex-1 flex-col">
         <Toolbar title={title} sort={search} onSort={(s) => setSearch(s)} showSort={showSort} showPeople={showPeople} peopleOnly={peopleOnly} extra={extra} infoOpen={!!detailsTarget} onInfo={toggleInfo} />
         <ItemsView

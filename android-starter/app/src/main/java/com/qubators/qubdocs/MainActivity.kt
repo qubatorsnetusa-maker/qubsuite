@@ -11,7 +11,9 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.os.Message
+import android.util.Log
 import android.view.View
+import android.view.ViewGroup
 import android.webkit.*
 import android.widget.Toast
 import androidx.webkit.ServiceWorkerClientCompat
@@ -163,7 +165,12 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxSize(),
                 factory = { context ->
                     WebView(context).apply {
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
                         setLayerType(View.LAYER_TYPE_HARDWARE, null)
+                        clearCache(true)
 
                         settings.apply {
                             javaScriptEnabled = true
@@ -173,9 +180,9 @@ class MainActivity : ComponentActivity() {
                             allowContentAccess = true
                             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                             cacheMode = WebSettings.LOAD_NO_CACHE
-                            useWideViewPort = true
-                            loadWithOverviewMode = true
-                            setSupportZoom(true)
+                            useWideViewPort = false
+                            loadWithOverviewMode = false
+                            setSupportZoom(false)
                             builtInZoomControls = false
                             displayZoomControls = false
                             setSupportMultipleWindows(true)
@@ -211,6 +218,17 @@ class MainActivity : ComponentActivity() {
                         }
 
                         webChromeClient = object : WebChromeClient() {
+                            override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                                val level = consoleMessage?.messageLevel()
+                                val msg = "[WebConsole] ${consoleMessage?.message()} (${consoleMessage?.sourceId()}:${consoleMessage?.lineNumber()})"
+                                when (level) {
+                                    ConsoleMessage.MessageLevel.ERROR -> Log.e("QubDocsWeb", msg)
+                                    ConsoleMessage.MessageLevel.WARNING -> Log.w("QubDocsWeb", msg)
+                                    else -> Log.d("QubDocsWeb", msg)
+                                }
+                                return true
+                            }
+
                             override fun onShowFileChooser(
                                 webView: WebView?,
                                 filePathCallback: ValueCallback<Array<Uri>>?,
@@ -235,10 +253,17 @@ class MainActivity : ComponentActivity() {
                                 if (resultMsg == null) return false
 
                                 val childWebView = WebView(context).apply {
+                                    layoutParams = ViewGroup.LayoutParams(
+                                        ViewGroup.LayoutParams.MATCH_PARENT,
+                                        ViewGroup.LayoutParams.MATCH_PARENT
+                                    )
                                     settings.apply {
                                         javaScriptEnabled = true
                                         domStorageEnabled = true
                                         databaseEnabled = true
+                                        useWideViewPort = true
+                                        loadWithOverviewMode = true
+                                        mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                                         setSupportMultipleWindows(true)
                                         javaScriptCanOpenWindowsAutomatically = true
                                         userAgentString = "$userAgentString QubDocsAndroid/1.0"
@@ -335,8 +360,18 @@ class MainActivity : ComponentActivity() {
                                             }
 
                                             val host = uri.host ?: ""
-                                            // Keep KingsChat and Qub inside the popup dialog
-                                            return if (host.contains("kingsch.at") || host.contains("kingschat") || host.contains("qubdocs.online")) {
+                                            // Route internal QubDocs navigations to the primary WebView rather than trapped in popup
+                                            if (host.contains("qubdocs.online") && !url.contains("oauth") && !url.contains("kingschat")) {
+                                                currentWebview?.post {
+                                                    currentWebview?.loadUrl(url)
+                                                }
+                                                view?.destroy()
+                                                popupWebView = null
+                                                return true
+                                            }
+
+                                            // Keep KingsChat inside the popup dialog
+                                            return if (host.contains("kingsch.at") || host.contains("kingschat")) {
                                                 false
                                             } else {
                                                 try {
@@ -364,13 +399,41 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
+                        val swCleanupScript = """
+                            (function() {
+                                try {
+                                    if ('serviceWorker' in navigator) {
+                                        navigator.serviceWorker.getRegistrations().then(function(regs) {
+                                            var hadSw = regs && regs.length > 0;
+                                            for (var i = 0; i < regs.length; i++) {
+                                                regs[i].unregister();
+                                            }
+                                            if ('caches' in window) {
+                                                caches.keys().then(function(names) {
+                                                    for (var j = 0; j < names.length; j++) {
+                                                        caches.delete(names[j]);
+                                                    }
+                                                });
+                                            }
+                                            if (hadSw && !sessionStorage.getItem('__qub_sw_purged')) {
+                                                sessionStorage.setItem('__qub_sw_purged', '1');
+                                                window.location.reload();
+                                            }
+                                        });
+                                    }
+                                } catch (e) {}
+                            })();
+                        """.trimIndent()
+
                         webViewClient = object : WebViewClient() {
                             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                                 isNetworkError = false
+                                view?.evaluateJavascript(swCleanupScript, null)
                             }
 
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 CookieManager.getInstance().flush()
+                                view?.evaluateJavascript(swCleanupScript, null)
                             }
 
                             override fun onReceivedError(
@@ -378,9 +441,18 @@ class MainActivity : ComponentActivity() {
                                 request: WebResourceRequest?,
                                 error: WebResourceError?
                             ) {
+                                Log.w("QubDocsWeb", "onReceivedError: ${error?.description} (code ${error?.errorCode}) for ${request?.url}")
                                 if (request?.isForMainFrame == true) {
                                     isNetworkError = true
                                 }
+                            }
+
+                            override fun onReceivedHttpError(
+                                view: WebView?,
+                                request: WebResourceRequest?,
+                                errorResponse: WebResourceResponse?
+                            ) {
+                                Log.w("QubDocsWeb", "onReceivedHttpError: ${errorResponse?.statusCode} ${errorResponse?.reasonPhrase} for ${request?.url}")
                             }
 
                             override fun shouldInterceptRequest(
@@ -395,7 +467,7 @@ class MainActivity : ComponentActivity() {
                                 val url = uri.toString()
                                 val host = uri.host ?: ""
 
-                                // Normalize sibling subdomains (drive.qubdocs.online, etc.) back to docs.qubdocs.online
+                                // Normalize sibling subdomains (drive.qubdocs.online, forms.qubdocs.online, etc.) back to docs.qubdocs.online
                                 if (request.isForMainFrame && (
                                     host.equals("drive.qubdocs.online", ignoreCase = true) ||
                                     host.equals("qubdocs.online", ignoreCase = true) ||
@@ -405,7 +477,15 @@ class MainActivity : ComponentActivity() {
                                     host.equals("pdf.qubdocs.online", ignoreCase = true) ||
                                     host.equals("slides.qubdocs.online", ignoreCase = true)
                                 )) {
-                                    val path = uri.path ?: "/drive"
+                                    val defaultPathForHost = when {
+                                        host.startsWith("sheet", ignoreCase = true) -> "/sheets"
+                                        host.startsWith("forms", ignoreCase = true) -> "/forms"
+                                        host.startsWith("pdf", ignoreCase = true) -> "/pdf"
+                                        host.startsWith("slides", ignoreCase = true) -> "/slides"
+                                        else -> "/drive"
+                                    }
+                                    val reqPath = uri.path
+                                    val path = if (reqPath.isNullOrEmpty() || reqPath == "/") defaultPathForHost else reqPath
                                     val query = if (uri.query != null) "?${uri.query}" else ""
                                     view?.loadUrl("https://docs.qubdocs.online$path$query")
                                     return true
@@ -433,6 +513,12 @@ class MainActivity : ComponentActivity() {
                         onWebViewCreated(this)
                         loadUrl(targetUrl)
                     }
+                },
+                update = { webView ->
+                    webView.layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
                 }
             )
 
@@ -589,7 +675,6 @@ class MainActivity : ComponentActivity() {
             if (!isOnline(this)) {
                 val offlineJson = """{"error":"offline","message":"Device is offline"}"""
                 val headers = mapOf(
-                    "Content-Type" to "application/json",
                     "Access-Control-Allow-Origin" to "*"
                 )
                 return WebResourceResponse(
@@ -614,7 +699,6 @@ class MainActivity : ComponentActivity() {
                 });
             """.trimIndent()
             val swHeaders = mutableMapOf(
-                "Content-Type" to "application/javascript; charset=utf-8",
                 "Cache-Control" to "no-cache, no-store, must-revalidate",
                 "Access-Control-Allow-Origin" to "*"
             )
@@ -639,13 +723,15 @@ class MainActivity : ComponentActivity() {
         }
 
         val mime = getMimeType(assetPath)
-        val isTextOrJs = mime.startsWith("text/") || mime == "application/javascript" || mime == "application/json"
-        val encoding = if (mime == "text/html" || mime == "application/json") "UTF-8" else null
+        val isTextBased = mime.startsWith("text/") ||
+                mime == "application/javascript" ||
+                mime == "application/json" ||
+                mime == "image/svg+xml"
+        val encoding = if (isTextBased) "UTF-8" else null
         val responseHeaders = mutableMapOf(
             "Access-Control-Allow-Origin" to "*",
             "Access-Control-Allow-Methods" to "GET, HEAD, OPTIONS",
-            "Cache-Control" to "no-cache, no-store, must-revalidate",
-            "Content-Type" to if (isTextOrJs) "$mime; charset=utf-8" else mime
+            "Cache-Control" to "no-cache, no-store, must-revalidate"
         )
 
         try {
@@ -663,8 +749,7 @@ class MainActivity : ComponentActivity() {
                 val htmlHeaders = mutableMapOf(
                     "Access-Control-Allow-Origin" to "*",
                     "Access-Control-Allow-Methods" to "GET, HEAD, OPTIONS",
-                    "Cache-Control" to "no-cache, no-store, must-revalidate",
-                    "Content-Type" to "text/html; charset=utf-8"
+                    "Cache-Control" to "no-cache, no-store, must-revalidate"
                 )
                 return WebResourceResponse("text/html", "UTF-8", 200, "OK", htmlHeaders, htmlStream)
             } catch (_: Exception) {

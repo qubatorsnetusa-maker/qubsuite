@@ -13,27 +13,24 @@ function AppLinks({ onNavigate, layout }: { onNavigate?: () => void; layout: 'li
   const item = layout === 'grid' ? 'flex flex-col items-center gap-1.5 rounded-xl p-3 text-xs hover:bg-hover' : 'flex h-11 items-center gap-4 rounded-r-full pl-6 pr-4 text-sm hover:bg-hover';
   return (
     <>
-      {LAUNCHER_APPS.map((a) => {
-        const service: EcosystemService = a.type === 'DOCUMENT' ? 'docs' : a.type === 'SPREADSHEET' ? 'sheets' : 'forms';
-        return (
-          <a key={a.home} href={getServiceUrl(service, a.home)} onClick={onNavigate} className={item}>
-            <FileIcon type={a.type} size={layout === 'grid' ? 36 : 22} />
-            Qub {a.product}
-          </a>
-        );
-      })}
-      <a href={getServiceUrl('slides', '/slides')} onClick={onNavigate} className={item}>
+      {LAUNCHER_APPS.map((a) => (
+        <Link key={a.home} to={a.home} onClick={onNavigate} className={item}>
+          <FileIcon type={a.type} size={layout === 'grid' ? 36 : 22} />
+          Qub {a.product}
+        </Link>
+      ))}
+      <Link to="/slides" onClick={onNavigate} className={item}>
         <Presentation className={layout === 'grid' ? 'size-9 text-[#f59e0b]' : 'size-[22px] text-[#f59e0b]'} />
         Qub Slides
-      </a>
-      <a href={getServiceUrl('pdf', '/pdf')} onClick={onNavigate} className={item}>
+      </Link>
+      <Link to="/pdf" onClick={onNavigate} className={item}>
         <FileIcon type="PDF" size={layout === 'grid' ? 36 : 22} />
         Qub PDF
-      </a>
-      <a href={getServiceUrl('drive', '/drive')} onClick={onNavigate} className={item}>
+      </Link>
+      <Link to="/drive" onClick={onNavigate} className={item}>
         <HardDrive className={layout === 'grid' ? 'size-9 text-[#1a56db]' : 'size-[22px] text-[#1a56db]'} />
         Qub Drive
-      </a>
+      </Link>
     </>
   );
 }
@@ -129,16 +126,16 @@ export function AppHeader({
 }) {
   const [drawer, setDrawer] = useState(false);
   return (
-    <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background px-2 sm:px-4">
+    <header className="flex h-14 sm:h-16 shrink-0 items-center gap-1.5 sm:gap-2 border-b border-border bg-background px-2 sm:px-4 w-full max-w-full overflow-hidden">
       {back ? (
         <Tooltip content={`Back to Qub ${app.product}`}>
-          <Link to={app.home} className="rounded-full p-2.5 text-muted hover:bg-hover" aria-label={`Back to Qub ${app.product}`}>
-            <ArrowLeft className="size-6" />
+          <Link to={app.home} className="flex size-9 sm:size-10 shrink-0 items-center justify-center rounded-full text-muted hover:bg-hover" aria-label={`Back to Qub ${app.product}`}>
+            <ArrowLeft className="size-5 sm:size-6" />
           </Link>
         </Tooltip>
       ) : (
-        <button className="rounded-full p-2.5 text-muted hover:bg-hover" onClick={() => setDrawer(true)} aria-label="Main menu">
-          <Menu className="size-6" />
+        <button className="flex size-9 sm:size-10 shrink-0 items-center justify-center rounded-full text-muted hover:bg-hover" onClick={() => setDrawer(true)} aria-label="Main menu">
+          <Menu className="size-5 sm:size-6" />
         </button>
       )}
       {title ?? (
@@ -146,12 +143,12 @@ export function AppHeader({
           <AppLogo app={app} />
         </Link>
       )}
-      <div className="flex min-w-0 flex-1 justify-center px-2">{onSearch && <AppSearch app={app} value={search ?? ''} onChange={onSearch} />}</div>
-      <div className="flex items-center gap-1">
+      <div className="flex min-w-0 flex-1 justify-center px-1 sm:px-2">{onSearch && <AppSearch app={app} value={search ?? ''} onChange={onSearch} />}</div>
+      <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
         <Popover>
           <Tooltip content="Qub apps">
             <PopoverTrigger asChild>
-              <button className="rounded-full p-2.5 text-muted hover:bg-hover" aria-label="Qub apps">
+              <button className="flex size-9 sm:size-10 shrink-0 items-center justify-center rounded-full text-muted hover:bg-hover" aria-label="Qub apps">
                 <LayoutGrid className="size-5" />
               </button>
             </PopoverTrigger>

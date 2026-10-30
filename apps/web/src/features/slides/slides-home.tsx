@@ -1,6 +1,6 @@
 import { AiAssistIcon } from '@/components/ai-assist-icon';
 import React, { useState } from 'react';
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import {
   Presentation,
   Plus,
@@ -16,10 +16,10 @@ import { toast } from 'sonner';
 import { getServiceUrl } from '@/lib/ecosystem-urls';
 import { getStoredDecks, createDeckFromTemplate, deleteDeck, duplicateSlideInDeck, saveDeck } from './slides-storage';
 import { STARTER_TEMPLATES } from './slide-templates';
-import type { PresentationDeck } from './slides-types';
-import { SLIDE_THEMES } from './slides-types';
+import { SLIDE_THEMES, type PresentationDeck } from './slides-types';
 import { AiGenerateDialog } from './ai-generate-dialog';
 import { cn } from '@/lib/utils';
+import { MobileBottomNav } from '@/components/mobile-bottom-nav';
 
 export function SlidesHome() {
   const navigate = useNavigate();
@@ -67,14 +67,14 @@ export function SlidesHome() {
       {/* Top App Bar */}
       <header className="h-16 border-b border-border bg-surface-2 px-6 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <a
-            href={getServiceUrl('drive', '/drive')}
+          <Link
+            to="/drive"
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-muted hover:text-foreground hover:bg-hover transition-colors text-xs font-medium border border-border/60"
             title="Switch to Qub Drive"
           >
             <HardDrive className="w-4 h-4 text-blue-600" />
             <span className="hidden sm:inline">Qub Drive</span>
-          </a>
+          </Link>
           <div className="h-5 w-px bg-border/80 mx-1 hidden sm:block" />
           <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500">
             <Presentation className="w-5 h-5" />
@@ -162,9 +162,22 @@ export function SlidesHome() {
                     className="group cursor-pointer rounded-xl border border-border hover:border-blue-500 bg-surface-2 overflow-hidden flex flex-col aspect-[16/10] transition-all hover:shadow-md"
                   >
                     {/* Visual Deck Preview Header */}
-                    <div className={cn('h-24 p-3 flex flex-col justify-between border-b text-[10px]', themeDef.cardBg)}>
-                      <span className="font-bold truncate">{t.deck.title}</span>
-                      <span className="text-[8px] opacity-70 truncate">{t.deck.slides[0]?.subtitle ?? ''}</span>
+                    <div className={cn('h-28 p-3.5 flex flex-col justify-between border-b text-[10px] relative overflow-hidden', themeDef.cardBg)}>
+                      <div className={cn('absolute top-0 left-0 right-0 h-1', themeDef.accentBg)} />
+                      {t.deck.slides[0]?.imageUrl && (
+                        <img
+                          src={t.deck.slides[0].imageUrl}
+                          alt=""
+                          className="absolute right-2 bottom-2 w-16 h-12 object-cover rounded-md border border-slate-200/80 shadow-xs opacity-90"
+                        />
+                      )}
+                      <div className="relative z-10 pr-16">
+                        <span className={cn('font-bold block truncate text-xs', themeDef.titleColor)}>{t.deck.title}</span>
+                        <span className={cn('text-[9px] opacity-80 block truncate mt-0.5', themeDef.textColor)}>{t.deck.slides[0]?.subtitle ?? ''}</span>
+                      </div>
+                      <span className={cn('relative z-10 text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded w-fit border', themeDef.badgeBg)}>
+                        {themeDef.name}
+                      </span>
                     </div>
                     {/* Metadata Footer */}
                     <div className="p-3 flex-1 flex flex-col justify-between bg-surface-2">
@@ -200,7 +213,7 @@ export function SlidesHome() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
               {filteredDecks.map((deck) => {
-                const themeDef = SLIDE_THEMES[deck.theme] || SLIDE_THEMES['dark-modern'];
+                const themeDef = SLIDE_THEMES[deck.theme] || SLIDE_THEMES['clean-corporate'];
                 const firstSlide = deck.slides[0];
                 return (
                   <div
@@ -260,6 +273,18 @@ export function SlidesHome() {
           )}
         </section>
       </main>
+
+      {/* Mobile Floating Action Button */}
+      <button
+        onClick={() => handleCreateFromTemplate('blank')}
+        className="fixed bottom-20 right-4 z-30 flex size-14 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-pop transition-transform animate-pop-in hover:shadow-xl active:scale-95 md:hidden"
+        aria-label="New Presentation"
+      >
+        <Plus className="size-7" />
+      </button>
+
+      {/* Unified Mobile Bottom Navigation */}
+      <MobileBottomNav activeSuite="slides" />
 
       {/* AI Presentation Generator Modal */}
       <AiGenerateDialog

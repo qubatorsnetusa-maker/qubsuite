@@ -38,7 +38,7 @@ function Responses({ form }: { form: FormDto }) {
   const me = useCurrentUser();
   const saving = useBackgroundSave(form.id, me.id);
   return (
-    <div className="flex h-full flex-col" style={{ background: form.theme.backgroundColor }}>
+    <div className="flex h-dvh min-h-dvh w-full flex-col" style={{ background: form.theme.backgroundColor }}>
       <FormTopBar form={form} tab="responses" status={saving?.status ?? 'saved'} onRetry={saving?.retry} />
       <main className="min-h-0 flex-1 overflow-y-auto px-4 py-6">
         <div className="mx-auto max-w-[768px] space-y-3">
@@ -54,7 +54,7 @@ function Responses({ form }: { form: FormDto }) {
                       const token = await authStore.validToken();
                       const res = await fetch(formsService.exportUrl(form.id), {
                         credentials: 'include',
-                        headers: token ? { Authorization: `Bearer ${token}`} : {},
+                        headers: token ? { Authorization: `Bearer ${token}` } : {},
                       });
                       if (!res.ok) throw new Error('Export failed');
                       const blob = await res.blob();

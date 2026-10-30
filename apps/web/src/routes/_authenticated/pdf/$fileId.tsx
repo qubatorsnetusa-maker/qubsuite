@@ -18,9 +18,9 @@ function PdfFileRouteComponent() {
 
   if (isLoading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-slate-900 text-white">
+      <div className="h-screen flex items-center justify-center bg-slate-50 text-slate-800">
         <div className="flex items-center gap-3">
-          <div className="size-5 animate-spin rounded-full border-2 border-red-500 border-t-transparent" />
+          <div className="size-5 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
           <span className="text-sm font-medium">Loading document...</span>
         </div>
       </div>
@@ -29,10 +29,10 @@ function PdfFileRouteComponent() {
 
   if (error || !file) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center bg-slate-900 text-white p-6 text-center space-y-4">
-        <FileText className="size-12 text-red-500 opacity-60" />
-        <h2 className="text-xl font-bold">Document Not Found</h2>
-        <p className="text-sm text-slate-400 max-w-sm">
+      <div className="h-screen flex flex-col items-center justify-center bg-slate-50 text-slate-800 p-6 text-center space-y-4">
+        <FileText className="size-12 text-red-500 opacity-75" />
+        <h2 className="text-xl font-bold text-slate-900">Document Not Found</h2>
+        <p className="text-sm text-slate-500 max-w-sm">
           The requested PDF file could not be found or you may not have permission to view it.
         </p>
         <Button onClick={() => void navigate({ to: '/pdf' as any })}>

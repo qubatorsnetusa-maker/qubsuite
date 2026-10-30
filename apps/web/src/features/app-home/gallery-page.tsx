@@ -15,7 +15,7 @@ export function TemplateGalleryPage({ type, folderId, app: override, featured }:
   }, [app.product]);
   const featuredTemplates = featured ? (templates as Template[]).filter(featured.filter) : [];
   return (
-    <div className="flex h-full flex-col bg-background">
+    <div className="flex h-dvh min-h-dvh w-full flex-col bg-background">
       <AppHeader app={app} back title={<h1 className="text-[22px] text-foreground">Template gallery</h1>} />
       <main className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-[1180px] space-y-10 px-4 py-6 sm:px-8">

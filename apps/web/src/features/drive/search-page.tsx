@@ -43,7 +43,7 @@ export function SearchPage() {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-1 w-full flex-col">
       <div className="px-4 pt-4">
         <h1 className="text-[22px]">{search.q ? <>Search results for “{search.q}”</> : 'Search'}</h1>
         <div className="flex flex-wrap gap-2 py-3" role="group" aria-label="Filters">

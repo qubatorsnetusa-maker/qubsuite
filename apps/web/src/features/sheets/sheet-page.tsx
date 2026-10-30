@@ -1,5 +1,16 @@
 import * as XLSX from 'xlsx';
-import { BarChart3, Highlighter } from 'lucide-react';
+import {
+  BarChart3,
+  Highlighter,
+  Paintbrush,
+  DollarSign,
+  Percent,
+  Hash,
+  LayoutGrid,
+  Layers,
+  Columns,
+  Eraser,
+} from 'lucide-react';
 import { SheetChartDialog } from './sheet-chart-dialog';
 import { SheetPivotDialog } from './sheet-pivot-dialog';
 import { ConditionalFormatDialog } from './conditional-format-dialog';
@@ -72,8 +83,29 @@ import { printHtml } from '@/lib/print-frame';
 import { buildPrintHtml } from './print-sheet';
 import { measureText } from './spill';
 
-const COLORS = ['#000000', '#5f6368', '#d93025', '#e37400', '#f9ab00', '#188038', '#1a73e8', '#9334e6', '#ffffff', '#fce8e6', '#fef7e0', '#e6f4ea', '#e8f0fe', '#f3e8fd'];
+const COLORS = [
+  '#000000', '#1e293b', '#5f6368', '#d93025', '#e37400', '#f9ab00', '#188038',
+  '#0d652d', '#1a73e8', '#174ea6', '#4338ca', '#9334e6', '#b45309', '#ffffff',
+  '#f8fafc', '#fce8e6', '#fef7e0', '#e6f4ea', '#e8f0fe', '#f3e8fd', '#fffbeb',
+];
 const CLIPBOARD_MIME = 'application/x-qub-cells';
+
+const TABLE_THEMES = [
+  { id: 'sapphire', label: 'Sapphire Corporate', headerBg: '#1a73e8', headerText: '#ffffff', evenBg: '#ffffff', oddBg: '#f0f6ff' },
+  { id: 'emerald', label: 'Emerald Financial', headerBg: '#0d652d', headerText: '#ffffff', evenBg: '#ffffff', oddBg: '#eefaf2' },
+  { id: 'slate', label: 'Slate Executive', headerBg: '#1e293b', headerText: '#ffffff', evenBg: '#ffffff', oddBg: '#f8fafc' },
+  { id: 'indigo', label: 'Indigo Analytics', headerBg: '#4338ca', headerText: '#ffffff', evenBg: '#ffffff', oddBg: '#f5f3ff' },
+  { id: 'amber', label: 'Warm Editorial', headerBg: '#b45309', headerText: '#ffffff', evenBg: '#ffffff', oddBg: '#fffbeb' },
+] as const;
+
+const CELL_STYLE_PRESETS: { id: string; label: string; style: CellStyle }[] = [
+  { id: 'good', label: 'Good / Positive', style: { background: '#e6f4ea', color: '#137333', bold: true } },
+  { id: 'bad', label: 'Bad / At Risk', style: { background: '#fce8e6', color: '#c5221f', bold: true } },
+  { id: 'neutral', label: 'Neutral / Warning', style: { background: '#fef7e0', color: '#b06000', bold: true } },
+  { id: 'calc', label: 'Calculation Cell', style: { background: '#f1f5f9', color: '#334155', italic: true } },
+  { id: 'total', label: 'Total / Summary Row', style: { background: '#e8f0fe', color: '#174ea6', bold: true, underline: true } },
+  { id: 'header', label: 'Accent Header', style: { background: '#1a73e8', color: '#ffffff', bold: true } },
+];
 
 export function SheetPage() {
   const { spreadsheetId } = useParams({ from: '/_authenticated/sheets/$spreadsheetId' });
@@ -113,15 +145,27 @@ function ColorButton({ label, icon, onPick }: { label: string; icon: ReactNode; 
           </button>
         </PopoverTrigger>
       </Tooltip>
-      <PopoverContent className="w-auto p-3">
+      <PopoverContent className="w-56 p-3">
+        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">{label}</div>
         <div className="grid grid-cols-7 gap-1.5">
           {COLORS.map((c) => (
-            <button key={c} onClick={() => onPick(c)} className="size-6 rounded-full border border-black/15" style={{ background: c }} aria-label={`${label} ${c}`} />
+            <button key={c} onClick={() => onPick(c)} className="size-6 rounded-full border border-black/15 transition-transform hover:scale-110" style={{ background: c }} aria-label={`${label} ${c}`} />
           ))}
         </div>
-        <button onClick={() => onPick(undefined)} className="mt-2 text-xs text-primary hover:underline">
-          Reset
-        </button>
+        <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
+          <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-slate-700 hover:text-primary">
+            <input
+              type="color"
+              defaultValue="#1a73e8"
+              onChange={(e) => onPick(e.target.value)}
+              className="size-5 cursor-pointer rounded border border-slate-200 p-0"
+            />
+            Custom Hex…
+          </label>
+          <button onClick={() => onPick(undefined)} className="text-xs font-medium text-primary hover:underline">
+            Reset
+          </button>
+        </div>
       </PopoverContent>
     </Popover>
   );
@@ -179,6 +223,11 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
   const [pivotOpen, setPivotOpen] = useState(false);
   const [conditionalRules, setConditionalRules] = useState<ConditionalFormatRule[]>([]);
   const [charts, setCharts] = useState<SheetChart[]>([]);
+  const [showGridlines, setShowGridlines] = useState(true);
+  const [sheetFontFamily, setSheetFontFamily] = useState('Inter, system-ui, sans-serif');
+  const [vAlign, setVAlign] = useState<'top' | 'middle' | 'bottom'>('bottom');
+  const [showDataBars, setShowDataBars] = useState(false);
+  const [copiedStyle, setCopiedStyle] = useState<CellStyle | null>(null);
   const socketRef = useRef<ReconnectingSocket<SheetServerMessage, SheetClientMessage> | null>(null);
 
   // ---------- realtime ----------
@@ -599,6 +648,117 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
     return { startRow: 0, endRow: maxRow, startCol: 0, endCol: maxCol };
   };
 
+  const targetRangeOrData = (): CellRange => {
+    if (range.startRow === range.endRow && range.startCol === range.endCol) {
+      const dr = dataRange();
+      if (dr.endRow > 0 || dr.endCol > 0) return dr;
+    }
+    return range;
+  };
+
+  const applyTableTheme = (theme: (typeof TABLE_THEMES)[number]) => {
+    if (!canEdit) return toast.error('You have view-only access.');
+    const tr = targetRangeOrData();
+    const ops: SheetOp[] = [];
+    // Header row styling
+    ops.push({
+      type: 'setStyle',
+      sheetId: sheet.id,
+      range: { startRow: tr.startRow, endRow: tr.startRow, startCol: tr.startCol, endCol: tr.endCol },
+      style: { background: theme.headerBg, color: theme.headerText, bold: true },
+    });
+    // Banded body rows
+    for (let r = tr.startRow + 1; r <= tr.endRow; r++) {
+      const isOdd = (r - tr.startRow) % 2 === 1;
+      ops.push({
+        type: 'setStyle',
+        sheetId: sheet.id,
+        range: { startRow: r, endRow: r, startCol: tr.startCol, endCol: tr.endCol },
+        style: { background: isOdd ? theme.oddBg : theme.evenBg, color: '#0f172a', bold: false },
+      });
+    }
+    runBatch(ops);
+    toast.success(`Applied "${theme.label}" table format to ${rangeA1(tr)}`);
+  };
+
+  const removeDuplicates = () => {
+    if (!canEdit) return toast.error('You have view-only access.');
+    const tr = targetRangeOrData();
+    if (tr.endRow <= tr.startRow) return toast.info('Select at least 2 rows to remove duplicates.');
+    const seen = new Set<string>();
+    const uniqueRows: string[][] = [];
+    let removedCount = 0;
+    for (let r = tr.startRow; r <= tr.endRow; r++) {
+      const rowInputs: string[] = [];
+      const rowKeyParts: string[] = [];
+      for (let c = tr.startCol; c <= tr.endCol; c++) {
+        const cell = store.get(sheet.id, r, c);
+        rowInputs.push(cell?.input ?? '');
+        rowKeyParts.push((cell?.formattedValue || cell?.input || '').trim().toLowerCase());
+      }
+      const key = rowKeyParts.join('\u0001');
+      if (key.replace(/\u0001/g, '') === '') continue;
+      if (seen.has(key)) {
+        removedCount++;
+      } else {
+        seen.add(key);
+        uniqueRows.push(rowInputs);
+      }
+    }
+    if (removedCount === 0) return toast.info('No duplicate rows found in range.');
+    const cells: { row: number; col: number; input: string }[] = [];
+    for (let i = 0; i <= tr.endRow - tr.startRow; i++) {
+      const r = tr.startRow + i;
+      const src = uniqueRows[i];
+      for (let j = 0; j <= tr.endCol - tr.startCol; j++) {
+        cells.push({ row: r, col: tr.startCol + j, input: src ? (src[j] ?? '') : '' });
+      }
+    }
+    runBatch([{ type: 'setCells', sheetId: sheet.id, cells }]);
+    toast.success(`Removed ${removedCount} duplicate row${removedCount === 1 ? '' : 's'}`);
+  };
+
+  const trimWhitespace = () => {
+    if (!canEdit) return toast.error('You have view-only access.');
+    const tr = targetRangeOrData();
+    const cells: { row: number; col: number; input: string }[] = [];
+    for (let r = tr.startRow; r <= tr.endRow; r++) {
+      for (let c = tr.startCol; c <= tr.endCol; c++) {
+        const current = store.get(sheet.id, r, c)?.input ?? '';
+        if (!current || current.startsWith('=')) continue;
+        const trimmed = current.trim().replace(/\s+/g, ' ');
+        if (trimmed !== current) {
+          cells.push({ row: r, col: c, input: trimmed });
+        }
+      }
+    }
+    if (!cells.length) return toast.info('No extra whitespace found in range.');
+    runBatch([{ type: 'setCells', sheetId: sheet.id, cells }]);
+    toast.success(`Trimmed whitespace in ${cells.length} cell${cells.length === 1 ? '' : 's'}`);
+  };
+
+  const splitTextToColumns = (delimiter: ',' | ';' | ' ') => {
+    if (!canEdit) return toast.error('You have view-only access.');
+    const cells: { row: number; col: number; input: string }[] = [];
+    let splitRows = 0;
+    for (let r = range.startRow; r <= range.endRow; r++) {
+      const raw = store.get(sheet.id, r, range.startCol)?.input ?? '';
+      if (!raw || raw.startsWith('=')) continue;
+      const parts = delimiter === ' ' ? raw.trim().split(/\s+/) : raw.split(delimiter).map((p) => p.trim());
+      if (parts.length > 1) {
+        splitRows++;
+        parts.forEach((p, idx) => {
+          if (range.startCol + idx < sheet.colCount) {
+            cells.push({ row: r, col: range.startCol + idx, input: p });
+          }
+        });
+      }
+    }
+    if (!cells.length) return toast.info('No delimited text found in selected column.');
+    runBatch([{ type: 'setCells', sheetId: sheet.id, cells }]);
+    toast.success(`Split ${splitRows} row${splitRows === 1 ? '' : 's'} into columns`);
+  };
+
   // ---------- status bar ----------
   const stats = useMemo(() => {
     let sum = 0;
@@ -700,7 +860,7 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
   };
 
   return (
-    <div className="flex h-full flex-col bg-background">
+    <div className="flex h-dvh min-h-dvh w-full flex-col bg-background">
       <div className="border-b border-border">
         <EditorHeader
           fileType="SPREADSHEET"
@@ -785,6 +945,13 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
                   <button className="rounded px-2 py-0.5 hover:bg-hover">View</button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
+                  <DropdownMenuItem onSelect={() => setShowGridlines((g) => !g)}>
+                    Show gridlines {showGridlines ? '✓' : ''}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setShowDataBars((b) => !b)}>
+                    In-cell data bars (numeric cells) {showDataBars ? '✓' : ''}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   {[0, 1, 2].map((n) => (
                     <DropdownMenuItem key={`r${n}`} disabled={!canEdit} onSelect={() => updateSheet({ frozenRows: n })}>
                       Freeze {n === 0 ? 'no rows' : `${n} row${n > 1 ? 's' : ''}`} {sheet.frozenRows === n ? '✓' : ''}
@@ -827,9 +994,6 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
                   <DropdownMenuItem onSelect={() => setPivotOpen(true)}>
                     <Table className="mr-2 size-4" /> Pivot table…
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setPivotOpen(true)}>
-                    <Table className="mr-2 size-4" /> Pivot table…
-                  </DropdownMenuItem>
                   <DropdownMenuItem disabled={!canEdit} onSelect={() => sheetMutation.mutate(() => sheetsService.addSheet(id))}>Sheet</DropdownMenuItem>
                   <DropdownMenuItem disabled={!canComment} onSelect={() => setPanel('comments')}>Comment</DropdownMenuItem>
                   {canEdit && (
@@ -862,6 +1026,26 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
                   {canEdit && (
                     <>
                       <DropdownMenuItem onSelect={() => setValidationOpen(true)}>Data validation…</DropdownMenuItem>
+                      <DropdownMenuItem icon={<Eraser />} onSelect={removeDuplicates}>
+                        Remove duplicate rows
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={trimWhitespace}>
+                        Trim whitespace
+                      </DropdownMenuItem>
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>Split text to columns</DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent>
+                          <DropdownMenuItem icon={<Columns />} onSelect={() => splitTextToColumns(',')}>
+                            Split by comma (,)
+                          </DropdownMenuItem>
+                          <DropdownMenuItem icon={<Columns />} onSelect={() => splitTextToColumns(';')}>
+                            Split by semicolon (;)
+                          </DropdownMenuItem>
+                          <DropdownMenuItem icon={<Columns />} onSelect={() => splitTextToColumns(' ')}>
+                            Split by space
+                          </DropdownMenuItem>
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
                       <DropdownMenuSeparator />
                     </>
                   )}
@@ -905,8 +1089,42 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
               <Printer />
             </ToolButton>
           )}
+          {canEdit && (
+            <ToolButton
+              label={copiedStyle ? 'Apply copied formatting' : 'Paint format'}
+              active={!!copiedStyle}
+              onClick={() => {
+                if (copiedStyle) {
+                  style(copiedStyle);
+                  setCopiedStyle(null);
+                  toast.success('Applied copied cell format');
+                } else {
+                  setCopiedStyle(activeCell?.style ?? {});
+                  toast.info('Format copied — select cells to apply');
+                }
+              }}
+            >
+              <Paintbrush />
+            </ToolButton>
+          )}
           <span className="mx-1 h-5 w-px bg-border" />
-          <NativeSelect aria-label="Number format" disabled={!canEdit} value={activeCell?.style?.numberFormat ?? 'general'} onChange={(e) => style({ numberFormat: e.target.value as CellStyle['numberFormat'] })} className="h-8 border-none bg-transparent">
+          <NativeSelect aria-label="Sheet font family" value={sheetFontFamily} onChange={(e) => setSheetFontFamily(e.target.value)} className="h-8 w-28 border-none bg-transparent text-xs font-medium">
+            <option value="Inter, system-ui, sans-serif">Inter</option>
+            <option value="Calibri, sans-serif">Calibri</option>
+            <option value="Arial, sans-serif">Arial</option>
+            <option value="Verdana, sans-serif">Verdana</option>
+            <option value="Georgia, serif">Georgia</option>
+            <option value="'Space Mono', monospace">Space Mono</option>
+          </NativeSelect>
+          <NativeSelect aria-label="Font size" disabled={!canEdit} value={activeCell?.style?.fontSize ?? 13} onChange={(e) => style({ fontSize: Number(e.target.value) })} className="h-8 w-14 border-none bg-transparent text-xs">
+            {[8, 10, 11, 12, 13, 14, 16, 18, 24, 36].map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </NativeSelect>
+          <span className="mx-1 h-5 w-px bg-border" />
+          <NativeSelect aria-label="Number format" disabled={!canEdit} value={activeCell?.style?.numberFormat ?? 'general'} onChange={(e) => style({ numberFormat: e.target.value as CellStyle['numberFormat'] })} className="h-8 border-none bg-transparent text-xs">
             <option value="general">Automatic</option>
             <option value="number">Number 1,000.12</option>
             <option value="integer">Integer 1,000</option>
@@ -916,13 +1134,31 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
             <option value="time">Time 2:30:00 PM</option>
             <option value="datetime">Date time 2026-09-27 2:30:00 PM</option>
           </NativeSelect>
-          <NativeSelect aria-label="Font size" disabled={!canEdit} value={activeCell?.style?.fontSize ?? 13} onChange={(e) => style({ fontSize: Number(e.target.value) })} className="h-8 w-16 border-none bg-transparent">
-            {[8, 10, 11, 12, 13, 14, 16, 18, 24, 36].map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </NativeSelect>
+          {canEdit && (
+            <>
+              <ToolButton
+                label="Format as currency ($)"
+                active={activeCell?.style?.numberFormat === 'currency'}
+                onClick={() => style({ numberFormat: activeCell?.style?.numberFormat === 'currency' ? 'general' : 'currency' })}
+              >
+                <DollarSign />
+              </ToolButton>
+              <ToolButton
+                label="Format as percent (%)"
+                active={activeCell?.style?.numberFormat === 'percent'}
+                onClick={() => style({ numberFormat: activeCell?.style?.numberFormat === 'percent' ? 'general' : 'percent' })}
+              >
+                <Percent />
+              </ToolButton>
+              <ToolButton
+                label="Toggle decimals (.00 / integer)"
+                active={activeCell?.style?.numberFormat === 'number'}
+                onClick={() => style({ numberFormat: activeCell?.style?.numberFormat === 'number' ? 'integer' : 'number' })}
+              >
+                <Hash />
+              </ToolButton>
+            </>
+          )}
           <span className="mx-1 h-5 w-px bg-border" />
           {canEdit && (
             <>
@@ -961,6 +1197,67 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
               <ToolButton label="Align right" active={activeCell?.style?.align === 'right'} onClick={() => style({ align: 'right' })}>
                 <AlignRight />
               </ToolButton>
+              <NativeSelect
+                aria-label="Vertical alignment"
+                value={vAlign}
+                onChange={(e) => setVAlign(e.target.value as 'top' | 'middle' | 'bottom')}
+                className="h-8 w-20 border-none bg-transparent text-xs"
+              >
+                <option value="top">Top</option>
+                <option value="middle">Middle</option>
+                <option value="bottom">Bottom</option>
+              </NativeSelect>
+              <span className="mx-1 h-5 w-px bg-border" />
+              {/* Format as Table Dropdown */}
+              <DropdownMenu>
+                <Tooltip content="Format as Table (Banded Rows)">
+                  <DropdownMenuTrigger asChild>
+                    <button type="button" aria-label="Format as Table" className="flex h-8 items-center gap-1 rounded px-2 text-xs font-medium text-[#444746] hover:bg-black/5">
+                      <LayoutGrid className="size-4 text-primary" />
+                      <span className="hidden lg:inline">Format Table</span>
+                    </button>
+                  </DropdownMenuTrigger>
+                </Tooltip>
+                <DropdownMenuContent align="start" className="w-56">
+                  {TABLE_THEMES.map((t) => (
+                    <DropdownMenuItem key={t.id} onSelect={() => applyTableTheme(t)}>
+                      <span className="mr-2 inline-flex overflow-hidden rounded border border-black/15">
+                        <span className="size-3.5" style={{ background: t.headerBg }} />
+                        <span className="size-3.5" style={{ background: t.oddBg }} />
+                      </span>
+                      {t.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {/* Cell Styles Gallery Dropdown */}
+              <DropdownMenu>
+                <Tooltip content="Cell Styles Gallery">
+                  <DropdownMenuTrigger asChild>
+                    <button type="button" aria-label="Cell Styles" className="flex h-8 items-center gap-1 rounded px-2 text-xs font-medium text-[#444746] hover:bg-black/5">
+                      <Layers className="size-4 text-indigo-600" />
+                      <span className="hidden xl:inline">Cell Styles</span>
+                    </button>
+                  </DropdownMenuTrigger>
+                </Tooltip>
+                <DropdownMenuContent align="start" className="w-52">
+                  {CELL_STYLE_PRESETS.map((p) => (
+                    <DropdownMenuItem key={p.id} onSelect={() => style(p.style)}>
+                      <span
+                        className="mr-2 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                        style={{ background: p.style.background ?? '#f1f5f9', color: p.style.color ?? '#0f172a' }}
+                      >
+                        Aa
+                      </span>
+                      {p.label}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => run([{ type: 'clearRange', sheetId: sheet.id, range, formats: true }])}>
+                    Clear cell formatting
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <span className="mx-1 h-5 w-px bg-border" />
               <ToolButton label={filter ? 'Remove filter' : 'Create a filter'} active={!!filter} onClick={() => (filter ? (setFilter(null), setHiddenRows(new Set())) : setFilterDialog(sel.active.col))}>
                 <Filter />
@@ -1082,6 +1379,12 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
           onSelect={(s) => {
             if (editing) commit('none');
             setSel(s);
+            if (copiedStyle && canEdit) {
+              const nr = normalizeRange(s.anchor, s.focus);
+              run([{ type: 'setStyle', sheetId: sheet.id, range: nr, style: copiedStyle }]);
+              setCopiedStyle(null);
+              toast.success('Applied copied cell format');
+            }
           }}
           editing={editing && !editing.fromFormulaBar ? editing : null}
           onEditChange={(value) => setEditing({ value })}
@@ -1099,6 +1402,10 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
           onRowMenu={(r, e) => openMenu('row', r, e)}
           onCellMenu={(e) => openMenu('cell', 0, e)}
           conditionalRules={conditionalRules}
+          showGridlines={showGridlines}
+          sheetFontFamily={sheetFontFamily}
+          vAlign={vAlign}
+          showDataBars={showDataBars}
           presence={store.presence}
           selfClientId={store.selfClientId}
           hiddenRows={hiddenRows}

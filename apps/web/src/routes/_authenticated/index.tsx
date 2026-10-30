@@ -3,6 +3,9 @@ import { startPagePath } from '@/features/drive/drive-prefs';
 
 function resolveSubdomainDestination(): string {
   if (typeof window !== 'undefined') {
+    if (typeof navigator !== 'undefined' && /QubDocsAndroid|Android|iPhone|iPad/i.test(navigator.userAgent)) {
+      return '/drive';
+    }
     const host = window.location.hostname.toLowerCase();
     if (host.startsWith('docs.')) return '/docs';
     if (host.startsWith('sheets.')) return '/sheets';

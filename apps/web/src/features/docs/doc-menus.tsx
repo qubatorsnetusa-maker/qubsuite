@@ -21,6 +21,15 @@ import {
   Undo2,
   Layout,
   Mic,
+  Bold,
+  Italic,
+  Underline,
+  Strikethrough,
+  RemoveFormatting,
+  Columns3,
+  BookOpen,
+  FileCheck,
+  CaseSensitive,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -40,6 +49,13 @@ import mammoth from 'mammoth';
 import { markdownToHtml } from '@qub/editor-schema';
 import { documentFile, saveFile, type DownloadFormat } from './download';
 import { TableGridPicker } from './table-grid-picker';
+import {
+  convertSelectionCase,
+  insertCalloutBanner,
+  insertExecutiveCoverPage,
+  insertSignatureBlock,
+  insertTableOfContents,
+} from './toolbar';
 
 export interface DocMenusProps {
   editor: Editor;
@@ -54,6 +70,9 @@ export interface DocMenusProps {
   onToggleRuler?(): void;
   onPageSetup?(): void;
   onOrientationChange?(orientation: 'portrait' | 'landscape'): void;
+  onColumnsChange?(columns: 1 | 2 | 3): void;
+  onTogglePageless?(): void;
+  pageless?: boolean;
   onTogglePageNumbers?(): void;
   showPageNumbers?: boolean;
   onVoiceTyping?(): void;
@@ -83,7 +102,11 @@ export function DocMenus(p: DocMenusProps) {
   const { editor } = p;
   const s = useEditorState({
     editor,
-    selector: ({ editor: e }) => ({ canUndo: e.can().undo?.() ?? false, canRedo: e.can().redo?.() ?? false, empty: e.state.selection.empty }),
+    selector: ({ editor: e }) => ({
+      canUndo: e.can().undo?.() ?? false,
+      canRedo: e.can().redo?.() ?? false,
+      empty: e.state.selection.empty,
+    }),
   });
   const c = () => editor.chain().focus();
   /** Editing menus hand focus back to the document when they close, instead of to their trigger button. */
@@ -100,7 +123,7 @@ export function DocMenus(p: DocMenusProps) {
         toast.warning(
           file.failedImages === 1
             ? '1 image couldn’t be embedded; it links back to Qub instead.'
-            : `${file.failedImages} images couldn’t be embedded; they link back to Qub instead.`,
+            : `${file.failedImages} images couldn’t be embedded; they link back to Qub instead.`
         );
       }
     } catch (err) {
@@ -117,7 +140,15 @@ export function DocMenus(p: DocMenusProps) {
             icon={<FilePlus />}
             shortcut="Ctrl+Alt+N"
             onSelect={() => {
-              window.open('/docs', '_blank');
+              const isMobileApp =
+                typeof navigator !== 'undefined' &&
+                (/QubDocsAndroid|Android|iPhone|iPad/i.test(navigator.userAgent) ||
+                  window.innerWidth < 1024);
+              if (isMobileApp) {
+                window.location.href = '/docs';
+              } else {
+                window.open('/docs', '_blank');
+              }
             }}
           >
             New document
@@ -144,7 +175,14 @@ export function DocMenus(p: DocMenusProps) {
                     const text = await file.text();
                     const paragraphs = text
                       .split(/\r?\n\r?\n/)
-                      .map((p) => `<p>${p.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\r?\n/g, '<br>')}</p>`)
+                      .map(
+                        (para) =>
+                          `<p>${para
+                            .replace(/&/g, '&amp;')
+                            .replace(/</g, '&lt;')
+                            .replace(/>/g, '&gt;')
+                            .replace(/\r?\n/g, '<br>')}</p>`
+                      )
                       .join('');
                     editor.chain().focus().setContent(paragraphs || '<p></p>').run();
                     toast.success(`Imported ${file.name}`);
@@ -156,11 +194,15 @@ export function DocMenus(p: DocMenusProps) {
                     const arrayBuffer = await file.arrayBuffer();
                     const uint8 = new Uint8Array(arrayBuffer);
                     const binStr = new TextDecoder('latin1').decode(uint8);
-                    const isLandscape = binStr.indexOf('w:orient="landscape"') !== -1 || binStr.indexOf('orient="landscape"') !== -1;
+                    const isLandscape =
+                      binStr.indexOf('w:orient="landscape"') !== -1 ||
+                      binStr.indexOf('orient="landscape"') !== -1;
                     const result = await mammoth.convertToHtml({ arrayBuffer });
                     if (result.value) {
                       editor.chain().focus().setContent(result.value).run();
-                      const hasWideTable = (result.value.match(/<th/gi)?.length ?? 0) >= 4 || result.value.indexOf('<table') !== -1;
+                      const hasWideTable =
+                        (result.value.match(/<th/gi)?.length ?? 0) >= 4 ||
+                        result.value.indexOf('<table') !== -1;
                       if ((isLandscape || hasWideTable) && p.onOrientationChange) {
                         p.onOrientationChange('landscape');
                         toast.success(`Loaded ${file.name} in Landscape orientation.`);
@@ -171,7 +213,6 @@ export function DocMenus(p: DocMenusProps) {
                       toast.warning('The document appeared empty.');
                     }
                   } else if (ext === 'pdf') {
-                    // Open in QubDocs PDF Sign & Edit dialog
                     window.open(`/drive?preview=${encodeURIComponent(file.name)}`, '_blank');
                     toast.info(`Opening ${file.name} in QubDocs PDF Editor.`);
                   } else {
@@ -196,7 +237,7 @@ export function DocMenus(p: DocMenusProps) {
           {p.canEdit && (
             <>
               <DropdownMenuItem icon={<Layout />} onSelect={p.onPageSetup}>
-                Page setup
+                Page setup &amp; watermark
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem icon={<FolderInput />} onSelect={p.onMove}>
@@ -210,17 +251,33 @@ export function DocMenus(p: DocMenusProps) {
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger icon={<Download />}>Download</DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
-                  <DropdownMenuItem onSelect={() => void download('docx')}>Microsoft Word (.docx)</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => void download('doc')}>Rich text HTML (.doc)</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => void download('pdf')}>PDF document (.pdf)</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => void download('docx')}>
+                    Microsoft Word (.docx)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => void download('doc')}>
+                    Rich text HTML (.doc)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => void download('pdf')}>
+                    PDF document (.pdf)
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => void download('md')}>Markdown (.md)</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => void download('html')}>Web page (.html)</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => void download('txt')}>Plain text (.txt)</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => void download('md')}>
+                    Markdown (.md)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => void download('html')}>
+                    Web page (.html)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => void download('txt')}>
+                    Plain text (.txt)
+                  </DropdownMenuItem>
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
-              {/* Deferred so the menu has closed before the (blocking) print dialog opens. */}
-              <DropdownMenuItem icon={<Printer />} shortcut="Ctrl+P" title="Print or save as PDF" onSelect={() => setTimeout(p.onPrint, 0)}>
+              <DropdownMenuItem
+                icon={<Printer />}
+                shortcut="Ctrl+P"
+                title="Print or save as PDF"
+                onSelect={() => setTimeout(p.onPrint, 0)}
+              >
                 Print
               </DropdownMenuItem>
             </>
@@ -241,16 +298,30 @@ export function DocMenus(p: DocMenusProps) {
         <DropdownMenuContent align="start" onCloseAutoFocus={backToEditor}>
           {p.canEdit && (
             <>
-              <DropdownMenuItem icon={<Undo2 />} shortcut="Ctrl+Z" disabled={!s.canUndo} onSelect={() => c().undo().run()}>
+              <DropdownMenuItem
+                icon={<Undo2 />}
+                shortcut="Ctrl+Z"
+                disabled={!s.canUndo}
+                onSelect={() => c().undo().run()}
+              >
                 Undo
               </DropdownMenuItem>
-              <DropdownMenuItem icon={<Redo2 />} shortcut="Ctrl+Y" disabled={!s.canRedo} onSelect={() => c().redo().run()}>
+              <DropdownMenuItem
+                icon={<Redo2 />}
+                shortcut="Ctrl+Y"
+                disabled={!s.canRedo}
+                onSelect={() => c().redo().run()}
+              >
                 Redo
               </DropdownMenuItem>
               <DropdownMenuSeparator />
             </>
           )}
-          <DropdownMenuItem icon={<Search />} shortcut={p.canEdit ? 'Ctrl+H' : 'Ctrl+F'} onSelect={() => p.onFind(p.canEdit)}>
+          <DropdownMenuItem
+            icon={<Search />}
+            shortcut={p.canEdit ? 'Ctrl+H' : 'Ctrl+F'}
+            onSelect={() => p.onFind(p.canEdit)}
+          >
             {p.canEdit ? 'Find and replace' : 'Find'}
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -267,11 +338,28 @@ export function DocMenus(p: DocMenusProps) {
               <DropdownMenuSeparator />
             </>
           )}
-          <DropdownMenuCheckboxItem checked={p.outlineOpen} onToggle={p.onToggleOutline} onCheckedChange={p.onToggleOutline}>
-            Show outline
+          {p.onTogglePageless && (
+            <DropdownMenuCheckboxItem
+              checked={!!p.pageless}
+              onToggle={p.onTogglePageless}
+              onCheckedChange={p.onTogglePageless}
+            >
+              Pageless mode (Wide canvas)
+            </DropdownMenuCheckboxItem>
+          )}
+          <DropdownMenuCheckboxItem
+            checked={p.outlineOpen}
+            onToggle={p.onToggleOutline}
+            onCheckedChange={p.onToggleOutline}
+          >
+            Show document outline
           </DropdownMenuCheckboxItem>
           {p.onToggleRuler && (
-            <DropdownMenuCheckboxItem checked={!!p.showRuler} onToggle={p.onToggleRuler} onCheckedChange={p.onToggleRuler}>
+            <DropdownMenuCheckboxItem
+              checked={!!p.showRuler}
+              onToggle={p.onToggleRuler}
+              onCheckedChange={p.onToggleRuler}
+            >
               Show ruler
             </DropdownMenuCheckboxItem>
           )}
@@ -296,25 +384,143 @@ export function DocMenus(p: DocMenusProps) {
                     <span className="flex-1 text-left">Table</span>
                   </button>
                 </TableGridPicker>
-                <DropdownMenuItem icon={<ListTodo />} shortcut="Ctrl+Shift+9" onSelect={() => c().toggleTaskList().run()}>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  icon={<BookOpen />}
+                  onSelect={() => insertExecutiveCoverPage(editor, p.title)}
+                >
+                  Executive cover header
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  icon={<FileText />}
+                  onSelect={() => insertTableOfContents(editor)}
+                >
+                  Table of contents
+                </DropdownMenuItem>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger icon={<Layout />}>Callout banner</DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem onSelect={() => insertCalloutBanner(editor, 'info')}>
+                      Key Note Callout (Blue)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => insertCalloutBanner(editor, 'warning')}>
+                      Action Required Callout (Amber)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => insertCalloutBanner(editor, 'success')}>
+                      Approved Decision Callout (Emerald)
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuItem icon={<FileCheck />} onSelect={() => insertSignatureBlock(editor)}>
+                  Signature block
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  icon={<ListTodo />}
+                  shortcut="Ctrl+Shift+9"
+                  onSelect={() => c().toggleTaskList().run()}
+                >
                   Checklist
                 </DropdownMenuItem>
                 <DropdownMenuItem icon={<Minus />} onSelect={() => c().setHorizontalRule().run()}>
                   Horizontal line
                 </DropdownMenuItem>
-                <DropdownMenuItem icon={<SeparatorHorizontal />} shortcut="Ctrl+Enter" onSelect={() => c().setPageBreak().run()}>
+                <DropdownMenuItem
+                  icon={<SeparatorHorizontal />}
+                  shortcut="Ctrl+Enter"
+                  onSelect={() => c().setPageBreak().run()}
+                >
                   Page break
                 </DropdownMenuItem>
+                {p.onPageSetup && (
+                  <DropdownMenuItem icon={<Layout />} onSelect={p.onPageSetup}>
+                    Headers, footers &amp; watermark
+                  </DropdownMenuItem>
+                )}
               </>
             )}
             {p.canComment && (
               <>
                 {p.canEdit && <DropdownMenuSeparator />}
-                <DropdownMenuItem icon={<MessageSquarePlus />} shortcut="Ctrl+Alt+M" disabled={s.empty} onSelect={p.onComment}>
+                <DropdownMenuItem
+                  icon={<MessageSquarePlus />}
+                  shortcut="Ctrl+Alt+M"
+                  disabled={s.empty}
+                  onSelect={p.onComment}
+                >
                   Comment
                 </DropdownMenuItem>
               </>
             )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+
+      {p.canEdit && (
+        <DropdownMenu>
+          <Trigger label="Format" />
+          <DropdownMenuContent align="start" onCloseAutoFocus={backToEditor}>
+            <DropdownMenuItem icon={<Bold />} shortcut="Ctrl+B" onSelect={() => c().toggleBold().run()}>
+              Bold
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              icon={<Italic />}
+              shortcut="Ctrl+I"
+              onSelect={() => c().toggleItalic().run()}
+            >
+              Italic
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              icon={<Underline />}
+              shortcut="Ctrl+U"
+              onSelect={() => c().toggleUnderline().run()}
+            >
+              Underline
+            </DropdownMenuItem>
+            <DropdownMenuItem icon={<Strikethrough />} onSelect={() => c().toggleStrike().run()}>
+              Strikethrough
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger icon={<CaseSensitive />}>Change case</DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuItem onSelect={() => convertSelectionCase(editor, 'upper')}>
+                  UPPERCASE
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => convertSelectionCase(editor, 'lower')}>
+                  lowercase
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => convertSelectionCase(editor, 'title')}>
+                  Title Case
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => convertSelectionCase(editor, 'sentence')}>
+                  Sentence case
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            {p.onColumnsChange && (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger icon={<Columns3 />}>Columns</DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <DropdownMenuItem onSelect={() => p.onColumnsChange?.(1)}>
+                    1 Column (Standard)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => p.onColumnsChange?.(2)}>
+                    2 Columns (Editorial)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => p.onColumnsChange?.(3)}>
+                    3 Columns (Newsletter)
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              icon={<RemoveFormatting />}
+              onSelect={() => c().unsetAllMarks().clearNodes().run()}
+            >
+              Clear formatting
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       )}

@@ -33,23 +33,226 @@ import {
   Printer,
   Subscript as SubscriptIcon,
   Superscript as SuperscriptIcon,
+  Paintbrush,
+  CaseSensitive,
+  LayoutList,
+  FileCheck,
 } from 'lucide-react';
 import { LINE_HEIGHTS, type LineHeight } from '@qub/editor-schema';
 import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/form-controls';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/menu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/menu';
 import { Popover, PopoverContent, PopoverTrigger, Tooltip } from '@/components/ui/misc';
 import { cn } from '@/lib/utils';
 import { currentFontSize, FONT_FAMILIES, parseFontSizeInput, stepFontSize } from './font';
 import { useImageUpload } from './image-upload';
 import { TableGridPicker } from './table-grid-picker';
 
-const COLORS = ['#000000', '#434343', '#666666', '#999999', '#d93025', '#e37400', '#f9ab00', '#188038', '#1a73e8', '#9334e6', '#c5221f', '#b06000'];
-const HIGHLIGHTS = ['#fef08a', '#bbf7d0', '#bfdbfe', '#fbcfe8', '#fed7aa', '#e9d5ff'];
+const COLORS = [
+  '#000000',
+  '#1e293b',
+  '#475569',
+  '#64748b',
+  '#94a3b8',
+  '#dc2626',
+  '#ea580c',
+  '#d97706',
+  '#16a34a',
+  '#059669',
+  '#0284c7',
+  '#2563eb',
+  '#4f46e5',
+  '#7c3aed',
+  '#9333ea',
+  '#db2777',
+  '#854d0e',
+  '#115e59',
+];
 
-function ToolButton({ label, active, disabled, onClick, children, shortcut }: { label: string; active?: boolean; disabled?: boolean; onClick(): void; children: ReactNode; shortcut?: string }) {
+const HIGHLIGHTS = [
+  '#fef08a',
+  '#fde68a',
+  '#bbf7d0',
+  '#a7f3d0',
+  '#bfdbfe',
+  '#c7d2fe',
+  '#e9d5ff',
+  '#fbcfe8',
+  '#fed7aa',
+  '#fecaca',
+  '#e2e8f0',
+  '#f1f5f9',
+];
+
+export function convertSelectionCase(
+  editor: Editor,
+  mode: 'upper' | 'lower' | 'title' | 'sentence'
+) {
+  const { from, to, empty } = editor.state.selection;
+  if (empty) {
+    toast.info('Select text first to change its case');
+    return;
+  }
+  const selectedText = editor.state.doc.textBetween(from, to, ' ');
+  if (!selectedText) return;
+  let transformed = selectedText;
+  if (mode === 'upper') transformed = selectedText.toUpperCase();
+  else if (mode === 'lower') transformed = selectedText.toLowerCase();
+  else if (mode === 'title') {
+    transformed = selectedText.replace(
+      /\w\S*/g,
+      (txt) => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase()
+    );
+  } else if (mode === 'sentence') {
+    transformed =
+      selectedText.charAt(0).toUpperCase() + selectedText.slice(1).toLowerCase();
+  }
+  editor.chain().focus().insertContentAt({ from, to }, transformed).run();
+}
+
+export function insertTableOfContents(editor: Editor) {
+  const headings: { level: number; text: string }[] = [];
+  editor.state.doc.descendants((node) => {
+    if (node.type.name === 'heading' && node.textContent.trim()) {
+      headings.push({
+        level: Number(node.attrs.level) || 1,
+        text: node.textContent.trim(),
+      });
+    }
+    return true;
+  });
+
+  if (headings.length === 0) {
+    editor
+      .chain()
+      .focus()
+      .insertContent(
+        `<h3>Table of Contents</h3><p><em>Add Heading 1, Heading 2, or Heading 3 sections to populate the Table of Contents.</em></p><hr>`
+      )
+      .run();
+    toast.info('Inserted Table of Contents placeholder');
+    return;
+  }
+
+  const listItems = headings
+    .map((h, i) => {
+      const prefix = h.level > 2 ? '&nbsp;&nbsp;&nbsp;&nbsp;• ' : `${i + 1}. `;
+      return `<p>${prefix}<strong>${h.text}</strong></p>`;
+    })
+    .join('');
+
+  editor
+    .chain()
+    .focus()
+    .insertContent(`<h3>Table of Contents</h3>${listItems}<hr>`)
+    .run();
+  toast.success('Table of Contents generated from document headings');
+}
+
+export function insertExecutiveCoverPage(editor: Editor, title?: string) {
+  const today = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+  const docTitle = title || 'Executive Document Title';
+  const html = `
+    <p><span style="color: #2563eb"><strong>EXECUTIVE BRIEFING DOCUMENT</strong></span></p>
+    <h1>${docTitle}</h1>
+    <p><span style="color: #475569">Prepared for stakeholder review, strategic alignment, and execution planning.</span></p>
+    <hr>
+    <p><strong>Date:</strong> ${today} &nbsp;|&nbsp; <strong>Status:</strong> <mark data-color="#bfdbfe">IN REVIEW</mark> &nbsp;|&nbsp; <strong>Classification:</strong> Internal</p>
+    <hr>
+    <p></p>
+  `;
+  editor.chain().focus('start').insertContent(html).run();
+  toast.success('Cover header block inserted');
+}
+
+export function insertCalloutBanner(
+  editor: Editor,
+  variant: 'info' | 'warning' | 'success'
+) {
+  const presets = {
+    info: {
+      title: 'KEY NOTE',
+      color: '#1d4ed8',
+      highlight: '#bfdbfe',
+      text: 'Important context or implementation guidance for readers.',
+    },
+    warning: {
+      title: 'ACTION REQUIRED',
+      color: '#b45309',
+      highlight: '#fde68a',
+      text: 'Please review the critical requirements and dependencies in this section.',
+    },
+    success: {
+      title: 'APPROVED DECISION',
+      color: '#047857',
+      highlight: '#bbf7d0',
+      text: 'This milestone and specification have been verified and approved.',
+    },
+  }[variant];
+
+  editor
+    .chain()
+    .focus()
+    .insertContent(
+      `<blockquote><p><mark data-color="${presets.highlight}"><strong>${presets.title}:</strong></mark> <span style="color: ${presets.color}">${presets.text}</span></p></blockquote><p></p>`
+    )
+    .run();
+}
+
+export function insertSignatureBlock(editor: Editor) {
+  const today = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+  const html = `
+    <hr>
+    <h3>Authorization &amp; Sign-Off</h3>
+    <table>
+      <tbody>
+        <tr>
+          <th>Authorized Signatory</th>
+          <th>Counterparty Signatory</th>
+        </tr>
+        <tr>
+          <td><p><strong>Signature:</strong> ______________________</p><p><strong>Name:</strong> </p><p><strong>Title:</strong> </p><p><strong>Date:</strong> ${today}</p></td>
+          <td><p><strong>Signature:</strong> ______________________</p><p><strong>Name:</strong> </p><p><strong>Title:</strong> </p><p><strong>Date:</strong> ${today}</p></td>
+        </tr>
+      </tbody>
+    </table>
+    <p></p>
+  `;
+  editor.chain().focus().insertContent(html).run();
+  toast.success('Signature block inserted');
+}
+
+function ToolButton({
+  label,
+  active,
+  disabled,
+  onClick,
+  children,
+  shortcut,
+}: {
+  label: string;
+  active?: boolean;
+  disabled?: boolean;
+  onClick(): void;
+  children: ReactNode;
+  shortcut?: string;
+}) {
   return (
     <Tooltip content={shortcut ? `${label} (${shortcut})` : label}>
       <button
@@ -59,7 +262,10 @@ function ToolButton({ label, active, disabled, onClick, children, shortcut }: { 
         disabled={disabled}
         aria-label={label}
         aria-pressed={active}
-        className={cn('flex size-8 shrink-0 items-center justify-center rounded text-[#444746] hover:bg-black/5 disabled:opacity-40 [&_svg]:size-[18px]', active && 'bg-primary-soft text-[#041e49]')}
+        className={cn(
+          'flex size-8 shrink-0 items-center justify-center rounded text-[#444746] hover:bg-black/5 disabled:opacity-40 [&_svg]:size-[18px]',
+          active && 'bg-primary-soft text-[#041e49]'
+        )}
       >
         {children}
       </button>
@@ -69,26 +275,76 @@ function ToolButton({ label, active, disabled, onClick, children, shortcut }: { 
 
 const Divider = () => <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden />;
 
-function ColorPicker({ label, icon, colors, current, onPick, onClear }: { label: string; icon: ReactNode; colors: string[]; current?: string; onPick(c: string): void; onClear(): void }) {
+function ColorPicker({
+  label,
+  icon,
+  colors,
+  current,
+  onPick,
+  onClear,
+}: {
+  label: string;
+  icon: ReactNode;
+  colors: string[];
+  current?: string;
+  onPick(c: string): void;
+  onClear(): void;
+}) {
   return (
     <Popover>
       <Tooltip content={label}>
         <PopoverTrigger asChild>
-          <button type="button" onMouseDown={(e) => e.preventDefault()} aria-label={label} className="flex size-8 shrink-0 flex-col items-center justify-center rounded text-[#444746] hover:bg-black/5 [&_svg]:size-[17px]">
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            aria-label={label}
+            className="flex size-8 shrink-0 flex-col items-center justify-center rounded text-[#444746] hover:bg-black/5 [&_svg]:size-[17px]"
+          >
             {icon}
-            <span className="-mt-0.5 h-1 w-4 rounded-sm" style={{ background: current ?? 'transparent' }} />
+            <span
+              className="-mt-0.5 h-1 w-4 rounded-sm"
+              style={{ background: current ?? 'transparent' }}
+            />
           </button>
         </PopoverTrigger>
       </Tooltip>
-      <PopoverContent className="w-auto p-3" onOpenAutoFocus={(e) => e.preventDefault()}>
+      <PopoverContent className="w-56 p-3 space-y-2.5" onOpenAutoFocus={(e) => e.preventDefault()}>
+        <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+          {label}
+        </div>
         <div className="grid grid-cols-6 gap-1.5">
           {colors.map((c) => (
-            <button key={c} type="button" onClick={() => onPick(c)} className="size-6 rounded-full border border-black/10" style={{ background: c }} aria-label={`${label} ${c}`} />
+            <button
+              key={c}
+              type="button"
+              onClick={() => onPick(c)}
+              className={cn(
+                'size-6 rounded-full border border-black/15 transition-transform hover:scale-110',
+                current === c && 'ring-2 ring-blue-600 ring-offset-1'
+              )}
+              style={{ background: c }}
+              aria-label={`${label} ${c}`}
+            />
           ))}
         </div>
-        <button type="button" onClick={onClear} className="mt-2 text-xs text-primary hover:underline">
-          Reset
-        </button>
+        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+          <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+            <input
+              type="color"
+              value={current && current.startsWith('#') ? current : '#2563eb'}
+              onChange={(e) => onPick(e.target.value)}
+              className="h-6 w-6 cursor-pointer rounded border border-slate-300 bg-white p-0.5"
+            />
+            <span>Custom Hex</span>
+          </label>
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-xs font-medium text-primary hover:underline"
+          >
+            Reset
+          </button>
+        </div>
       </PopoverContent>
     </Popover>
   );
@@ -107,7 +363,15 @@ function LinkButton({ editor }: { editor: Editor }) {
     >
       <Tooltip content="Insert link (Ctrl+K)">
         <PopoverTrigger asChild>
-          <button type="button" onMouseDown={(e) => e.preventDefault()} aria-label="Insert link" className={cn('flex size-8 items-center justify-center rounded hover:bg-black/5 [&_svg]:size-[18px]', editor.isActive('link') && 'bg-primary-soft')}>
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            aria-label="Insert link"
+            className={cn(
+              'flex size-8 items-center justify-center rounded hover:bg-black/5 [&_svg]:size-[18px]',
+              editor.isActive('link') && 'bg-primary-soft'
+            )}
+          >
             <Link2 />
           </button>
         </PopoverTrigger>
@@ -119,12 +383,20 @@ function LinkButton({ editor }: { editor: Editor }) {
             e.preventDefault();
             const href = url.trim();
             if (!href) editor.chain().focus().extendMarkRange('link').unsetLink().run();
-            else if (!/^(https?:|mailto:)/i.test(href)) toast.error('Links must start with http://, https:// or mailto:');
+            else if (!/^(https?:|mailto:)/i.test(href))
+              toast.error('Links must start with http://, https:// or mailto:');
             else editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
             setOpen(false);
           }}
         >
-          <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com" autoFocus aria-label="Link URL" className="h-9" />
+          <Input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://example.com"
+            autoFocus
+            aria-label="Link URL"
+            className="h-9"
+          />
           <Button type="submit" size="sm">
             Apply
           </Button>
@@ -139,7 +411,11 @@ function FontSizeControl({ editor, size }: { editor: Editor; size: number }) {
   const apply = (n: number) => editor.chain().focus().setFontSize(`${n}pt`).run();
   return (
     <div className="flex shrink-0 items-center">
-      <ToolButton label="Decrease font size" shortcut="Ctrl+Shift+," onClick={() => apply(stepFontSize(size, -1))}>
+      <ToolButton
+        label="Decrease font size"
+        shortcut="Ctrl+Shift+,"
+        onClick={() => apply(stepFontSize(size, -1))}
+      >
         <Minus />
       </ToolButton>
       <input
@@ -162,27 +438,40 @@ function FontSizeControl({ editor, size }: { editor: Editor; size: number }) {
         }}
         className="h-7 w-10 rounded border border-border bg-transparent text-center text-sm focus:outline-none focus:ring-1 focus:ring-primary"
       />
-      <ToolButton label="Increase font size" shortcut="Ctrl+Shift+." onClick={() => apply(stepFontSize(size, 1))}>
+      <ToolButton
+        label="Increase font size"
+        shortcut="Ctrl+Shift+."
+        onClick={() => apply(stepFontSize(size, 1))}
+      >
         <Plus />
       </ToolButton>
     </div>
   );
 }
 
-const SPACING_LABELS: Record<LineHeight, string> = { '1': 'Single', '1.15': '1.15', '1.5': '1.5', '2': 'Double' };
+const SPACING_LABELS: Record<LineHeight, string> = {
+  '1': 'Single (1.0)',
+  '1.15': 'Compact (1.15)',
+  '1.5': 'Comfortable (1.5)',
+  '2': 'Double (2.0)',
+};
 
 function LineSpacingMenu({ editor, current }: { editor: Editor; current: string | null }) {
   const value = current ?? '1.5';
   return (
     <DropdownMenu>
-      <Tooltip content="Line spacing">
+      <Tooltip content="Line & paragraph spacing">
         <DropdownMenuTrigger asChild>
-          <button type="button" onMouseDown={(e) => e.preventDefault()} aria-label="Line spacing" className="flex size-8 shrink-0 items-center justify-center rounded text-[#444746] hover:bg-black/5 [&_svg]:size-[18px]">
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            aria-label="Line spacing"
+            className="flex size-8 shrink-0 items-center justify-center rounded text-[#444746] hover:bg-black/5 [&_svg]:size-[18px]"
+          >
             <ArrowUpDown />
           </button>
         </DropdownMenuTrigger>
       </Tooltip>
-      {/* Return focus to the document (not the trigger) so typing continues where it was. */}
       <DropdownMenuContent
         align="start"
         onCloseAutoFocus={(e) => {
@@ -191,13 +480,28 @@ function LineSpacingMenu({ editor, current }: { editor: Editor; current: string 
         }}
       >
         {LINE_HEIGHTS.map((v) => (
-          <DropdownMenuItem key={v} icon={value === v ? <Check /> : <span className="size-4" />} onSelect={() => editor.chain().focus().setBlockLineHeight(v).run()}>
+          <DropdownMenuItem
+            key={v}
+            icon={value === v ? <Check /> : <span className="size-4" />}
+            onSelect={() => editor.chain().focus().setBlockLineHeight(v).run()}
+          >
             {SPACING_LABELS[v]}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+interface CopiedFormat {
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  strike: boolean;
+  color?: string;
+  highlight?: string;
+  fontFamily?: string;
+  fontSize?: string;
 }
 
 export function DocToolbar({
@@ -220,6 +524,8 @@ export function DocToolbar({
   /** Present when the user may print (the owner hasn't turned downloading off). */
   onPrint?: () => void;
 }) {
+  const [copiedFormat, setCopiedFormat] = useState<CopiedFormat | null>(null);
+
   const s = useEditorState({
     editor,
     selector: ({ editor: e }) => ({
@@ -244,23 +550,84 @@ export function DocToolbar({
       sup: e.isActive('superscript'),
       fontFamily: (e.getAttributes('textStyle').fontFamily as string | undefined) ?? '',
       fontSize: currentFontSize(e),
-      lineHeight: (e.getAttributes('paragraph').lineHeight ?? e.getAttributes('heading').lineHeight ?? null) as string | null,
+      lineHeight: (e.getAttributes('paragraph').lineHeight ??
+        e.getAttributes('heading').lineHeight ??
+        null) as string | null,
     }),
   });
   const image = useImageUpload(editor, documentId);
   const c = () => editor.chain().focus();
 
+  const handleFormatPainter = () => {
+    if (copiedFormat) {
+      let chain = editor.chain().focus();
+      if (copiedFormat.bold) chain = chain.setBold();
+      else chain = chain.unsetBold();
+      if (copiedFormat.italic) chain = chain.setItalic();
+      else chain = chain.unsetItalic();
+      if (copiedFormat.underline) chain = chain.setUnderline();
+      else chain = chain.unsetUnderline();
+      if (copiedFormat.strike) chain = chain.setStrike();
+      else chain = chain.unsetStrike();
+      if (copiedFormat.color) chain = chain.setColor(copiedFormat.color);
+      else chain = chain.unsetColor();
+      if (copiedFormat.highlight) chain = chain.setHighlight({ color: copiedFormat.highlight });
+      else chain = chain.unsetHighlight();
+      if (copiedFormat.fontFamily) chain = chain.setFontFamily(copiedFormat.fontFamily);
+      else chain = chain.unsetFontFamily();
+      if (copiedFormat.fontSize) chain = chain.setFontSize(copiedFormat.fontSize);
+      chain.run();
+      setCopiedFormat(null);
+      toast.success('Formatting applied');
+    } else {
+      setCopiedFormat({
+        bold: s.bold,
+        italic: s.italic,
+        underline: s.underline,
+        strike: s.strike,
+        color: s.color,
+        highlight: s.highlight,
+        fontFamily: s.fontFamily || undefined,
+        fontSize: `${s.fontSize}pt`,
+      });
+      toast.info('Format copied — select target text and click Paint Format again');
+    }
+  };
+
   return (
-    <div role="toolbar" aria-label="Formatting" className="mx-2 flex h-10 items-center gap-0.5 overflow-x-auto rounded-full bg-[#edf2fa] px-3 sm:mx-4">
-      <ToolButton label="Undo" shortcut="Ctrl+Z" disabled={!canEdit || !s.canUndo} onClick={() => c().undo().run()}>
+    <div
+      role="toolbar"
+      aria-label="Formatting"
+      className="mx-2 flex h-10 items-center gap-0.5 overflow-x-auto rounded-full bg-[#edf2fa] px-3 sm:mx-4"
+    >
+      <ToolButton
+        label="Undo"
+        shortcut="Ctrl+Z"
+        disabled={!canEdit || !s.canUndo}
+        onClick={() => c().undo().run()}
+      >
         <Undo2 />
       </ToolButton>
-      <ToolButton label="Redo" shortcut="Ctrl+Y" disabled={!canEdit || !s.canRedo} onClick={() => c().redo().run()}>
+      <ToolButton
+        label="Redo"
+        shortcut="Ctrl+Y"
+        disabled={!canEdit || !s.canRedo}
+        onClick={() => c().redo().run()}
+      >
         <Redo2 />
       </ToolButton>
       {onPrint && (
         <ToolButton label="Print" shortcut="Ctrl+P" onClick={onPrint}>
           <Printer />
+        </ToolButton>
+      )}
+      {canEdit && (
+        <ToolButton
+          label={copiedFormat ? 'Apply copied format' : 'Paint format'}
+          active={!!copiedFormat}
+          onClick={handleFormatPainter}
+        >
+          <Paintbrush />
         </ToolButton>
       )}
       {onVoiceTyping && (
@@ -270,7 +637,7 @@ export function DocToolbar({
           active={voiceActive}
           onClick={onVoiceTyping}
         >
-          <Mic className={voiceActive ? "text-rose-500 animate-pulse" : ""} />
+          <Mic className={voiceActive ? 'text-rose-500 animate-pulse' : ''} />
         </ToolButton>
       )}
       <Divider />
@@ -283,7 +650,7 @@ export function DocToolbar({
           if (level) c().setHeading({ level: level as 1 | 2 | 3 | 4 }).run();
           else c().setParagraph().run();
         }}
-        className="h-8 w-32 shrink-0 rounded bg-transparent px-1 text-sm hover:bg-black/5 focus:outline-none"
+        className="h-8 w-28 shrink-0 rounded bg-transparent px-1 text-sm hover:bg-black/5 focus:outline-none"
       >
         <option value={0}>Normal text</option>
         <option value={1}>Title</option>
@@ -297,17 +664,21 @@ export function DocToolbar({
           <select
             aria-label="Font"
             value={s.fontFamily}
-            onChange={(e) => (e.target.value ? c().setFontFamily(e.target.value).run() : c().unsetFontFamily().run())}
+            onChange={(e) =>
+              e.target.value ? c().setFontFamily(e.target.value).run() : c().unsetFontFamily().run()
+            }
             className="h-8 w-32 shrink-0 rounded bg-transparent px-1 text-sm hover:bg-black/5 focus:outline-none"
           >
-            <option value="">Default</option>
+            <option value="">Default (Inter)</option>
             {FONT_FAMILIES.map((f) => (
               <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>
                 {f.label}
               </option>
             ))}
             {s.fontFamily && !FONT_FAMILIES.some((f) => f.value === s.fontFamily) && (
-              <option value={s.fontFamily}>{s.fontFamily.split(',')[0]!.replace(/["']/g, '').trim()}</option>
+              <option value={s.fontFamily}>
+                {s.fontFamily.split(',')[0]!.replace(/["']/g, '').trim()}
+              </option>
             )}
           </select>
           <Divider />
@@ -319,7 +690,12 @@ export function DocToolbar({
           <ToolButton label="Italic" shortcut="Ctrl+I" active={s.italic} onClick={() => c().toggleItalic().run()}>
             <Italic />
           </ToolButton>
-          <ToolButton label="Underline" shortcut="Ctrl+U" active={s.underline} onClick={() => c().toggleUnderline().run()}>
+          <ToolButton
+            label="Underline"
+            shortcut="Ctrl+U"
+            active={s.underline}
+            onClick={() => c().toggleUnderline().run()}
+          >
             <Underline />
           </ToolButton>
           <ToolButton label="Strikethrough" active={s.strike} onClick={() => c().toggleStrike().run()}>
@@ -328,11 +704,61 @@ export function DocToolbar({
           <ToolButton label="Subscript" shortcut="Ctrl+," active={s.sub} onClick={() => c().toggleSubscript().run()}>
             <SubscriptIcon />
           </ToolButton>
-          <ToolButton label="Superscript" shortcut="Ctrl+." active={s.sup} onClick={() => c().toggleSuperscript().run()}>
+          <ToolButton
+            label="Superscript"
+            shortcut="Ctrl+."
+            active={s.sup}
+            onClick={() => c().toggleSuperscript().run()}
+          >
             <SuperscriptIcon />
           </ToolButton>
-          <ColorPicker label="Text color" icon={<Baseline />} colors={COLORS} current={s.color} onPick={(col) => c().setColor(col).run()} onClear={() => c().unsetColor().run()} />
-          <ColorPicker label="Highlight color" icon={<Highlighter />} colors={HIGHLIGHTS} current={s.highlight} onPick={(col) => c().setHighlight({ color: col }).run()} onClear={() => c().unsetHighlight().run()} />
+
+          {/* Change Case Dropdown */}
+          <DropdownMenu>
+            <Tooltip content="Change case (UPPER, lower, Title Case)">
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  aria-label="Change case"
+                  className="flex size-8 shrink-0 items-center justify-center rounded text-[#444746] hover:bg-black/5 [&_svg]:size-[18px]"
+                >
+                  <CaseSensitive />
+                </button>
+              </DropdownMenuTrigger>
+            </Tooltip>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onSelect={() => convertSelectionCase(editor, 'upper')}>
+                UPPERCASE
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => convertSelectionCase(editor, 'lower')}>
+                lowercase
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => convertSelectionCase(editor, 'title')}>
+                Title Case
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => convertSelectionCase(editor, 'sentence')}>
+                Sentence case
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <ColorPicker
+            label="Text color"
+            icon={<Baseline />}
+            colors={COLORS}
+            current={s.color}
+            onPick={(col) => c().setColor(col).run()}
+            onClear={() => c().unsetColor().run()}
+          />
+          <ColorPicker
+            label="Highlight color"
+            icon={<Highlighter />}
+            colors={HIGHLIGHTS}
+            current={s.highlight}
+            onPick={(col) => c().setHighlight({ color: col }).run()}
+            onClear={() => c().unsetHighlight().run()}
+          />
           <Divider />
           <LinkButton editor={editor} />
           <ToolButton label="Insert image" onClick={image.pick}>
@@ -348,7 +774,7 @@ export function DocToolbar({
               <button
                 type="button"
                 className={cn(
-                  'flex size-7 items-center justify-center rounded text-foreground transition-colors hover:bg-hover [&_svg]:size-4',
+                  'flex size-7 items-center justify-center rounded text-foreground transition-colors hover:bg-hover [&_svg]:size-4'
                 )}
                 title="Insert table"
                 aria-label="Insert table"
@@ -357,33 +783,129 @@ export function DocToolbar({
               </button>
             </TableGridPicker>
           )}
+
+          {/* Insert Rich Document Blocks & Smart Chips */}
+          <DropdownMenu>
+            <Tooltip content="Insert document blocks (Cover, TOC, Callout, Signature, Status Chip)">
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  aria-label="Insert document block"
+                  className="flex size-8 shrink-0 items-center justify-center rounded text-[#444746] hover:bg-black/5 [&_svg]:size-[18px]"
+                >
+                  <LayoutList />
+                </button>
+              </DropdownMenuTrigger>
+            </Tooltip>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuItem onSelect={() => insertExecutiveCoverPage(editor)}>
+                Executive Cover Header
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => insertTableOfContents(editor)}>
+                Auto Table of Contents
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => insertCalloutBanner(editor, 'info')}>
+                Callout Box: Key Note (Blue)
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => insertCalloutBanner(editor, 'warning')}>
+                Callout Box: Action Item (Amber)
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => insertCalloutBanner(editor, 'success')}>
+                Callout Box: Approved (Green)
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => insertSignatureBlock(editor)}>
+                Formal Signature Block
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => {
+                  const today = new Date().toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                  });
+                  editor
+                    .chain()
+                    .focus()
+                    .insertContent(`<mark data-color="#e2e8f0"><strong>${today}</strong></mark> `)
+                    .run();
+                }}
+              >
+                Insert Date Chip ({new Date().toLocaleDateString()})
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => {
+                  editor
+                    .chain()
+                    .focus()
+                    .insertContent(
+                      `<mark data-color="#bbf7d0"><strong>[ APPROVED ]</strong></mark> `
+                    )
+                    .run();
+                }}
+              >
+                Insert Status Chip: APPROVED
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <Divider />
           {(['left', 'center', 'right', 'justify'] as const).map((a) => (
-            <ToolButton key={a} label={`Align ${a}`} active={s.align === a} onClick={() => c().setTextAlign(a).run()}>
+            <ToolButton
+              key={a}
+              label={`Align ${a}`}
+              active={s.align === a}
+              onClick={() => c().setTextAlign(a).run()}
+            >
               {{ left: <AlignLeft />, center: <AlignCenter />, right: <AlignRight />, justify: <AlignJustify /> }[a]}
             </ToolButton>
           ))}
           <LineSpacingMenu editor={editor} current={s.lineHeight} />
           <Divider />
-          <ToolButton label="Bulleted list" shortcut="Ctrl+Shift+8" active={s.bullet} onClick={() => c().toggleBulletList().run()}>
+          <ToolButton
+            label="Bulleted list"
+            shortcut="Ctrl+Shift+8"
+            active={s.bullet}
+            onClick={() => c().toggleBulletList().run()}
+          >
             <List />
           </ToolButton>
-          <ToolButton label="Numbered list" shortcut="Ctrl+Shift+7" active={s.ordered} onClick={() => c().toggleOrderedList().run()}>
+          <ToolButton
+            label="Numbered list"
+            shortcut="Ctrl+Shift+7"
+            active={s.ordered}
+            onClick={() => c().toggleOrderedList().run()}
+          >
             <ListOrdered />
           </ToolButton>
-          <ToolButton label="Checklist" shortcut="Ctrl+Shift+9" active={s.task} onClick={() => c().toggleTaskList().run()}>
+          <ToolButton
+            label="Checklist"
+            shortcut="Ctrl+Shift+9"
+            active={s.task}
+            onClick={() => c().toggleTaskList().run()}
+          >
             <ListTodo />
           </ToolButton>
-          <ToolButton label="Decrease indent" shortcut="Shift+Tab" onClick={() => {
-            if (c().liftListItem('listItem').run()) return;
-            c().liftListItem('taskItem').run();
-          }}>
+          <ToolButton
+            label="Decrease indent"
+            shortcut="Shift+Tab"
+            onClick={() => {
+              if (c().liftListItem('listItem').run()) return;
+              c().liftListItem('taskItem').run();
+            }}
+          >
             <Outdent />
           </ToolButton>
-          <ToolButton label="Increase indent" shortcut="Tab" onClick={() => {
-            if (c().sinkListItem('listItem').run()) return;
-            c().sinkListItem('taskItem').run();
-          }}>
+          <ToolButton
+            label="Increase indent"
+            shortcut="Tab"
+            onClick={() => {
+              if (c().sinkListItem('listItem').run()) return;
+              c().sinkListItem('taskItem').run();
+            }}
+          >
             <Indent />
           </ToolButton>
           <ToolButton label="Quote" active={s.quote} onClick={() => c().toggleBlockquote().run()}>
@@ -406,7 +928,11 @@ export function DocToolbar({
           <MessageSquarePlus />
         </ToolButton>
       )}
-      {!canEdit && <span className="ml-2 whitespace-nowrap text-xs text-muted">{canComment ? 'Commenting' : 'Viewing'} only</span>}
+      {!canEdit && (
+        <span className="ml-2 whitespace-nowrap text-xs text-muted">
+          {canComment ? 'Commenting' : 'Viewing'} only
+        </span>
+      )}
     </div>
   );
 }

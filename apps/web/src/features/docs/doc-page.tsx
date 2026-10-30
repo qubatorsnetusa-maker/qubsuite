@@ -43,7 +43,7 @@ import { Pagination } from './pagination';
 import { printDocument } from './print';
 import { DocToolbar } from './toolbar';
 import { TableControlsBar } from './table-controls-bar';
-import { PageSetupDialog, PAPER_SIZES, type PaperSize } from './page-setup-dialog';
+import { PageSetupDialog, PAPER_SIZES, type PageSetupConfig, type PaperSize } from './page-setup-dialog';
 import { VoiceTypingWidget } from './voice-typing-widget';
 import { useCollaboration } from './use-collaboration';
 import { VersionsPanel } from './versions-panel';
@@ -110,13 +110,25 @@ function DocEditor({ documentId }: { documentId: string }) {
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [aiMode, setAiMode] = useState<AiMode>('bottom');
   const [margins, setMargins] = useState({ left: 96, right: 96 });
-  const [pageConfig, setPageConfig] = useState<any>({ orientation: 'portrait', paperSize: 'letter', pageColor: '#ffffff' });
+  const [pageConfig, setPageConfig] = useState<PageSetupConfig>({
+    orientation: 'portrait',
+    paperSize: 'letter',
+    pageColor: '#ffffff',
+    columns: 1,
+    pageless: false,
+    watermark: '',
+    headerText: '',
+    footerText: '',
+    showPageNumbers: false,
+  });
   const pageHeight = pageConfig.orientation === 'landscape'
     ? PAPER_SIZES[pageConfig.paperSize as PaperSize]?.portraitWidth ?? 816
     : PAPER_SIZES[pageConfig.paperSize as PaperSize]?.portraitHeight ?? 1056;
-  const pageWidth = pageConfig.orientation === 'landscape'
-    ? PAPER_SIZES[pageConfig.paperSize as PaperSize]?.portraitHeight ?? 1056
-    : PAPER_SIZES[pageConfig.paperSize as PaperSize]?.portraitWidth ?? 816;
+  const pageWidth = pageConfig.pageless
+    ? 1160
+    : pageConfig.orientation === 'landscape'
+      ? PAPER_SIZES[pageConfig.paperSize as PaperSize]?.portraitHeight ?? 1056
+      : PAPER_SIZES[pageConfig.paperSize as PaperSize]?.portraitWidth ?? 816;
   const [shareOpen, setShareOpen] = useState(false);
   const [requestAccessOpen, setRequestAccessOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
@@ -169,13 +181,12 @@ function DocEditor({ documentId }: { documentId: string }) {
             FontSizeShortcuts,
             CommentHighlights.configure({ ydoc: collab.ydoc, onActivate: (id) => { setActiveAnchor(id); setPanel('comments'); } }),
           ]
-        : // Until the collaboration provider exists the editor is an empty, read-only placeholder; it is recreated with collaboration.
-          documentExtensions(),
+        : documentExtensions(),
       editable: false,
       immediatelyRender: false,
       editorProps: {
         attributes: { class: 'qub-editor', spellcheck: 'true', 'aria-label': 'Document body', role: 'textbox', 'aria-multiline': 'true' },
-        handleDrop: (view, event, slice, moved) => {
+        handleDrop: (view, event, _slice, moved) => {
           if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
             const file = event.dataTransfer.files[0];
             if (!file) return false;
@@ -218,8 +229,8 @@ function DocEditor({ documentId }: { documentId: string }) {
             }
           }
           return false;
-        },
-        handlePaste: (view, event) => {
+        },
+        handlePaste: (_view, event) => {
           if (event.clipboardData && event.clipboardData.files && event.clipboardData.files.length > 0) {
             const file = event.clipboardData.files[0];
             if (file && file.type.startsWith('image/')) {
@@ -295,8 +306,6 @@ function DocEditor({ documentId }: { documentId: string }) {
   const printRef = useRef(print);
   printRef.current = print;
 
-  // Document shortcuts. Ctrl+Alt+M adds a comment (explicit action — no floating button on plain selection);
-  // Ctrl+F / Ctrl+H open find / find and replace instead of the browser's find; Ctrl+P prints the document only.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey)) return;
@@ -368,8 +377,10 @@ function DocEditor({ documentId }: { documentId: string }) {
   };
   if (collab.fatal) return <ErrorState error={new Error(collab.fatal)} title="Document unavailable" />;
 
+  const displayPageNumbers = pageConfig.showPageNumbers || showPageNumbers;
+
   return (
-    <div className="flex h-full flex-col bg-surface-2 print:block print:h-auto print:bg-white">
+    <div className="flex h-dvh min-h-dvh w-full flex-col bg-surface-2 print:block print:h-auto print:bg-white">
       <div className="bg-background shadow-[0_1px_0_#dadce0] print:hidden">
         <EditorHeader
           fileType="DOCUMENT"
@@ -397,9 +408,21 @@ function DocEditor({ documentId }: { documentId: string }) {
                 onToggleRuler={() => setShowRuler((r) => !r)}
                 onVersionHistory={() => setVersionsOpen(true)}
                 onPageSetup={() => setPageSetupOpen(true)}
-                onOrientationChange={(orient) => setPageConfig((prev: any) => ({ ...prev, orientation: orient }))}
+                onOrientationChange={(orient) => setPageConfig((prev) => ({ ...prev, orientation: orient }))}
+                onColumnsChange={(cols) => {
+                  setPageConfig((prev) => ({ ...prev, columns: cols }));
+                  toast.success(`Document layout set to ${cols} ${cols === 1 ? 'column' : 'columns'}`);
+                }}
+                onTogglePageless={() =>
+                  setPageConfig((prev) => {
+                    const next = !prev.pageless;
+                    toast.success(next ? 'Pageless mode enabled' : 'Print page layout enabled');
+                    return { ...prev, pageless: next };
+                  })
+                }
+                pageless={pageConfig.pageless}
                 onTogglePageNumbers={() => setShowPageNumbers((v) => !v)}
-                showPageNumbers={showPageNumbers}
+                showPageNumbers={displayPageNumbers}
                 onVoiceTyping={() => setVoiceOpen((v) => !v)}
                 onMove={() => setMoveOpen(true)}
                 onTrash={() => trash.mutate()}
@@ -432,29 +455,63 @@ function DocEditor({ documentId }: { documentId: string }) {
             </>
           }
         />
-        <div className="pb-2">{editor && <DocToolbar editor={editor} documentId={documentId} canEdit={canEdit} canComment={canComment} onComment={startComment} onPrint={d.capabilities.canDownload ? print : undefined} onVoiceTyping={() => setVoiceOpen((v) => !v)} voiceActive={voiceOpen} />}
-          {editor && <div className="flex justify-center"><TableControlsBar editor={editor} /></div>}</div>
+        <div className="pb-2">
+          {editor && (
+            <DocToolbar
+              editor={editor}
+              documentId={documentId}
+              canEdit={canEdit}
+              canComment={canComment}
+              onComment={startComment}
+              onPrint={d.capabilities.canDownload ? print : undefined}
+              onVoiceTyping={() => setVoiceOpen((v) => !v)}
+              voiceActive={voiceOpen}
+            />
+          )}
+          {editor && (
+            <div className="flex justify-center">
+              <TableControlsBar editor={editor} />
+            </div>
+          )}
+        </div>
         {editor && (
           <button
             type="button"
             onClick={() => setWordCountOpen(true)}
-            className="fixed bottom-4 left-6 z-30 flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-white/95 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-md backdrop-blur-sm hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900/95 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="fixed bottom-4 left-6 z-30 flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-white/95 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-md backdrop-blur-sm hover:bg-slate-50 hover:text-slate-900"
             title="Click to view detailed word & character count"
           >
-            <span className="tabular-nums font-semibold text-blue-600 dark:text-blue-400">{liveWordCount.toLocaleString()}</span>
+            <span className="tabular-nums font-semibold text-blue-600">{liveWordCount.toLocaleString()}</span>
             <span>{liveWordCount === 1 ? 'word' : 'words'}</span>
           </button>
         )}
       </div>
-      {d.isTrashed && <div className="bg-[#fef7e0] px-4 py-2 text-center text-sm print:hidden">This document is in the trash. Restore it from Drive to keep editing.</div>}
+      {d.isTrashed && (
+        <div className="bg-[#fef7e0] px-4 py-2 text-center text-sm print:hidden">
+          This document is in the trash. Restore it from Drive to keep editing.
+        </div>
+      )}
 
       <div className="relative flex min-h-0 flex-1 print:block overflow-hidden">
         {find && editor && (
-          <FindReplaceBar editor={editor} canReplace={canEdit} showReplace={find.replace} focusNonce={find.nonce} onClose={() => setFind(null)} />
+          <FindReplaceBar
+            editor={editor}
+            canReplace={canEdit}
+            showReplace={find.replace}
+            focusNonce={find.nonce}
+            onClose={() => setFind(null)}
+          />
         )}
         {outlineOpen && editor && <OutlinePanel editor={editor} scrollRoot={pageStack} onClose={toggleOutline} />}
-        <div ref={setPageStack} className={cn('qub-page-stack min-w-0 flex-1 overflow-y-auto print:overflow-visible', !d.capabilities.canDownload && 'qub-no-print')} onClick={(e) => e.target === e.currentTarget && editor?.commands.focus('end')}>
-          {showRuler && (
+        <div
+          ref={setPageStack}
+          className={cn(
+            'qub-page-stack min-w-0 flex-1 overflow-y-auto print:overflow-visible',
+            !d.capabilities.canDownload && 'qub-no-print'
+          )}
+          onClick={(e) => e.target === e.currentTarget && editor?.commands.focus('end')}
+        >
+          {showRuler && !pageConfig.pageless && (
             <div className="sticky top-0 z-10 pt-2 pb-1 bg-surface-2 print:hidden flex justify-center">
               <HorizontalRuler
                 width={pageWidth}
@@ -464,9 +521,9 @@ function DocEditor({ documentId }: { documentId: string }) {
               />
             </div>
           )}
-          
+
           <div className="flex items-start justify-center gap-2 my-4 lg:my-6 print:m-0">
-            {showRuler && (
+            {showRuler && !pageConfig.pageless && (
               <div className="sticky top-12 print:hidden">
                 <VerticalRuler height={pageHeight} topMargin={margins.left} bottomMargin={margins.right} />
               </div>
@@ -475,18 +532,59 @@ function DocEditor({ documentId }: { documentId: string }) {
               style={{
                 width: `${pageWidth}px`,
                 maxWidth: `${pageWidth}px`,
-                minHeight: `${pageHeight}px`,
+                minHeight: pageConfig.pageless ? 'calc(100dvh - 140px)' : `${pageHeight}px`,
                 paddingLeft: `${margins.left}px`,
                 paddingRight: `${margins.right}px`,
                 backgroundColor: pageConfig.pageColor || '#ffffff',
               }}
-              className={cn('shadow-card transition-all duration-200', 'py-8 min-[900px]:py-[96px]', 'print:m-0 print:max-w-none print:p-0 print:shadow-none')}
+              className={cn(
+                'relative transition-all duration-200 overflow-hidden',
+                pageConfig.pageless ? 'rounded-2xl border border-slate-200/80 shadow-xs' : 'shadow-card',
+                'py-8 min-[900px]:py-[80px]',
+                'print:m-0 print:max-w-none print:p-0 print:shadow-none'
+              )}
             >
-              {!collab.synced && !editor?.getText() && <p className="text-sm text-muted print:hidden">Connecting…</p>}
-              <EditorContent editor={editor} />
-              {showPageNumbers && (
-                <div className="mt-12 pt-4 border-t border-slate-200 text-center text-xs text-slate-400 select-none print:block">
-                  Page 1
+              {/* Diagonal Page Watermark */}
+              {pageConfig.watermark && (
+                <div className="pointer-events-none select-none absolute inset-0 flex items-center justify-center z-0 overflow-hidden">
+                  <span className="-rotate-45 text-5xl md:text-7xl font-black uppercase tracking-[0.2em] text-slate-900/[0.05] whitespace-nowrap">
+                    {pageConfig.watermark}
+                  </span>
+                </div>
+              )}
+
+              {/* Running Page Header */}
+              {pageConfig.headerText && (
+                <div className="relative z-10 mb-6 pb-2 border-b border-slate-200/80 flex items-center justify-between text-xs text-slate-400">
+                  <span>{pageConfig.headerText}</span>
+                  <span>{d.title}</span>
+                </div>
+              )}
+
+              {!collab.synced && !editor?.getText() && (
+                <p className="text-sm text-muted print:hidden">Connecting…</p>
+              )}
+
+              <div
+                className="relative z-10"
+                style={
+                  pageConfig.columns && pageConfig.columns > 1
+                    ? {
+                        columnCount: pageConfig.columns,
+                        columnGap: '2.5rem',
+                        columnRule: '1px solid #e2e8f0',
+                      }
+                    : undefined
+                }
+              >
+                <EditorContent editor={editor} />
+              </div>
+
+              {/* Running Page Footer & Page Numbering */}
+              {(pageConfig.footerText || displayPageNumbers) && (
+                <div className="relative z-10 mt-12 pt-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-400 select-none print:flex">
+                  <span>{pageConfig.footerText || ''}</span>
+                  {displayPageNumbers && <span className="font-mono">Page 1</span>}
                 </div>
               )}
             </div>
@@ -495,11 +593,7 @@ function DocEditor({ documentId }: { documentId: string }) {
 
         {/* AI Assistant in Sidebar Mode */}
         {editor && canEdit && aiMode === 'sidebar' && (
-          <FloatingAiBar
-            editor={editor}
-            mode={aiMode}
-            onModeChange={setAiMode}
-          />
+          <FloatingAiBar editor={editor} mode={aiMode} onModeChange={setAiMode} />
         )}
 
         {panel === 'comments' && editor && (
@@ -523,15 +617,21 @@ function DocEditor({ documentId }: { documentId: string }) {
 
       {/* Floating AI Assistant in Bottom Pill or FAB Mode */}
       {editor && canEdit && aiMode !== 'sidebar' && (
-        <FloatingAiBar
-          editor={editor}
-          mode={aiMode}
-          onModeChange={setAiMode}
-        />
+        <FloatingAiBar editor={editor} mode={aiMode} onModeChange={setAiMode} />
       )}
 
       {editor && <WordCountDialog editor={editor} open={wordCountOpen} onOpenChange={setWordCountOpen} />}
-      {versionsOpen && <VersionsPanel documentId={documentId} canEdit={canEdit} onClose={() => setVersionsOpen(false)} />}
+      {versionsOpen && (
+        <VersionsPanel documentId={documentId} canEdit={canEdit} onClose={() => setVersionsOpen(false)} />
+      )}
+      {editor && slidesOpen && (
+        <DocSlidesPresenter
+          docContent={editor.getJSON()}
+          docTitle={d.title}
+          isOpen={slidesOpen}
+          onClose={() => setSlidesOpen(false)}
+        />
+      )}
       <ShareDialog
         target={
           shareOpen

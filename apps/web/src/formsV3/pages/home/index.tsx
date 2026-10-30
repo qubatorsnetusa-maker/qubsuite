@@ -32,7 +32,6 @@ import {
   TrendingUp,
   Webhook,
   X,
-  Zap,
 } from 'lucide-react'
 import { copyToClipboard } from '@/formsV3/utils/shareUtils'
 

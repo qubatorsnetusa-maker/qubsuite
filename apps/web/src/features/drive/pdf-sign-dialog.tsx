@@ -24,9 +24,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/form-controls';
 import { SignatureModal } from '@/features/pdf/signature-modal';
 
-// Initialize PDF.js worker with public static worker
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+
+// Initialize PDF.js worker with matching bundled worker
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 }
 
 export type EditorTool = 'select' | 'text' | 'signature' | 'date';

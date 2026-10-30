@@ -137,7 +137,16 @@ export function ClassicRenderer({ form, session, mode, upload, banner }: Rendere
           </QuestionCard>
         )}
         {pageFields.map((f) => (
-          <QuestionCard key={f.id} id={f.id} label={session.pipe(f.label)} description={f.description ? session.pipe(f.description) : null} required={f.required} error={session.errors[f.id]}>
+          <QuestionCard
+            key={f.id}
+            id={f.id}
+            label={session.pipe(f.label)}
+            description={f.description ? session.pipe(f.description) : null}
+            imageUrl={f.type !== 'IMAGE_BLOCK' ? f.settings.imageUrl : null}
+            imageAlt={f.settings.imageAlt}
+            required={f.required}
+            error={session.errors[f.id]}
+          >
             <QuestionBody field={f} form={form} session={session} upload={upload} variant="classic" />
           </QuestionCard>
         ))}

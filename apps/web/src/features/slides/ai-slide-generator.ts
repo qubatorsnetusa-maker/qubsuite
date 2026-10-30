@@ -86,7 +86,7 @@ function selectImageForText(text: string, index: number): { url: string; alt: st
  * Analyzes structure, headings, bullet patterns, numbers and quotes in raw text.
  */
 export function generateSlidesLocally(options: GenerateSlidesOptions): PresentationDeck {
-  const { rawText, slideCount = 5, theme = 'dark-modern', includeImages = true } = options;
+  const { rawText, slideCount = 5, theme = 'royal-executive', includeImages = true } = options;
   const lines = rawText
     .replace(/\r\n/g, '\n')
     .split('\n')
@@ -199,7 +199,7 @@ export function generateSlidesLocally(options: GenerateSlidesOptions): Presentat
  * otherwise transparently falls back to local high-intelligence heuristic engine.
  */
 export async function generateSlidesWithAi(options: GenerateSlidesOptions): Promise<PresentationDeck> {
-  const { rawText, slideCount = 5, theme = 'dark-modern', tone = 'professional', includeImages = true } = options;
+  const { rawText, slideCount = 5, theme = 'royal-executive', tone = 'professional', includeImages = true } = options;
 
   try {
     const res = await fetch('/api/ai/slides/generate', {

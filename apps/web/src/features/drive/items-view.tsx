@@ -203,43 +203,43 @@ export function ItemsView(props: ItemsViewProps) {
   const folderDropProps = (item: DriveItemDto) =>
     item.kind === 'folder' && !item.isTrashed && item.capabilities.canEdit
       ? {
-          onDragOver: (e: DragEvent) => {
-            if (hasQubItems(e) || hasFiles(e)) {
-              e.preventDefault();
-              e.stopPropagation();
-              setDropTarget(item.id);
-            }
-          },
-          onDragLeave: () => setDropTarget((t) => (t === item.id ? null : t)),
-          onDrop: (e: DragEvent) => {
+        onDragOver: (e: DragEvent) => {
+          if (hasQubItems(e) || hasFiles(e)) {
             e.preventDefault();
             e.stopPropagation();
-            setDropTarget(null);
-            setBgDrop(false);
-            const dragged = readDragItems(e)?.filter((d) => d.id !== item.id);
-            if (dragged?.length) move.mutate({ items: dragged, folderId: item.id, folderName: item.name });
-            else if (e.dataTransfer.files.length) uploads.uploadDrop(e.dataTransfer, item.id);
-          },
-        }
+            setDropTarget(item.id);
+          }
+        },
+        onDragLeave: () => setDropTarget((t) => (t === item.id ? null : t)),
+        onDrop: (e: DragEvent) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setDropTarget(null);
+          setBgDrop(false);
+          const dragged = readDragItems(e)?.filter((d) => d.id !== item.id);
+          if (dragged?.length) move.mutate({ items: dragged, folderId: item.id, folderName: item.name });
+          else if (e.dataTransfer.files.length) uploads.uploadDrop(e.dataTransfer, item.id);
+        },
+      }
       : {};
 
   const bgDropProps = props.dropFolderId
     ? {
-        onDragOver: (e: DragEvent) => {
-          if (hasFiles(e)) {
-            e.preventDefault();
-            setBgDrop(true);
-          }
-        },
-        onDragLeave: (e: DragEvent) => {
-          if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) setBgDrop(false);
-        },
-        onDrop: (e: DragEvent) => {
+      onDragOver: (e: DragEvent) => {
+        if (hasFiles(e)) {
           e.preventDefault();
-          setBgDrop(false);
-          if (e.dataTransfer.files.length) uploads.uploadDrop(e.dataTransfer, props.dropFolderId);
-        },
-      }
+          setBgDrop(true);
+        }
+      },
+      onDragLeave: (e: DragEvent) => {
+        if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) setBgDrop(false);
+      },
+      onDrop: (e: DragEvent) => {
+        e.preventDefault();
+        setBgDrop(false);
+        if (e.dataTransfer.files.length) uploads.uploadDrop(e.dataTransfer, props.dropFolderId);
+      },
+    }
     : {};
 
   // A double-click opens what its first click selected. The first click can open the details panel, which narrows
@@ -262,6 +262,11 @@ export function ItemsView(props: ItemsViewProps) {
     'aria-selected': selected.has(keyOf(item)),
     onClick: (e: MouseEvent) => {
       e.stopPropagation();
+      const isMobile = typeof window !== 'undefined' && (window.innerWidth < 768 || /Android|iPhone|iPad|QubDocsAndroid/i.test(navigator.userAgent));
+      if (isMobile) {
+        actions.open(item);
+        return;
+      }
       if (e.detail >= 2 && firstClick.current) return;
       firstClick.current = item;
       select(index, e);
@@ -310,7 +315,7 @@ export function ItemsView(props: ItemsViewProps) {
         <ContextMenuTrigger asChild disabled={!selection.length}>
           <div
             ref={containerRef}
-            className={cn('relative min-h-0 flex-1 overflow-y-auto px-4 pb-6 outline-none', bgDrop && 'bg-primary-soft/40 ring-2 ring-inset ring-primary')}
+            className={cn('relative min-h-[50dvh] md:min-h-0 flex-1 overflow-y-auto px-4 pb-6 outline-none', bgDrop && 'bg-primary-soft/40 ring-2 ring-inset ring-primary')}
             onKeyDown={onKeyDown}
             onClick={onBackgroundClick}
             onDoubleClick={onBackgroundDoubleClick}
@@ -484,62 +489,72 @@ function ListView({
   }, []);
   const virtualizer = useVirtualizer({ count: items.length, getScrollElement: () => scrollRef.current, estimateSize: () => rowHeight, overscan: 12, scrollMargin: margin });
   useEffect(() => virtualizer.measure(), [rowHeight, virtualizer]);
-  const cols = 'grid grid-cols-[minmax(0,1fr)_120px] md:grid-cols-[minmax(0,1fr)_160px_170px_100px_48px]';
+  const cols = 'grid grid-cols-[minmax(0,1fr)_85px_36px] sm:grid-cols-[minmax(0,1fr)_120px_40px] md:grid-cols-[minmax(0,1fr)_160px_170px_100px_48px]';
+
+  const virtualRows = virtualizer.getVirtualItems();
+  // Safe fallback: If virtualization produces 0 items but items.length > 0 (e.g. before initial resize observer measurement), render all items directly!
+  const useVirtual = virtualRows.length > 0;
+  const rowsToRender = useVirtual
+    ? virtualRows.map((row) => ({ index: row.index, item: items[row.index]!, top: row.start - margin, isVirtual: true }))
+    : items.map((item, index) => ({ index, item, top: index * rowHeight, isVirtual: false }));
+
   return (
-    <div role="table" aria-label="Files" aria-rowcount={items.length}>
+    <div role="table" aria-label="Files" aria-rowcount={items.length} className="w-full">
       <div role="row" className={cn(cols, 'sticky top-0 z-10 items-center border-b border-border bg-background text-sm font-medium text-foreground', rowHeight < 48 ? 'h-10' : 'h-12')}>
-        <span role="columnheader" className="pl-3">Name</span>
-        <span role="columnheader" className="hidden md:block">Owner</span>
-        <span role="columnheader">{dateColumn?.label ?? 'Last modified'}</span>
-        <span role="columnheader" className="hidden md:block">{showLocation ? 'Location' : 'File size'}</span>
-        <span className="hidden md:block" />
+        <span role="columnheader" className="pl-3 truncate">Name</span>
+        <span role="columnheader" className="hidden md:block truncate">Owner</span>
+        <span role="columnheader" className="truncate">{dateColumn?.label ?? 'Last modified'}</span>
+        <span role="columnheader" className="hidden md:block truncate">{showLocation ? 'Location' : 'File size'}</span>
+        <span role="columnheader" className="w-9" />
       </div>
-      <div ref={bodyRef} className="relative" style={{ height: virtualizer.getTotalSize() }}>
-        {virtualizer.getVirtualItems().map((row) => {
-          const item = items[row.index]!;
-          return (
-            <div
-              key={keyOf(item)}
-              role="row"
-              {...handlers(item, row.index)}
-              className={cn(
-                cols,
-                'absolute inset-x-0 items-center border-b border-border text-sm outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary',
-                selected.has(keyOf(item)) && 'bg-selected hover:bg-selected',
-                dropTarget === item.id && 'ring-2 ring-inset ring-primary',
-              )}
-              style={{ height: rowHeight, transform: `translateY(${row.start - margin}px)` }}
-            >
-              <span role="cell" className="flex min-w-0 items-center gap-3 pl-3">
-                <FileIcon type={item.kind === 'folder' ? 'FOLDER' : item.fileType} size={rowHeight < 48 ? 18 : 22} shared={item.kind === 'folder' && item.owner.id !== meId} />
-                <span className="truncate">{item.name}</span>
-                {item.owner.id !== meId && <Users className="size-4 shrink-0 text-subtle" aria-label="Shared" />}
-                {item.isStarred && <Star className="size-4 shrink-0 fill-muted text-muted" aria-label="Starred" />}
-              </span>
-              <span role="cell" className="hidden min-w-0 items-center gap-2 md:flex">
-                <Avatar user={item.owner} size={24} />
-                <span className="truncate text-muted">{ownerLabel(item, meId)}</span>
-              </span>
-              <span role="cell" className="truncate text-muted">
-                {formatRelative(dateColumn ? (dateColumn.value(item) ?? item.updatedAt) : item.updatedAt)}
-              </span>
-              <span role="cell" className="hidden truncate text-muted md:block">
-                {showLocation
-                  ? item.kind === 'file'
-                    ? item.folderName ?? '—'
-                    : item.parentName ?? '—'
-                  : item.kind === 'file'
-                    ? ['DOCUMENT', 'SPREADSHEET', 'FORM'].includes(item.fileType)
-                      ? FILE_TYPE_LABEL[item.fileType]
-                      : formatBytes(item.size)
-                    : '—'}
-              </span>
-              <span role="cell" className="hidden md:block">
-                <ItemMenuButton item={item} />
-              </span>
-            </div>
-          );
-        })}
+      <div
+        ref={bodyRef}
+        className={cn('relative w-full', !useVirtual && 'flex flex-col')}
+        style={{ minHeight: items.length * rowHeight, height: useVirtual ? virtualizer.getTotalSize() : undefined }}
+      >
+        {rowsToRender.map(({ item, index, top, isVirtual }) => (
+          <div
+            key={keyOf(item)}
+            role="row"
+            {...handlers(item, index)}
+            className={cn(
+              cols,
+              'items-center border-b border-border text-sm outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary',
+              isVirtual ? 'absolute inset-x-0' : 'relative w-full',
+              selected.has(keyOf(item)) && 'bg-selected hover:bg-selected',
+              dropTarget === item.id && 'ring-2 ring-inset ring-primary',
+            )}
+            style={{ height: rowHeight, transform: isVirtual ? `translateY(${top}px)` : undefined }}
+          >
+            <span role="cell" className="flex min-w-0 items-center gap-2 sm:gap-3 pl-2 sm:pl-3 pr-1">
+              <FileIcon type={item.kind === 'folder' ? 'FOLDER' : item.fileType} size={rowHeight < 48 ? 18 : 22} shared={item.kind === 'folder' && item.owner.id !== meId} />
+              <span className="truncate">{item.name}</span>
+              {item.owner.id !== meId && <Users className="size-4 shrink-0 text-subtle" aria-label="Shared" />}
+              {item.isStarred && <Star className="size-4 shrink-0 fill-muted text-muted" aria-label="Starred" />}
+            </span>
+            <span role="cell" className="hidden min-w-0 items-center gap-2 md:flex">
+              <Avatar user={item.owner} size={24} />
+              <span className="truncate text-muted">{ownerLabel(item, meId)}</span>
+            </span>
+            <span role="cell" className="truncate text-muted text-xs sm:text-sm">
+              {formatRelative(dateColumn ? (dateColumn.value(item) ?? item.updatedAt) : item.updatedAt)}
+            </span>
+            <span role="cell" className="hidden truncate text-muted md:block">
+              {showLocation
+                ? item.kind === 'file'
+                  ? item.folderName ?? '—'
+                  : item.parentName ?? '—'
+                : item.kind === 'file'
+                  ? ['DOCUMENT', 'SPREADSHEET', 'FORM'].includes(item.fileType)
+                    ? FILE_TYPE_LABEL[item.fileType]
+                    : formatBytes(item.size)
+                  : '—'}
+            </span>
+            <span role="cell" className="flex items-center justify-end pr-1 sm:pr-2">
+              <ItemMenuButton item={item} />
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );

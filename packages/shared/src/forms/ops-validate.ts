@@ -42,7 +42,7 @@ const NO_DEFAULT = new Set<FormFieldType>(['CONSENT', 'FILE_UPLOAD', 'SIGNATURE'
 /** Input types that may carry a default answer (prefilled for respondents). */
 export const DEFAULT_ANSWER_TYPES: ReadonlySet<FormFieldType> = new Set(QUESTION_TYPE_LIST.filter((d) => d.isInput && !NO_DEFAULT.has(d.type)).map((d) => d.type));
 
-const httpUrl = z.string().max(2000).refine(isHttpUrl, 'Use a link starting with http:// or https://');
+const httpUrl = z.string().max(2_000_000).refine(isHttpUrl, 'Use a link starting with http://, https://, or an uploaded image');
 // `.strict()`: every schema here mirrors a DTO in ../types exactly (see registry/types.ts, EngineField/EngineRule/EngineVariable) —
 // the key set must match one-for-one so a stray or missing key on a snapshot is caught, not silently stripped or defaulted.
 const optionSnapshotSchema = z

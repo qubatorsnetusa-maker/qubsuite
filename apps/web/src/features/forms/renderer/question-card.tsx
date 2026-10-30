@@ -9,13 +9,19 @@ import type { RespondentForm } from './respondent-form';
 
 export const labelId = (fieldId: string) => `label-${fieldId}`;
 
-export function QuestionCard({ id, label, description, required, error, children }: { id: string; label: string; description?: string | null; required?: boolean; error?: string; children: ReactNode }) {
+export function QuestionCard({ id, label, description, imageUrl, imageAlt, required, error, children }: { id: string; label: string; description?: string | null; imageUrl?: string | null; imageAlt?: string; required?: boolean; error?: string; children: ReactNode }) {
   return (
     <section id={`field-${id}`} className={cn('rounded-lg bg-white p-6 shadow-card', error && 'ring-1 ring-danger')} aria-labelledby={labelId(id)}>
       <h3 id={labelId(id)} className="text-base">
         {label || 'Untitled question'} {required && <span className="text-danger" aria-label="required">*</span>}
       </h3>
       {description && <p className="mt-1 whitespace-pre-wrap text-sm text-muted">{description}</p>}
+      {imageUrl && (
+        <figure className="mt-3 overflow-hidden rounded-lg border border-slate-200/80 bg-slate-50/40 p-2 inline-block max-w-full">
+          <img src={imageUrl} alt={imageAlt ?? label ?? 'Question reference image'} className="max-h-72 w-auto max-w-full rounded-md object-contain" />
+          {imageAlt && <figcaption className="mt-1.5 text-xs text-slate-500">{imageAlt}</figcaption>}
+        </figure>
+      )}
       <div className="mt-4">{children}</div>
       <FieldError message={error} />
     </section>

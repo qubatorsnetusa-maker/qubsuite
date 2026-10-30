@@ -171,6 +171,12 @@ export function ConversationalRenderer({ form, session, mode, upload, banner }: 
                 </span>
               </h1>
               {field.description && !isContent && <p className="whitespace-pre-wrap text-lg text-muted">{session.pipe(field.description)}</p>}
+              {!isContent && field.settings.imageUrl && (
+                <figure className="overflow-hidden rounded-xl border border-black/10 bg-white/60 p-2 inline-block max-w-full">
+                  <img src={field.settings.imageUrl} alt={field.settings.imageAlt ?? field.label} className="max-h-72 w-auto max-w-full rounded-lg object-contain" />
+                  {field.settings.imageAlt && <figcaption className="mt-1.5 text-xs text-muted">{field.settings.imageAlt}</figcaption>}
+                </figure>
+              )}
               <QuestionBody field={field} form={form} session={session} upload={upload} variant="conversational" onAnswered={scheduleAdvance} />
               <FieldError message={error} />
             </section>

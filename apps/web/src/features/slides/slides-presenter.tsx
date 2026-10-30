@@ -37,7 +37,7 @@ export function SlidesPresenter({
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const hudTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const themeConfig = SLIDE_THEMES[deck.theme] || SLIDE_THEMES['dark-modern'];
+  const themeConfig = SLIDE_THEMES[deck.theme] || SLIDE_THEMES['clean-corporate'];
 
   // Timer counter
   useEffect(() => {
@@ -194,10 +194,21 @@ export function SlidesPresenter({
       </div>
 
       {/* Main Slide Presentation Stage */}
-      <div className="relative w-[92vw] max-w-[1240px] flex items-center justify-center">
+      <div
+        key={currentSlide.id}
+        className={cn(
+          'relative w-[92vw] max-w-[1240px] flex items-center justify-center transition-all duration-300',
+          currentSlide.style?.transition === 'zoom'
+            ? 'animate-pop-in'
+            : currentSlide.style?.transition === 'slide'
+              ? 'animate-in slide-in-from-right-6 duration-300'
+              : 'animate-fade-in'
+        )}
+      >
         <SlidesCanvas
           slide={currentSlide}
           theme={deck.theme}
+          aspectRatio={deck.aspectRatio}
           slideNumber={currentIndex + 1}
           totalSlides={deck.slides.length}
           readOnly
@@ -206,9 +217,9 @@ export function SlidesPresenter({
 
       {/* Speaker Notes Overlay Tray */}
       {showNotes && currentSlide.speakerNotes && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 w-[85vw] max-w-2xl bg-black/85 text-slate-100 border border-white/20 rounded-xl p-4 shadow-2xl backdrop-blur-md z-20 text-sm">
-          <div className="flex items-center justify-between mb-2 pb-1 border-b border-white/10">
-            <div className="flex items-center gap-1.5 font-semibold text-xs tracking-wide uppercase text-blue-400">
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 w-[85vw] max-w-2xl bg-white/95 text-slate-800 border border-slate-200 rounded-xl p-4 shadow-2xl backdrop-blur-md z-20 text-sm">
+          <div className="flex items-center justify-between mb-2 pb-1 border-b border-slate-200">
+            <div className="flex items-center gap-1.5 font-semibold text-xs tracking-wide uppercase text-blue-600">
               <FileText className="w-3.5 h-3.5" />
               <span>Speaker Notes</span>
             </div>
@@ -216,7 +227,7 @@ export function SlidesPresenter({
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
-          <p className="text-slate-300 leading-relaxed max-h-32 overflow-y-auto">
+          <p className="text-slate-600 leading-relaxed max-h-32 overflow-y-auto">
             {currentSlide.speakerNotes}
           </p>
         </div>
@@ -225,39 +236,39 @@ export function SlidesPresenter({
       {/* Floating Bottom Navigation HUD */}
       <div
         className={cn(
-          'absolute bottom-6 flex items-center gap-3 px-5 py-2.5 rounded-full bg-black/60 text-white border border-white/15 shadow-2xl backdrop-blur-lg transition-opacity duration-300 z-10',
+          'absolute bottom-6 flex items-center gap-3 px-5 py-2.5 rounded-full bg-white/95 text-slate-800 border border-slate-200 shadow-xl backdrop-blur-lg transition-opacity duration-300 z-10',
           showHud ? 'opacity-100' : 'opacity-0 pointer-events-none'
         )}
       >
         <button
           onClick={prevSlide}
           disabled={currentIndex === 0}
-          className="p-1.5 rounded-full hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+          className="p-1.5 rounded-full hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
           title="Previous slide"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
 
-        <span className="text-xs font-semibold px-2">
+        <span className="text-xs font-semibold px-2 tabular-nums">
           {currentIndex + 1} / {deck.slides.length}
         </span>
 
         <button
           onClick={nextSlide}
           disabled={currentIndex === deck.slides.length - 1}
-          className="p-1.5 rounded-full hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+          className="p-1.5 rounded-full hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
           title="Next slide"
         >
           <ChevronRight className="w-5 h-5" />
         </button>
 
-        <div className="h-4 w-px bg-white/20 mx-1" />
+        <div className="h-4 w-px bg-slate-200 mx-1" />
 
         <button
           onClick={() => setShowNotes((n) => !n)}
           className={cn(
-            'p-1.5 rounded-full hover:bg-white/20 transition-colors',
-            showNotes && 'bg-blue-500/30 text-blue-400'
+            'p-1.5 rounded-full hover:bg-slate-100 transition-colors',
+            showNotes && 'bg-blue-50 text-blue-600'
           )}
           title="Toggle Speaker Notes (N)"
         >

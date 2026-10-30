@@ -1,6 +1,25 @@
-export type AnnotationType = 'text' | 'signature' | 'image' | 'date' | 'checkmark' | 'cross';
+export type AnnotationType =
+  | 'text'
+  | 'signature'
+  | 'image'
+  | 'date'
+  | 'checkmark'
+  | 'cross'
+  | 'highlight'
+  | 'whiteout'
+  | 'stamp';
 
-export type EditorTool = 'select' | 'text' | 'signature' | 'image' | 'date' | 'checkmark' | 'cross';
+export type EditorTool =
+  | 'select'
+  | 'text'
+  | 'signature'
+  | 'image'
+  | 'date'
+  | 'checkmark'
+  | 'cross'
+  | 'highlight'
+  | 'whiteout'
+  | 'stamp';
 
 export interface PdfAnnotation {
   id: string;
@@ -25,6 +44,20 @@ export const TEXT_COLOR_OPTIONS = [
   { name: 'Legal Blue', value: '#1d4ed8' },
   { name: 'Red', value: '#dc2626' },
   { name: 'Emerald', value: '#059669' },
+] as const;
+
+export const HIGHLIGHT_COLOR_OPTIONS = [
+  { name: 'Yellow', value: '#fde047' },
+  { name: 'Green', value: '#6ee7b7' },
+  { name: 'Blue', value: '#93c5fd' },
+  { name: 'Rose', value: '#fda4af' },
+] as const;
+
+export const STAMP_PRESETS = [
+  { label: 'APPROVED', color: '#059669' },
+  { label: 'CONFIDENTIAL', color: '#dc2626' },
+  { label: 'PAID', color: '#1d4ed8' },
+  { label: 'FINAL', color: '#0f172a' },
 ] as const;
 
 export const SIGNATURE_SCALE_PRESETS = [

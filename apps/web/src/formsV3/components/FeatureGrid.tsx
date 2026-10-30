@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layers, ShieldAlert, Smartphone, CheckCircle, Command, Zap, MousePointerClick, Bot } from 'lucide-react';
+import { Layers, ShieldAlert, Smartphone, Bot } from 'lucide-react';
 
 export const FeatureGrid: React.FC = () => {
   return (

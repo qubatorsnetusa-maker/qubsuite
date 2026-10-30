@@ -1,7 +1,7 @@
 import type { FormDto, FormFieldDto, FormFieldType, UpdateFieldInput } from '@qub/shared';
 import { duplicateFieldTx, fieldSetTx, QUESTION_TYPE_LIST, QUESTION_TYPES, type DefinitionIssue } from '@qub/shared/forms';
-import { Copy, GitBranch, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { Copy, GitBranch, Image as ImageIcon, Link2, Trash2, Upload, X } from 'lucide-react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input, NativeSelect, Switch } from '@/components/ui/form-controls';
 import { Tooltip } from '@/components/ui/misc';
@@ -42,10 +42,59 @@ export function QuestionEditor({
   const { remove, checking, dialog: deleteDialog } = useDeleteQuestion(form);
   const duplicate = () => ops.apply(duplicateFieldTx(form, field.id)?.tx ?? null);
   const [logicOpen, setLogicOpen] = useState(false);
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
+  const [imageUrlInput, setImageUrlInput] = useState(field.settings.imageUrl?.startsWith('http') ? field.settings.imageUrl : '');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const isScreen = field.type === 'WELCOME' || field.type === 'ENDING';
   const isSection = field.type === 'SECTION';
   const hasLogic = field.rules.length > 0;
   const branchable = canBranch(field);
+
+  const handleImageFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 960;
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        update({ settings: { ...field.settings, imageUrl: compressedDataUrl, imageAlt: field.settings.imageAlt || file.name.replace(/\.[^.]+$/, '') } }, 'Attach question image');
+        setImagePickerOpen(false);
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleApplyImageUrl = () => {
+    const trimmed = imageUrlInput.trim();
+    if (!trimmed) return;
+    update({ settings: { ...field.settings, imageUrl: trimmed } }, 'Attach question image');
+    setImagePickerOpen(false);
+  };
+
+  const handleRemoveQuestionImage = () => {
+    update({ settings: { ...field.settings, imageUrl: null, imageAlt: undefined } }, 'Remove question image');
+    setImageUrlInput('');
+    setImagePickerOpen(false);
+  };
 
   return (
     <section
@@ -72,6 +121,33 @@ export function QuestionEditor({
             suggestions={pipeSuggestions(form, field.id)}
             className={cn('border-0 border-b bg-surface px-3 text-base', isSection && 'text-xl')}
           />
+          {!isSection && !isScreen && field.type !== 'IMAGE_BLOCK' && field.type !== 'VIDEO_BLOCK' && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageFileSelect}
+                className="hidden"
+              />
+              <Tooltip content="Add image to question">
+                <Button
+                  type="button"
+                  variant="subtle"
+                  size="icon"
+                  disabled={!canEdit}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setImagePickerOpen((v) => !v);
+                  }}
+                  aria-label="Add image to question"
+                  className={cn('h-10 w-10 shrink-0 text-slate-600 hover:bg-slate-100 hover:text-slate-900', (field.settings.imageUrl || imagePickerOpen) && 'bg-blue-50 text-blue-600')}
+                >
+                  <ImageIcon className="size-5" />
+                </Button>
+              </Tooltip>
+            </>
+          )}
           {!isSection && !isScreen && (
             <NativeSelect
               aria-label="Question type"
@@ -116,6 +192,101 @@ export function QuestionEditor({
             suggestions={pipeSuggestions(form, field.id)}
             className="min-h-10 text-sm"
           />
+        )}
+
+        {imagePickerOpen && !isSection && !isScreen && field.type !== 'IMAGE_BLOCK' && (
+          <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                <ImageIcon className="size-4 text-blue-600" />
+                Attach guiding image to question
+              </span>
+              <button
+                type="button"
+                onClick={() => setImagePickerOpen(false)}
+                className="rounded-md p-1 text-slate-400 hover:bg-slate-200/60 hover:text-slate-700"
+                aria-label="Close image picker"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                className="bg-white gap-1.5 text-xs"
+              >
+                <Upload className="size-3.5" />
+                Upload from device
+              </Button>
+              <span className="text-xs text-slate-400">or</span>
+              <div className="flex flex-1 min-w-[200px] items-center gap-1.5">
+                <div className="relative flex-1">
+                  <Link2 className="size-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <Input
+                    type="url"
+                    value={imageUrlInput}
+                    onChange={(e) => setImageUrlInput(e.target.value)}
+                    placeholder="Paste image URL (https://...)"
+                    className="h-8 pl-8 text-xs bg-white"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleApplyImageUrl();
+                      }
+                    }}
+                  />
+                </div>
+                <Button type="button" size="sm" onClick={handleApplyImageUrl} disabled={!imageUrlInput.trim()} className="h-8 text-xs">
+                  Add
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!isSection && !isScreen && field.type !== 'IMAGE_BLOCK' && field.settings.imageUrl && (
+          <div className="relative rounded-xl border border-slate-200 bg-slate-50/50 p-3 space-y-2">
+            <div className="relative inline-block max-w-full overflow-hidden rounded-lg border border-slate-200 bg-white">
+              <img
+                src={field.settings.imageUrl}
+                alt={field.settings.imageAlt ?? field.label}
+                className="max-h-64 w-auto max-w-full object-contain rounded-lg"
+              />
+              {canEdit && (
+                <div className="absolute top-2 right-2 flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="rounded-md bg-white/95 px-2 py-1 text-xs font-medium text-slate-700 shadow-sm border border-slate-200 hover:bg-white"
+                    title="Change image"
+                  >
+                    Change
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRemoveQuestionImage}
+                    className="rounded-md bg-white/95 p-1 text-rose-600 shadow-sm border border-slate-200 hover:bg-rose-50"
+                    title="Remove image"
+                    aria-label="Remove question image"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+            {canEdit && active && (
+              <Input
+                type="text"
+                value={field.settings.imageAlt ?? ''}
+                onChange={(e) => update({ settings: { ...field.settings, imageAlt: e.target.value || undefined } }, 'Update image caption', `imageAlt:${field.id}`)}
+                placeholder="Image caption / alt text (optional)"
+                className="h-8 text-xs bg-white"
+              />
+            )}
+          </div>
         )}
 
         {def.optionKinds.length > 0 && <OptionsEditor field={field} canEdit={canEdit} onUpdate={(i) => update(i)} />}
