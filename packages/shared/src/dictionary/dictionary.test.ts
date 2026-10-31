@@ -54,4 +54,23 @@ describe('Dictionary Module', () => {
     expect(html.startsWith('<p>')).toBe(true);
     expect(html.endsWith('</p>')).toBe(true);
   });
+
+  it('returns updated exact definitions for Loveworld Expansionism and Loveworld Exceptionalism', () => {
+    const expHits = lookupDictionary('Loveworld Expansionism');
+    expect(expHits.length).toBeGreaterThan(0);
+    expect(expHits[0]?.def).toBe(
+      'This is the doctrine and endeavor of expanding our reach, our influence, and territories, through the relentless spreading of our message by all available and innovative means . Where the means are not available, we create them. We have the licence to grow.'
+    );
+
+    const excHits = lookupDictionary('What is Loveworld Exceptionalism?');
+    expect(excHits.length).toBeGreaterThan(0);
+    expect(excHits[0]?.def).toBe(
+      'The idea and ideology that we have been called uniquely with a divine and definite message for the world and the church of Christ. We have a calling to lead and blaze new trails in doctrine, music and arts, education, organization, administration, products, and services.'
+    );
+
+    // Also verify subterms match
+    expect(lookupDictionary('expansionism')[0]?.term).toBe('LOVEWORLD EXPANSIONISM');
+    expect(lookupDictionary('exceptionalism')[0]?.term).toBe('LOVEWORLD EXCEPTIONALISM');
+  });
 });
+

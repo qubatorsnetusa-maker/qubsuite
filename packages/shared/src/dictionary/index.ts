@@ -23,6 +23,16 @@ for (const entry of DICTIONARY_ENTRIES) {
   }
   termMap.get(clean)!.push(entry);
 
+  if (clean.startsWith('loveworld ')) {
+    const sub = clean.slice('loveworld '.length).trim();
+    if (sub && !termMap.has(sub)) {
+      termMap.set(sub, []);
+    }
+    if (sub && !termMap.get(sub)!.includes(entry)) {
+      termMap.get(sub)!.push(entry);
+    }
+  }
+
   const fullLower = entry.term.trim().toLowerCase();
   if (fullLower !== clean) {
     if (!termMap.has(fullLower)) {
@@ -150,3 +160,4 @@ export function formatExactDefinition(entries: DictionaryEntry[]): string {
 function escapeRegExp(string: string): string {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+

@@ -142,7 +142,7 @@ export async function aiRoutes(app: FastifyInstance) {
         return {
           success: true,
           data: {
-            result: `<p><strong>${prompt}</strong></p><p>Loveworld Exceptionalism is the foundational ideology and conviction that the ministry has been called uniquely with a divine and definite message for the world and the church of Christ, excelling in doctrine, music, arts, and innovation.</p>`,
+            result: `<p><strong>${prompt}</strong></p><p>Loveworld Exceptionalism is the idea and ideology that we have been called uniquely with a divine and definite message for the world and the church of Christ. We have a calling to lead and blaze new trails in doctrine, music and arts, education, organization, administration, products, and services.</p>`,
           },
         };
       }
