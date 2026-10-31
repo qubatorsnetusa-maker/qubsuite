@@ -1,30 +1,10 @@
-export interface DictionaryEntry {
-  term: string;
-  def: string;
-}
-
-// Load pre-extracted dictionary of Pastor Chris definitions
-let dictionaryCache: DictionaryEntry[] = [];
-try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const fsMod = require('fs');
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const pathMod = require('path');
-  const possiblePaths = [
-    pathMod.join(__dirname, 'pastor-chris-dictionary.json'),
-    pathMod.join(process.cwd(), 'src/services/pastor-chris-dictionary.json'),
-    pathMod.join(process.cwd(), 'apps/api/src/services/pastor-chris-dictionary.json'),
-    'C:/Users/Kelvin Odems/Downloads/QubSuite/Qubators/apps/api/src/services/pastor-chris-dictionary.json'
-  ];
-  for (const p of possiblePaths) {
-    if (fsMod.existsSync(p)) {
-      dictionaryCache = JSON.parse(fsMod.readFileSync(p, 'utf8'));
-      break;
-    }
-  }
-} catch (e) {
-  dictionaryCache = [];
-}
+export {
+  type DictionaryEntry,
+  lookupDictionary,
+  isSummarizeOrExpandQuery,
+  formatExactDefinition,
+  DICTIONARY_ENTRIES,
+} from '@qub/shared';
 
 /**
  * Underlying Truth / Confession of Faith & Applied Positions (RAG Foundation)
@@ -152,45 +132,4 @@ export function checkContentSafety(text: string): { safe: boolean; reason?: 'por
   }
 
   return { safe: true };
-}
-
-/**
- * Query the Pastor Chris Dictionary.
- * Returns exact or high-confidence matches as the PRIMARY source for text definitions.
- */
-export function lookupDictionary(query: string): DictionaryEntry[] {
-  if (!query || dictionaryCache.length === 0) return [];
-
-  const q = query.trim().toLowerCase();
-  
-  // Clean query of common definition requests
-  const cleanedQuery = q
-    .replace(/^what is (the definition of )?/i, '')
-    .replace(/^define /i, '')
-    .replace(/^meaning of /i, '')
-    .replace(/\?$/, '')
-    .trim();
-
-  const results: DictionaryEntry[] = [];
-
-  // 1. Exact match on term
-  for (const entry of dictionaryCache) {
-    const termLower = entry.term.toLowerCase();
-    if (termLower === cleanedQuery || termLower.startsWith(cleanedQuery + ' ') || termLower.includes('(' + cleanedQuery + ')')) {
-      results.push(entry);
-    }
-  }
-
-  // 2. If nothing found, check words in term
-  if (results.length === 0 && cleanedQuery.length >= 3) {
-    for (const entry of dictionaryCache) {
-      const termLower = entry.term.toLowerCase();
-      if (termLower.includes(cleanedQuery)) {
-        results.push(entry);
-        if (results.length >= 5) break;
-      }
-    }
-  }
-
-  return results;
 }

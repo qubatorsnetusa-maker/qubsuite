@@ -1,4 +1,5 @@
 import { AiAssistIcon } from '@/components/ai-assist-icon';
+import { lookupDictionary, formatExactDefinition } from '@qub/shared';
 import { useState, useRef } from 'react';
 import type { Editor } from '@tiptap/react';
 import {
@@ -93,7 +94,12 @@ export function FloatingAiBar({ editor, mode, onModeChange }: FloatingAiBarProps
         toast.error('AI assistant returned an empty response.');
       }
     } catch (err: any) {
-      // Offline / fallback response
+      // Offline / fallback response: Check dictionary first for exact definition
+      const dictHits = lookupDictionary(textToSubmit);
+      if (dictHits.length > 0) {
+        setResult(formatExactDefinition(dictHits));
+        return;
+      }
       const fallbackHtml = `<p><strong>${textToSubmit}</strong></p><p>Artificial intelligence models running on-device execute inference locally with zero-latency, full data privacy, and complete offline capability.</p><ul><li><strong>Privacy First:</strong> No data leaves your workstation.</li><li><strong>Zero Latency:</strong> Instant completions without network latency.</li><li><strong>Always Available:</strong> Works seamlessly offline.</li></ul>`;
       setResult(fallbackHtml);
     } finally {

@@ -1,4 +1,10 @@
-import { UNDERLYING_TRUTH_RAG, checkContentSafety, lookupDictionary } from './ai-rag-truth';
+import {
+  UNDERLYING_TRUTH_RAG,
+  checkContentSafety,
+  formatExactDefinition,
+  isSummarizeOrExpandQuery,
+  lookupDictionary,
+} from './ai-rag-truth';
 import type { FastifyBaseLogger } from 'fastify';
 import type { Env } from '../config/env';
 
@@ -207,28 +213,6 @@ export class AIService {
       };
     }
 
-    // PRIMARY SOURCE LOOKUP: Check Pastor Chris Dictionary first for term definitions
-    const dictEntries = lookupDictionary(promptText);
-    const isDefinitionQuery =
-      dictEntries.length > 0 &&
-      (/(?:define|meaning|what is|explanation of|who is|significance of)/i.test(promptText) ||
-        promptText.split(' ').length <= 4);
-
-    if (isDefinitionQuery && dictEntries.length > 0 && dictEntries[0]) {
-      const primary = dictEntries[0];
-      let defHtml = `<div style="margin-bottom:1em;"><p><strong>${primary.term}</strong>: ${primary.def}</p></div>`;
-      if (dictEntries.length > 1) {
-        defHtml += '<p><strong>Related definitions:</strong></p><ul>';
-        for (const entry of dictEntries.slice(1, 4)) {
-          defHtml += `<li><strong>${entry.term}</strong>: ${entry.def}</li>`;
-        }
-        defHtml += '</ul>';
-      }
-      // If user specifically wanted just definition, return dictionary match directly as primary source
-      if (/^(?:define|what is|meaning of)/i.test(promptText) || promptText.split(' ').length <= 3) {
-        return { result: defHtml };
-      }
-    }
     const tone = input.tone ?? 'professional';
     let systemPrompt = `You are an expert co-author and editor in an enterprise document suite. Maintain an ${tone} tone.
 
@@ -245,6 +229,41 @@ FORMATTING RULES:
 2. Never output markdown asterisks (**bold** or *italic*), markdown tables with pipes (|---|), or markdown hashtags (#). Use <strong>, <em>, or headings.
 3. If the user asks for standard text or a summary, return clean text or HTML paragraphs.
 4. Do not wrap output in code fences. Return raw HTML or text directly.`;
+
+    // PRIMARY SOURCE LOOKUP: Check Pastor Chris Dictionary first for term definitions
+    const dictEntries = lookupDictionary(promptText);
+    if (dictEntries.length > 0) {
+      const mode = isSummarizeOrExpandQuery(promptText, input.task);
+      if (!mode) {
+        // Whenever a user asks a question from the dictionary, provide the exact definition not a paraphrased one
+        return { result: formatExactDefinition(dictEntries) };
+      }
+
+      // User specifically requested to summarize or expand the dictionary definition
+      const primary = dictEntries[0]!;
+      const otherDefs = dictEntries.slice(1).map((d) => `Alternate sense: "${d.def}"`).join('\n');
+      const customInstruction =
+        mode === 'summarize'
+          ? `The exact dictionary definition of "${primary.term}" is: "${primary.def}".\n${otherDefs}\n\nTask: Provide a concise summary of this exact definition while strictly preserving its doctrinal precision. Do not contradict or dilute the original definition.`
+          : `The exact dictionary definition of "${primary.term}" is: "${primary.def}".\n${otherDefs}\n\nTask: Expand on this exact definition with deeper scriptural insight, theological depth, practical Christian living applications, and biblical context in accordance with the underlying truth. Ground your expansion firmly on the exact definition.`;
+
+      try {
+        const response = await this.runModel<{ response: string }>('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: customInstruction },
+          ],
+          max_tokens: 1500,
+          temperature: 0.3,
+        });
+        const generatedHtml = this.extractText(response);
+        const finalHtml = `<p><strong>${primary.term} (Exact Definition)</strong>: ${primary.def}</p><hr/><p><strong>${mode === 'summarize' ? 'Summary' : 'In-Depth Study'}:</strong></p>${generatedHtml}`;
+        return { result: finalHtml };
+      } catch (err) {
+        this.log.warn({ err }, 'Workers AI summary/expansion failed, falling back to exact definition');
+        return { result: formatExactDefinition(dictEntries) };
+      }
+    }
 
     let userPrompt = '';
     switch (input.task) {

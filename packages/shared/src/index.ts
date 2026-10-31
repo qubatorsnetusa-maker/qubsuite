@@ -6,3 +6,4 @@ export * from './realtime';
 export * from './csv';
 export * from './filename';
 export * from './email-validator';
+export * from './dictionary';

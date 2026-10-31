@@ -1,4 +1,9 @@
-import { checkContentSafety, lookupDictionary } from '../../services/ai-rag-truth';
+import {
+  checkContentSafety,
+  formatExactDefinition,
+  isSummarizeOrExpandQuery,
+  lookupDictionary,
+} from '../../services/ai-rag-truth';
 ﻿import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -113,18 +118,12 @@ export async function aiRoutes(app: FastifyInstance) {
 
       // Check dictionary definitions as PRIMARY source first
       const dictHits = lookupDictionary(prompt);
-      const isDefQuery = dictHits.length > 0 && (/^(?:define|what is|meaning of)/i.test(prompt) || prompt.split(' ').length <= 4);
-      if (isDefQuery && dictHits[0]) {
-        const top = dictHits[0];
-        let html = `<p><strong>${top.term}</strong>: ${top.def}</p>`;
-        if (dictHits.length > 1) {
-          html += '<p><strong>Related entries:</strong></p><ul>';
-          for (const d of dictHits.slice(1, 4)) {
-            html += `<li><strong>${d.term}</strong>: ${d.def}</li>`;
-          }
-          html += '</ul>';
+      if (dictHits.length > 0) {
+        const mode = isSummarizeOrExpandQuery(prompt, req.body.task);
+        if (!mode) {
+          // Whenever a user asks a question from the dictionary, provide the exact definition not a paraphrased one
+          return { success: true, data: { result: formatExactDefinition(dictHits) } };
         }
-        return { success: true, data: { result: html } };
       }
 
       try {
@@ -132,12 +131,11 @@ export async function aiRoutes(app: FastifyInstance) {
         return { success: true, data: res };
       } catch (err: any) {
         req.log.warn({ err }, 'AI doc assist fallback triggered');
-        if (dictHits.length > 0 && dictHits[0]) {
-          const top = dictHits[0];
+        if (dictHits.length > 0) {
           return {
             success: true,
             data: {
-              result: `<p><strong>${top.term}</strong>: ${top.def}</p>`,
+              result: formatExactDefinition(dictHits),
             },
           };
         }
