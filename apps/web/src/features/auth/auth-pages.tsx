@@ -1,5 +1,5 @@
 import { KingsChatButton } from './kingschat-button';
-import { OnboardingScreens, ONBOARDING_COMPLETED_KEY } from './onboarding-screens';
+import { OnboardingScreens, ONBOARDING_COMPLETED_KEY, shouldShowOnboarding } from './onboarding-screens';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { checkEmailSyntaxAndTypo, getTypoSuggestion, forgotPasswordSchema, loginSchema, passwordSchema, registerSchema, type LoginInput, type RegisterInput } from '@qub/shared';
 import { useMutation } from '@tanstack/react-query';
@@ -77,17 +77,7 @@ export function LoginPage() {
     !!search.neon_auth_session_verifier;
   const [resendCooldown, setResendCooldown] = useState(0);
   const [verifying, setVerifying] = useState(isCallback);
-  const [showOnboarding, setShowOnboarding] = useState(() => {
-    if (isCallback) return false;
-    if (typeof window === 'undefined') return false;
-    try {
-      const url = new URL(window.location.href);
-      if (url.searchParams.get('onboarding') === 'true') return true;
-      return !localStorage.getItem(ONBOARDING_COMPLETED_KEY);
-    } catch {
-      return false;
-    }
-  });
+  const [showOnboarding, setShowOnboarding] = useState(() => !isCallback && shouldShowOnboarding());
 
   // Handle redirect callback from Neon Auth magic link email verification
   useEffect(() => {
@@ -337,17 +327,7 @@ export function RegisterPage() {
     !!search.neon_auth_session_verifier;
   const [resendCooldown, setResendCooldown] = useState(0);
   const [verifying, setVerifying] = useState(isCallback);
-  const [showOnboarding, setShowOnboarding] = useState(() => {
-    if (isCallback) return false;
-    if (typeof window === 'undefined') return false;
-    try {
-      const url = new URL(window.location.href);
-      if (url.searchParams.get('onboarding') === 'true') return true;
-      return !localStorage.getItem(ONBOARDING_COMPLETED_KEY);
-    } catch {
-      return false;
-    }
-  });
+  const [showOnboarding, setShowOnboarding] = useState(() => !isCallback && shouldShowOnboarding());
 
   // Handle redirect callback from Neon Auth magic link email verification
   useEffect(() => {

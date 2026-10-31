@@ -6,6 +6,40 @@ import { cn } from '@/lib/utils';
 
 export const ONBOARDING_COMPLETED_KEY = 'qub_onboarding_completed';
 
+/**
+ * Checks whether the current environment is a mobile app or mobile device.
+ * Onboarding screens should only display on mobile, not web or desktop.
+ */
+export function isMobileClient(): boolean {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  // Native Android app wrapper
+  if (/QubDocsAndroid/i.test(ua)) return true;
+  // Mobile phone / tablet devices
+  if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(ua)) return true;
+  // Touch-enabled small viewport (mobile phones)
+  if (window.innerWidth <= 768 && 'maxTouchPoints' in navigator && navigator.maxTouchPoints > 0) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Returns true if onboarding should be shown:
+ * Only on mobile, when not yet completed in localStorage (or overridden by ?onboarding=true).
+ */
+export function shouldShowOnboarding(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('onboarding') === 'true') return true;
+    if (!isMobileClient()) return false;
+    return !localStorage.getItem(ONBOARDING_COMPLETED_KEY);
+  } catch {
+    return false;
+  }
+}
+
 interface OnboardingScreensProps {
   onComplete: () => void;
 }
