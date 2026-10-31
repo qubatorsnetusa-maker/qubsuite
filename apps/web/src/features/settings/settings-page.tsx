@@ -1,18 +1,14 @@
-import { zodResolver } from '@hookform/resolvers/zod';
-import { changePasswordSchema, type ChangePasswordInput } from '@qub/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { ArrowLeft, Laptop, MailWarning } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { QubLogo } from '@/components/logo';
 import { Button } from '@/components/ui/button';
-import { FieldError, Input, Label } from '@/components/ui/form-controls';
+import { Input, Label } from '@/components/ui/form-controls';
 import { Avatar, Badge } from '@/components/ui/misc';
 import { UserMenu } from '@/components/user-menu';
 import { useCurrentUser } from '@/hooks/use-auth';
-import { ApiError } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import { authService } from '@/services/auth';
 import { qk } from '@/services/query-keys';
@@ -38,21 +34,6 @@ export function SettingsPage() {
   const sessions = useQuery({ queryKey: qk.sessions, queryFn: authService.sessions });
   const revoke = useMutation({ mutationFn: authService.revokeSession, onSuccess: () => qc.invalidateQueries({ queryKey: qk.sessions }) });
   const logoutAll = useMutation({ mutationFn: authService.logoutAll, onSuccess: () => void navigate({ to: '/login' }) });
-
-  const pw = useForm<ChangePasswordInput>({ resolver: zodResolver(changePasswordSchema), defaultValues: { currentPassword: '', newPassword: '' } });
-  const changePw = useMutation({
-    mutationFn: authService.changePassword,
-    meta: { silent: true },
-    onSuccess: () => {
-      pw.reset();
-      toast.success('Password changed. Other sessions were signed out.');
-      void qc.invalidateQueries({ queryKey: qk.sessions });
-    },
-    onError: (err) => {
-      if (err instanceof ApiError && err.fieldErrors.currentPassword) pw.setError('currentPassword', { message: err.fieldErrors.currentPassword });
-      else toast.error((err as Error).message);
-    },
-  });
 
   return (
     <div className="min-h-full bg-surface">
@@ -97,24 +78,6 @@ export function SettingsPage() {
             </Button>
           </form>
           <p className="mt-3 text-sm text-muted">Email: {me.email}</p>
-        </Card>
-
-        <Card title="Password">
-          <form className="space-y-4" noValidate onSubmit={pw.handleSubmit((v) => changePw.mutate(v))}>
-            <div>
-              <Label htmlFor="current">Current password</Label>
-              <Input id="current" type="password" autoComplete="current-password" className="mt-1.5" {...pw.register('currentPassword')} />
-              <FieldError message={pw.formState.errors.currentPassword?.message} />
-            </div>
-            <div>
-              <Label htmlFor="new">New password</Label>
-              <Input id="new" type="password" autoComplete="new-password" className="mt-1.5" {...pw.register('newPassword')} />
-              <FieldError message={pw.formState.errors.newPassword?.message} />
-            </div>
-            <Button type="submit" loading={changePw.isPending}>
-              Change password
-            </Button>
-          </form>
         </Card>
 
         <Card title="Where you’re signed in">

@@ -103,13 +103,14 @@ describe('answers, refs, settings, submissions', () => {
 
 describe('theme schema', () => {
   const theme = { primaryColor: '#673ab7', backgroundColor: '#f0ebf8', fontFamily: 'sans' as const };
-  it('accepts only http(s) header images', () => {
+  it('accepts only http(s) or data:image header images', () => {
     expect(formThemeSchema.safeParse({ ...theme, headerImageUrl: 'https://example.com/a.png' }).success).toBe(true);
+    expect(formThemeSchema.safeParse({ ...theme, headerImageUrl: 'data:image/png;base64,AAAA' }).success).toBe(true);
     expect(formThemeSchema.safeParse({ ...theme, headerImageUrl: null }).success).toBe(true);
-    for (const bad of ['javascript:alert(1)', 'data:image/png;base64,AAAA', 'ftp://example.com/a.png']) {
+    for (const bad of ['javascript:alert(1)', 'ftp://example.com/a.png']) {
       const r = formThemeSchema.safeParse({ ...theme, headerImageUrl: bad });
       expect(r.success, bad).toBe(false);
-      expect(r.error?.issues[0]?.message).toBe('Use a link starting with http:// or https://');
+      expect(r.error?.issues[0]?.message).toBe('Use a link starting with http://, https://, or an uploaded image');
     }
   });
 });
@@ -168,7 +169,7 @@ describe('formThemeSchema extras', () => {
     ['a tagline over 120 chars', { brandTagline: 'x'.repeat(121) }],
     ['a javascript: website URL', { websiteUrl: 'javascript:alert(1)' }],
     ['a link label over 40 chars', { websiteLabel: 'x'.repeat(41) }],
-    ['a data: banner URL', { headerBannerUrl: 'data:image/png;base64,AAAA' }],
+    ['an ftp: banner URL', { headerBannerUrl: 'ftp://cdn.example.com/banner.jpg' }],
     ['a banner height below 60', { headerBannerHeight: 59 }],
     ['a banner height above 240', { headerBannerHeight: 241 }],
     ['an unknown extras key', { wobble: true }],

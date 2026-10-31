@@ -140,7 +140,7 @@ export function MobileCreateSheet({ open, onClose, folderId }: MobileCreateSheet
 
           {/* Qub Suite Applications */}
           <div className="pt-4">
-            <p className="mb-2.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-muted">Qub Suite Apps</p>
+            <p className="mb-2.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-muted">Create New</p>
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={handleCreateDoc}

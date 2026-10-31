@@ -53,19 +53,33 @@ class MainActivity : ComponentActivity() {
     }
 
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
+    private var cameraPhotoUri: Uri? = null
     private var webViewRef: WebView? = null
 
-    // Native Android file chooser for document upload, photo signatures, and attachments
+    // Native Android file chooser & camera capture for OCR, document upload, photo signatures, and attachments
     private val filePickerLauncher: ActivityResultLauncher<Intent> =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (filePathCallback == null) return@registerForActivityResult
             val results: Array<Uri>? = when {
-                result.resultCode == RESULT_OK && result.data != null -> {
+                result.resultCode == RESULT_OK -> {
                     val dataString = result.data?.dataString
                     val clipData = result.data?.clipData
+                    val bitmap = result.data?.extras?.get("data") as? Bitmap
                     when {
                         clipData != null -> Array(clipData.itemCount) { i -> clipData.getItemAt(i).uri }
                         dataString != null -> arrayOf(Uri.parse(dataString))
+                        cameraPhotoUri != null -> arrayOf(cameraPhotoUri!!)
+                        bitmap != null -> {
+                            try {
+                                val file = java.io.File(cacheDir, "ocr_snap_${System.currentTimeMillis()}.jpg")
+                                java.io.FileOutputStream(file).use { out ->
+                                    bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+                                }
+                                arrayOf(Uri.fromFile(file))
+                            } catch (_: Exception) {
+                                null
+                            }
+                        }
                         else -> null
                     }
                 }
@@ -73,6 +87,7 @@ class MainActivity : ComponentActivity() {
             }
             filePathCallback?.onReceiveValue(results)
             filePathCallback = null
+            cameraPhotoUri = null
         }
 
     private var pendingPermissionRequest: PermissionRequest? = null
@@ -82,18 +97,20 @@ class MainActivity : ComponentActivity() {
             val cameraGranted = permissions[android.Manifest.permission.CAMERA] == true
 
             pendingPermissionRequest?.let { req ->
-                val granted = mutableListOf<String>()
-                for (res in req.resources) {
-                    if (res == PermissionRequest.RESOURCE_AUDIO_CAPTURE && audioGranted) {
-                        granted.add(res)
-                    } else if (res == PermissionRequest.RESOURCE_VIDEO_CAPTURE && cameraGranted) {
-                        granted.add(res)
+                runOnUiThread {
+                    val granted = mutableListOf<String>()
+                    for (res in req.resources) {
+                        if (res == PermissionRequest.RESOURCE_AUDIO_CAPTURE && audioGranted) {
+                            granted.add(res)
+                        } else if (res == PermissionRequest.RESOURCE_VIDEO_CAPTURE && cameraGranted) {
+                            granted.add(res)
+                        }
                     }
-                }
-                if (granted.isNotEmpty()) {
-                    req.grant(granted.toTypedArray())
-                } else {
-                    req.deny()
+                    if (granted.isNotEmpty()) {
+                        req.grant(granted.toTypedArray())
+                    } else {
+                        req.deny()
+                    }
                 }
             }
             pendingPermissionRequest = null
@@ -204,13 +221,14 @@ class MainActivity : ComponentActivity() {
                             allowContentAccess = true
                             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                             cacheMode = WebSettings.LOAD_NO_CACHE
-                            useWideViewPort = false
-                            loadWithOverviewMode = false
-                            setSupportZoom(false)
-                            builtInZoomControls = false
+                            useWideViewPort = true
+                            loadWithOverviewMode = true
+                            setSupportZoom(true)
+                            builtInZoomControls = true
                             displayZoomControls = false
                             setSupportMultipleWindows(true)
                             javaScriptCanOpenWindowsAutomatically = true
+                            mediaPlaybackRequiresUserGesture = false
                             userAgentString = "$userAgentString QubDocsAndroid/1.0"
                         }
 
@@ -242,6 +260,9 @@ class MainActivity : ComponentActivity() {
                         }
 
                         webChromeClient = object : WebChromeClient() {
+                            override fun getDefaultVideoPoster(): Bitmap? {
+                                return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+                            }
                             override fun onPermissionRequest(request: PermissionRequest?) {
                                 if (request == null) return
                                 val resources = request.resources ?: return
@@ -259,7 +280,9 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                                 if (needed.isEmpty()) {
-                                    request.grant(resources)
+                                    runOnUiThread {
+                                        request.grant(resources)
+                                    }
                                 } else {
                                     pendingPermissionRequest = request
                                     permissionLauncher.launch(needed.toTypedArray())
@@ -289,11 +312,50 @@ class MainActivity : ComponentActivity() {
                                 fileChooserParams: FileChooserParams?
                             ): Boolean {
                                 if (filePathCallback == null) return false
-                                val intent = fileChooserParams?.createIntent() ?: Intent(Intent.ACTION_GET_CONTENT).apply {
-                                    type = "*/*"
+                                val isCapture = fileChooserParams?.isCaptureEnabled == true
+                                val acceptTypes = fileChooserParams?.acceptTypes ?: emptyArray()
+                                val wantsImage = isCapture || acceptTypes.any { it.contains("image") }
+
+                                var captureIntent: Intent? = null
+                                if (wantsImage) {
+                                    try {
+                                        val values = android.content.ContentValues().apply {
+                                            put(android.provider.MediaStore.Images.Media.TITLE, "QubDocs_OCR_${System.currentTimeMillis()}")
+                                            put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                                        }
+                                        cameraPhotoUri = contentResolver.insert(
+                                            android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                                            values
+                                        )
+                                        captureIntent = Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE).apply {
+                                            if (cameraPhotoUri != null) {
+                                                putExtra(android.provider.MediaStore.EXTRA_OUTPUT, cameraPhotoUri)
+                                            }
+                                        }
+                                    } catch (_: Exception) {
+                                        cameraPhotoUri = null
+                                        captureIntent = Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE)
+                                    }
+                                }
+
+                                val contentIntent = fileChooserParams?.createIntent() ?: Intent(Intent.ACTION_GET_CONTENT).apply {
+                                    type = if (wantsImage) "image/*" else "*/*"
                                     addCategory(Intent.CATEGORY_OPENABLE)
                                 }
-                                onOpenFileChooser(filePathCallback, intent)
+
+                                val finalIntent = if (isCapture && captureIntent != null) {
+                                    captureIntent
+                                } else if (captureIntent != null) {
+                                    Intent(Intent.ACTION_CHOOSER).apply {
+                                        putExtra(Intent.EXTRA_INTENT, contentIntent)
+                                        putExtra(Intent.EXTRA_TITLE, "Select or Capture Image")
+                                        putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(captureIntent))
+                                    }
+                                } else {
+                                    contentIntent
+                                }
+
+                                onOpenFileChooser(filePathCallback, finalIntent)
                                 return true
                             }
 
@@ -320,6 +382,7 @@ class MainActivity : ComponentActivity() {
                                         mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                                         setSupportMultipleWindows(true)
                                         javaScriptCanOpenWindowsAutomatically = true
+                            mediaPlaybackRequiresUserGesture = false
                                         userAgentString = "$userAgentString QubDocsAndroid/1.0"
                                     }
                                     val childCookieManager = CookieManager.getInstance()

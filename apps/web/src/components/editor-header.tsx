@@ -21,7 +21,15 @@ export function SaveIndicator({ status, lastSavedAt, onRetry }: { status: SaveSt
   };
   const c = content[status];
   return (
-    <span className={cn('flex items-center gap-1.5 whitespace-nowrap text-xs', c.tone)} role="status" aria-live="polite">
+    <span
+      className={cn(
+        'items-center gap-1.5 whitespace-nowrap text-xs',
+        status === 'saved' ? 'hidden sm:inline-flex' : 'inline-flex',
+        c.tone
+      )}
+      role="status"
+      aria-live="polite"
+    >
       {c.icon}
       <span className="hidden sm:inline">{c.text}</span>
       {status === 'failed' && onRetry && (

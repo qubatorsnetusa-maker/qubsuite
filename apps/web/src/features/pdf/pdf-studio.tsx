@@ -84,8 +84,23 @@ export function PdfStudio({
   const [pdfProxy, setPdfProxy] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [numPages, setNumPages] = useState<number>(1);
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [zoomScale, setZoomScale] = useState<number>(1.2);
+  const [pagesDrawerOpen, setPagesDrawerOpen] = useState<boolean>(false);
+  const [zoomScale, setZoomScale] = useState<number>(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      const avail = Math.max(300, window.innerWidth - 20);
+      return Math.max(0.48, Math.min(0.75, Math.round((avail / 595) * 100) / 100));
+    }
+    return 1.2;
+  });
   const [pageLoading, setPageLoading] = useState(false);
+
+  const handleFitToWidth = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const containerWidth = window.innerWidth < 768 ? window.innerWidth - 16 : 800;
+    const targetScale = Math.max(0.45, Math.min(1.5, Math.round((containerWidth / 595) * 100) / 100));
+    setZoomScale(targetScale);
+    toast.success(`Fit to screen (${Math.round(targetScale * 100)}%)`);
+  }, []);
   const [isExporting, setIsExporting] = useState(false);
   const [includeAuditMark, setIncludeAuditMark] = useState(true);
 
@@ -199,8 +214,8 @@ export function PdfStudio({
     [selectedId]
   );
 
-  // Drag-to-reposition any annotation on the PDF overlay
-  const startDragAnnotation = (e: React.MouseEvent, ann: PdfAnnotation) => {
+  // Drag-to-reposition any annotation on the PDF overlay (Mouse + Touch Pointer support)
+  const startDragAnnotation = (e: React.PointerEvent | React.MouseEvent, ann: PdfAnnotation) => {
     e.stopPropagation();
     setSelectedId(ann.id);
     const overlay = overlayRef.current;
@@ -211,9 +226,11 @@ export function PdfStudio({
     const origX = ann.xPercent;
     const origY = ann.yPercent;
 
-    const onMove = (ev: globalThis.MouseEvent) => {
-      const dxPct = ((ev.clientX - startX) / rect.width) * 100;
-      const dyPct = ((ev.clientY - startY) / rect.height) * 100;
+    const onMove = (ev: MouseEvent | PointerEvent | TouchEvent) => {
+      const clientX = 'clientX' in ev ? (ev as MouseEvent).clientX : (ev as TouchEvent).touches?.[0]?.clientX ?? startX;
+      const clientY = 'clientY' in ev ? (ev as MouseEvent).clientY : (ev as TouchEvent).touches?.[0]?.clientY ?? startY;
+      const dxPct = ((clientX - startX) / rect.width) * 100;
+      const dyPct = ((clientY - startY) / rect.height) * 100;
       setAnnotations((prev) =>
         prev.map((item) =>
           item.id === ann.id
@@ -227,11 +244,19 @@ export function PdfStudio({
       );
     };
     const onUp = () => {
-      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('pointermove', onMove as any);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('mousemove', onMove as any);
       window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchmove', onMove as any);
+      window.removeEventListener('touchend', onUp);
     };
-    window.addEventListener('mousemove', onMove);
+    window.addEventListener('pointermove', onMove as any);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('mousemove', onMove as any);
     window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchmove', onMove as any, { passive: true });
+    window.addEventListener('touchend', onUp);
   };
 
   const handleFontSizeChange = (size: number) => {
@@ -666,8 +691,8 @@ export function PdfStudio({
       />
 
       {/* Top Clean Light-Themed Header */}
-      <header className="h-14 border-b border-slate-200 bg-white px-4 flex items-center justify-between shrink-0 z-30 shadow-xs">
-        <div className="flex items-center gap-3">
+      <header className="h-14 border-b border-slate-200 bg-white px-2 sm:px-4 flex items-center justify-between gap-1.5 sm:gap-3 shrink-0 z-30 shadow-xs">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           {onBack && (
             <button
               onClick={onBack}
@@ -679,27 +704,27 @@ export function PdfStudio({
           )}
 
           {/* Qub PDF Brand Badge */}
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 rounded-lg bg-red-600 text-white shadow-sm">
+          <div className="flex items-center gap-1.5 sm:gap-2.5">
+            <div className="p-1.5 rounded-lg bg-red-600 text-white shadow-sm shrink-0">
               <FileText className="size-4 font-bold" />
             </div>
-            <div className="flex flex-col">
-              <span className="font-bold text-[10px] tracking-wider uppercase text-red-600 leading-none">
+            <div className="flex flex-col min-w-0">
+              <span className="font-bold text-[9px] sm:text-[10px] tracking-wider uppercase text-red-600 leading-none">
                 Qub PDF
               </span>
               <input
                 type="text"
                 value={docName}
                 onChange={(e) => setDocName(e.target.value)}
-                className="bg-transparent text-sm font-semibold text-slate-900 hover:text-slate-700 border-0 outline-none p-0 focus:ring-0 w-44 sm:w-64 truncate"
+                className="bg-transparent text-xs sm:text-sm font-semibold text-slate-900 hover:text-slate-700 border-0 outline-none p-0 focus:ring-0 w-24 sm:w-44 md:w-64 truncate"
                 title="Rename document"
               />
             </div>
           </div>
         </div>
 
-        {/* Primary PDF Tools Center Toolbar */}
-        <div className="flex items-center gap-1 bg-slate-100 border border-slate-200/80 p-1 rounded-xl">
+        {/* Primary PDF Tools Center Toolbar (Horizontally scrollable on mobile) */}
+        <div className="flex items-center gap-1 bg-slate-100 border border-slate-200/80 p-1 rounded-xl overflow-x-auto no-scrollbar flex-nowrap max-w-[calc(100vw-190px)] sm:max-w-none">
           <button
             type="button"
             onClick={() => setActiveTool('select')}
@@ -874,18 +899,30 @@ export function PdfStudio({
             size="sm"
             onClick={() => handleExportPdf(true)}
             disabled={isExporting}
-            className="bg-red-600 hover:bg-red-700 text-white text-xs h-8 font-semibold shadow-sm gap-1.5"
+            className="bg-red-600 hover:bg-red-700 text-white text-xs h-8 font-semibold shadow-sm gap-1.5 shrink-0 px-2 sm:px-3"
           >
-            <Download className="size-3.5" />
-            <span>{isExporting ? 'Exporting...' : 'Download PDF'}</span>
+            <Download className="size-3.5 shrink-0" />
+            <span className="hidden sm:inline">{isExporting ? 'Exporting...' : 'Download PDF'}</span>
+            <span className="sm:hidden">{isExporting ? '...' : 'Export'}</span>
           </Button>
         </div>
       </header>
 
-      {/* Secondary Properties & Contextual Toolbar */}
-      <div className="h-10 bg-slate-50 border-b border-slate-200 px-6 flex items-center justify-between text-xs shrink-0 z-20">
+      {/* Secondary Properties & Contextual Toolbar (Scrollable on mobile) */}
+      <div className="min-h-10.5 bg-slate-50 border-b border-slate-200 px-2 sm:px-6 py-1 flex items-center justify-between text-xs shrink-0 z-20 overflow-x-auto no-scrollbar flex-nowrap gap-2 sm:gap-3">
+        {/* Mobile Pages Drawer Toggle */}
+        <button
+          type="button"
+          onClick={() => setPagesDrawerOpen((o) => !o)}
+          className="md:hidden flex items-center gap-1 bg-white border border-slate-200 px-2 py-1 rounded-lg text-xs font-semibold text-slate-700 shadow-2xs shrink-0 hover:bg-slate-50 active:scale-95"
+          title="Toggle Page Thumbnails"
+        >
+          <FileText className="size-3.5 text-red-600" />
+          <span>Pages ({currentPage}/{numPages})</span>
+        </button>
+
         {/* Context-aware item controls: Text Font Size or Signature Scale */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4 shrink-0">
           {/* Text Controls */}
           {(activeTool === 'text' || selectedAnnotation?.type === 'text') && (
             <div className="flex items-center gap-2">
@@ -1082,22 +1119,30 @@ export function PdfStudio({
           </div>
 
           {/* Zoom controls */}
-          <div className="flex items-center gap-1 bg-white border border-slate-200 px-2 py-0.5 rounded-lg text-xs shadow-2xs">
+          <div className="flex items-center gap-1 bg-white border border-slate-200 px-1.5 py-0.5 rounded-lg text-xs shadow-2xs shrink-0">
             <button
               type="button"
-              onClick={() => setZoomScale((z) => Math.max(0.6, z - 0.2))}
-              className="p-1 text-slate-600 hover:text-slate-900"
+              onClick={handleFitToWidth}
+              className="px-1.5 py-0.5 rounded text-[10px] font-bold text-red-600 hover:bg-red-50 uppercase tracking-wider active:scale-95"
+              title="Fit to Screen Width"
+            >
+              Fit
+            </button>
+            <button
+              type="button"
+              onClick={() => setZoomScale((z) => Math.max(0.4, Math.round((z - 0.15) * 100) / 100))}
+              className="p-1 text-slate-600 hover:text-slate-900 active:scale-95"
               title="Zoom Out"
             >
               <ZoomOut className="size-3.5" />
             </button>
-            <span className="w-10 text-center font-mono text-slate-700 font-medium">
+            <span className="w-9 text-center font-mono text-slate-700 font-semibold text-[11px]">
               {Math.round(zoomScale * 100)}%
             </span>
             <button
               type="button"
-              onClick={() => setZoomScale((z) => Math.min(2.5, z + 0.2))}
-              className="p-1 text-slate-600 hover:text-slate-900"
+              onClick={() => setZoomScale((z) => Math.min(2.5, Math.round((z + 0.15) * 100) / 100))}
+              className="p-1 text-slate-600 hover:text-slate-900 active:scale-95"
               title="Zoom In"
             >
               <ZoomIn className="size-3.5" />
@@ -1108,18 +1153,47 @@ export function PdfStudio({
 
       {/* Main Workspace Body */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Page Thumbnails strip (Light Theme) */}
-        <aside className="w-20 sm:w-28 bg-white border-r border-slate-200 p-2 flex flex-col items-center gap-3 overflow-y-auto shrink-0 select-none">
-          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500">
-            Pages
-          </span>
+        {/* Mobile Pages Drawer Backdrop */}
+        {pagesDrawerOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs md:hidden"
+            onClick={() => setPagesDrawerOpen(false)}
+          />
+        )}
+
+        {/* Left Page Thumbnails Strip (Hidden on mobile by default, slide-over drawer when toggled) */}
+        <aside
+          className={cn(
+            'bg-white border-r border-slate-200 p-2 flex flex-col items-center gap-3 overflow-y-auto shrink-0 select-none transition-all duration-200',
+            pagesDrawerOpen
+              ? 'fixed inset-y-0 left-0 z-50 w-32 shadow-2xl flex pt-4'
+              : 'hidden md:flex w-20 sm:w-28'
+          )}
+        >
+          <div className="w-full flex items-center justify-between px-1 md:justify-center">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500">
+              Pages ({numPages})
+            </span>
+            {pagesDrawerOpen && (
+              <button
+                type="button"
+                onClick={() => setPagesDrawerOpen(false)}
+                className="md:hidden p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
           {Array.from({ length: numPages }).map((_, idx) => {
             const pageNum = idx + 1;
             const isCurrent = pageNum === currentPage;
             return (
               <div
                 key={pageNum}
-                onClick={() => setCurrentPage(pageNum)}
+                onClick={() => {
+                  setCurrentPage(pageNum);
+                  setPagesDrawerOpen(false);
+                }}
                 className={cn(
                   'w-16 h-22 rounded-lg border flex flex-col items-center justify-between p-1.5 cursor-pointer transition-all',
                   isCurrent
@@ -1138,8 +1212,8 @@ export function PdfStudio({
           })}
         </aside>
 
-        {/* Center PDF Canvas Viewport */}
-        <main className="flex-1 bg-slate-100 overflow-auto flex items-center justify-center p-6 sm:p-10 relative">
+        {/* Center PDF Canvas Viewport (Mobile-optimized padding) */}
+        <main className="flex-1 bg-slate-100 overflow-auto flex items-center justify-center p-1.5 sm:p-6 md:p-10 relative">
           {pageLoading && (
             <div className="absolute inset-0 z-40 flex items-center justify-center bg-white/75 backdrop-blur-xs">
               <div className="flex items-center gap-2.5 rounded-xl bg-white border border-slate-200 px-5 py-3 text-xs text-slate-700 shadow-lg">
@@ -1182,6 +1256,7 @@ export function PdfStudio({
                   return (
                     <div
                       key={ann.id}
+                      onPointerDown={(e) => startDragAnnotation(e, ann)}
                       onMouseDown={(e) => startDragAnnotation(e, ann)}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1254,6 +1329,7 @@ export function PdfStudio({
                   return (
                     <div
                       key={ann.id}
+                      onPointerDown={(e) => startDragAnnotation(e, ann)}
                       onMouseDown={(e) => startDragAnnotation(e, ann)}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1332,6 +1408,7 @@ export function PdfStudio({
                   return (
                     <div
                       key={ann.id}
+                      onPointerDown={(e) => startDragAnnotation(e, ann)}
                       onMouseDown={(e) => startDragAnnotation(e, ann)}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1364,6 +1441,7 @@ export function PdfStudio({
                   return (
                     <div
                       key={ann.id}
+                      onPointerDown={(e) => startDragAnnotation(e, ann)}
                       onMouseDown={(e) => startDragAnnotation(e, ann)}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1399,6 +1477,7 @@ export function PdfStudio({
                   return (
                     <div
                       key={ann.id}
+                      onPointerDown={(e) => startDragAnnotation(e, ann)}
                       onMouseDown={(e) => startDragAnnotation(e, ann)}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1436,6 +1515,7 @@ export function PdfStudio({
                   return (
                     <div
                       key={ann.id}
+                      onPointerDown={(e) => startDragAnnotation(e, ann)}
                       onMouseDown={(e) => startDragAnnotation(e, ann)}
                       onClick={(e) => {
                         e.stopPropagation();

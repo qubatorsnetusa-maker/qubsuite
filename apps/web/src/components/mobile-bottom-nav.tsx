@@ -150,7 +150,6 @@ export function MobileBottomNav({ onOpenMenu, activeSuite }: MobileBottomNavProp
             </div>
 
             <div className="mb-4">
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted">Qub Suite</p>
               <div className="grid grid-cols-3 gap-2">
                 {QUB_SUITE_APPS.map((app) => (
                   <button

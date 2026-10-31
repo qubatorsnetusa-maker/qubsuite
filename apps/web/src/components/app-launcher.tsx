@@ -115,8 +115,7 @@ export function AppLauncher() {
       </Tooltip>
       <DropdownMenuContent align="end" className="w-[320px] p-3 shadow-pop rounded-2xl border border-border/80 bg-background/95 backdrop-blur-md">
         <div className="mb-2.5 px-2">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted">Qub Suite</p>
-          <p className="text-sm font-medium text-foreground">Switch Application</p>
+          <p className="text-xs font-semibold text-muted">Switch Application</p>
         </div>
         <div className="grid grid-cols-3 gap-2">
           {QUB_SUITE_APPS.map((app) => (

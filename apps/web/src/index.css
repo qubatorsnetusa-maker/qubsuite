@@ -9,6 +9,7 @@
 
   --color-background: #ffffff;
   --color-surface: #f8fafd;
+  --color-surface-1: #ffffff;
   --color-surface-2: #f0f4f9;
   --color-foreground: #1f1f1f;
   --color-muted: #5f6368;
@@ -192,8 +193,8 @@ body.resize-cursor * {
 :is(.ProseMirror, .qub-doc-preview) sub, :is(.ProseMirror, .qub-doc-preview) sup { font-size: 0.75em; }
 
 /* Manual page break */
-:is(.ProseMirror, .qub-doc-preview) .qub-manual-break { position: relative; height: 1.5em; border-top: 1px dashed #c4c7c5; margin: 0.75em 0 0; }
-:is(.ProseMirror, .qub-doc-preview) .qub-manual-break::after { content: 'Page break'; position: absolute; top: -0.75em; left: 50%; transform: translateX(-50%); background: #fff; padding: 0 0.5em; font-size: 8pt; color: #80868b; }
+:is(.ProseMirror, .qub-doc-preview) .qub-manual-break { position: relative; height: 1.8em; border-top: 1.5px dashed #94a3b8; margin: 1.25em 0; user-select: none; }
+:is(.ProseMirror, .qub-doc-preview) .qub-manual-break::after { content: 'Page Break'; position: absolute; top: -0.8em; left: 50%; transform: translateX(-50%); background: #ffffff; border: 1px solid #cbd5e1; border-radius: 9999px; padding: 0.1em 0.6em; font-size: 8pt; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #64748b; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); }
 .ProseMirror .qub-manual-break.ProseMirror-selectednode { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
 /* Find & replace */
@@ -216,10 +217,10 @@ body.resize-cursor * {
 .qub-page-break::after {
   content: '';
   position: absolute;
-  left: calc(-1 * var(--page-margin));
-  right: calc(-1 * var(--page-margin));
-  bottom: var(--page-margin);
-  height: var(--page-gap);
+  left: calc(-1 * var(--page-margin, 96px));
+  right: calc(-1 * var(--page-margin, 96px));
+  bottom: var(--page-margin, 96px);
+  height: var(--page-gap, 24px);
   background: var(--color-surface-2);
   border-top: 1px solid var(--color-border);
   border-bottom: 1px solid var(--color-border);

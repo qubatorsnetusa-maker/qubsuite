@@ -249,7 +249,7 @@ export function FloatingAiBar({ editor, mode, onModeChange }: FloatingAiBarProps
   return (
     <div className="fixed bottom-3 sm:bottom-5 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-1.25rem)] max-w-[760px] print:hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
       {/* Main Pill Input Bar */}
-      <div className="relative flex items-center gap-2 rounded-full border border-blue-200/90 bg-white/95 px-3 py-2 shadow-2xl shadow-blue-500/10 ring-4 ring-blue-500/10 backdrop-blur-md transition-all focus-within:border-blue-500 focus-within:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900/95">
+      <div className="relative flex items-center gap-1.5 sm:gap-2 rounded-full border border-blue-200/90 bg-white/98 px-2 sm:px-3.5 py-1.5 sm:py-2 shadow-2xl shadow-blue-500/10 ring-4 ring-blue-500/10 backdrop-blur-md transition-all focus-within:border-blue-500 focus-within:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900/98">
         <input
           ref={inputRef}
           type="text"
@@ -262,28 +262,28 @@ export function FloatingAiBar({ editor, mode, onModeChange }: FloatingAiBarProps
             }
           }}
           disabled={loading}
-          placeholder={isListening ? "Listening... Speak your instructions to AI" : "Help me write, brainstorm ideas, draft a proposal..."}
-          className="flex-1 bg-transparent px-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-hidden dark:text-slate-100 dark:placeholder-slate-500"
+          placeholder={isListening ? "Listening... Speak to AI" : "Help me write, generate ideas, draft a proposal..."}
+          className="min-w-0 flex-1 bg-transparent px-2 sm:px-2.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-hidden dark:text-slate-100 dark:placeholder-slate-500"
         />
 
         {voiceSupported && (
           <button
             type="button"
             onClick={toggleListening}
-            className={`flex h-8 w-8 items-center justify-center rounded-full transition-all ${
+            className={`shrink-0 flex h-7.5 w-7.5 sm:h-8 sm:w-8 items-center justify-center rounded-full transition-all ${
               isListening
                 ? 'bg-rose-500 text-white shadow-md animate-pulse'
                 : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200'
             }`}
             title={isListening ? "Stop voice input" : "Voice input - speak to AI"}
           >
-            {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            {isListening ? <MicOff className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <Mic className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
           </button>
         )}
 
-        {/* AI Assist Indicator */}
-        <div className="flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-400">
-          <span className="hidden sm:inline">AI Assist</span><span className="sm:hidden font-bold">AI</span>
+        {/* AI Assist Indicator (Desktop only - hidden on mobile to maximize input and button space) */}
+        <div className="hidden sm:flex shrink-0 items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-400">
+          <span>AI Assist</span>
         </div>
 
         {/* 3 Dots Menu: Switch to sidebar or minimize to floating button */}
@@ -291,10 +291,10 @@ export function FloatingAiBar({ editor, mode, onModeChange }: FloatingAiBarProps
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+              className="shrink-0 flex h-7.5 w-7.5 sm:h-8 sm:w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
               title="More options"
             >
-              <MoreVertical className="h-4 w-4" />
+              <MoreVertical className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" side="top" className="w-52">
@@ -310,63 +310,78 @@ export function FloatingAiBar({ editor, mode, onModeChange }: FloatingAiBarProps
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Submit Up Arrow Button */}
+        {/* Submit Up Arrow Button - Never clipped, touch-friendly, prominent */}
         <button
           type="button"
           onClick={() => handleGenerate()}
           disabled={!prompt.trim() || loading}
-          className={`flex h-8 w-8 items-center justify-center rounded-full transition-all ${
+          className={`shrink-0 flex h-7.5 w-7.5 sm:h-8 sm:w-8 items-center justify-center rounded-full transition-all active:scale-95 ${
             prompt.trim() && !loading
               ? 'bg-blue-600 text-white shadow-md hover:bg-blue-700'
               : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
           }`}
           title="Generate with AI"
         >
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
+          {loading ? <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" /> : <ArrowUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
         </button>
       </div>
 
-      {/* Generated Result Preview Card */}
+      {/* Generated Result Preview Card (Optimized for Mobile) */}
       {result && (
-        <div className="mt-3 rounded-2xl border border-slate-200 bg-white/98 p-4 shadow-2xl backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/98 animate-in fade-in slide-in-from-bottom-2 duration-200">
-          <div className="mb-2 flex items-center justify-between border-b border-slate-100 pb-2 dark:border-slate-800">
-            <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
+        <div className="mt-2 sm:mt-3 w-full max-w-full overflow-hidden rounded-2xl border border-slate-200/90 bg-white/98 p-3 sm:p-4 shadow-2xl backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/98 animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <div className="mb-2 flex items-center justify-between gap-2 border-b border-slate-100 pb-2 dark:border-slate-800">
+            <span className="text-[11px] sm:text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider truncate">
               Generated Draft
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 shrink-0">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => handleGenerate()}
-                className="h-7 text-xs"
+                className="h-7 px-2.5 text-xs font-medium shrink-0"
+                title="Retry generation"
               >
                 <RotateCcw className="mr-1 h-3 w-3" />
-                Retry
+                <span>Retry</span>
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleDiscard}
-                className="h-7 text-xs text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                className="h-7 px-2 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 shrink-0"
+                title="Discard draft"
               >
                 <X className="mr-1 h-3 w-3" />
-                Discard
+                <span>Discard</span>
               </Button>
               <Button
                 size="sm"
                 onClick={handleInsert}
-                className="h-7 bg-blue-600 text-xs text-white hover:bg-blue-700"
+                className="hidden sm:inline-flex h-7 bg-blue-600 px-3 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 shrink-0"
+                title="Insert content into document"
               >
                 <Check className="mr-1 h-3.5 w-3.5" />
-                Insert
+                <span>Insert</span>
               </Button>
             </div>
           </div>
 
           <div
-            className="prose prose-sm max-h-[300px] overflow-y-auto rounded-lg bg-slate-50/80 p-3 text-slate-800 dark:bg-slate-950 dark:text-slate-200"
+            className="prose prose-sm max-h-[30dvh] sm:max-h-[260px] overflow-y-auto rounded-xl bg-slate-50/90 p-3 text-xs sm:text-sm text-slate-800 border border-slate-100/80 dark:bg-slate-950 dark:text-slate-200 dark:border-slate-800 leading-relaxed"
             dangerouslySetInnerHTML={{ __html: result }}
           />
+
+          {/* Mobile full-width insert button cleanly inside card */}
+          <div className="mt-2.5 sm:hidden">
+            <Button
+              size="sm"
+              onClick={handleInsert}
+              className="w-full bg-blue-600 h-9 rounded-xl text-xs font-semibold text-white shadow-sm hover:bg-blue-700 flex items-center justify-center gap-1.5"
+            >
+              <Check className="h-3.5 w-3.5" />
+              <span>Insert into Document</span>
+            </Button>
+          </div>
         </div>
       )}
     </div>

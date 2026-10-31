@@ -7,9 +7,24 @@ import {
   Minus,
   Table as TableIcon,
   Palette,
+  Rows,
+  Columns,
+  Combine,
+  Split,
+  Heading,
+  Check,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger, Tooltip } from '@/components/ui/misc';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/menu';
+import { cn } from '@/lib/utils';
 
 interface TableControlsBarProps {
   editor: Editor;
@@ -18,62 +33,56 @@ interface TableControlsBarProps {
 // MS Word / Google Docs style Table Themes
 const TABLE_THEMES = [
   {
-    name: 'Modern Blue',
+    name: 'Modern Blue (Grid & Header)',
     headerBg: '#e8f0fe',
     rowBg: '#ffffff',
-    altRowBg: '#f8fafd',
     borderColor: '#c2d7fa',
   },
   {
     name: 'Executive Grey',
     headerBg: '#f1f3f4',
     rowBg: '#ffffff',
-    altRowBg: '#f8f9fa',
     borderColor: '#dadce0',
   },
   {
     name: 'Emerald Green',
     headerBg: '#e6f4ea',
     rowBg: '#ffffff',
-    altRowBg: '#f6fbf7',
     borderColor: '#b7e1cd',
   },
   {
     name: 'Warm Amber',
     headerBg: '#fef7e0',
     rowBg: '#ffffff',
-    altRowBg: '#fffdf6',
     borderColor: '#fce8b2',
   },
   {
     name: 'Lavender Purple',
     headerBg: '#f3e8fd',
     rowBg: '#ffffff',
-    altRowBg: '#faf5fe',
     borderColor: '#d7aefb',
   },
   {
     name: 'Coral Rose',
     headerBg: '#fce8e6',
     rowBg: '#ffffff',
-    altRowBg: '#fdf3f2',
     borderColor: '#f4c7c3',
   },
 ];
 
 const INDIVIDUAL_COLORS = [
-  '#ffffff',
-  '#f8f9fa',
-  '#f1f3f4',
-  '#e8f0fe',
-  '#fce8e6',
-  '#fef7e0',
-  '#e6f4ea',
-  '#f3e8fd',
-  '#d2e3fc',
-  '#fad2cf',
-  '#feefc3',
-  '#ceead6',
+  { name: 'None', color: '' },
+  { name: 'White', color: '#ffffff' },
+  { name: 'Soft Gray', color: '#f8f9fa' },
+  { name: 'Medium Gray', color: '#e9ecef' },
+  { name: 'Light Blue', color: '#e8f0fe' },
+  { name: 'Soft Red', color: '#fce8e6' },
+  { name: 'Soft Yellow', color: '#fef7e0' },
+  { name: 'Soft Green', color: '#e6f4ea' },
+  { name: 'Soft Purple', color: '#f3e8fd' },
+  { name: 'Accent Blue', color: '#d2e3fc' },
+  { name: 'Accent Rose', color: '#fad2cf' },
+  { name: 'Accent Emerald', color: '#ceead6' },
 ];
 
 export function TableControlsBar({ editor }: TableControlsBarProps) {
@@ -87,108 +96,180 @@ export function TableControlsBar({ editor }: TableControlsBarProps) {
   const c = () => editor.chain().focus();
 
   const setCellColor = (color: string) => {
-    c().setCellAttribute('backgroundColor', color).run();
+    if (!color) {
+      c().setCellAttribute('backgroundColor', null).run();
+      toast.success('Cell shading cleared');
+    } else {
+      c().setCellAttribute('backgroundColor', color).run();
+      toast.success('Cell shading applied');
+    }
   };
 
   const applyTableTheme = (theme: typeof TABLE_THEMES[0]) => {
-    // Select table and apply header color
     c().setCellAttribute('backgroundColor', theme.headerBg).run();
+    toast.success(`Applied ${theme.name}`);
   };
 
   return (
-    <div className="flex items-center gap-1 rounded-lg border border-border/80 bg-background px-3 py-1.5 shadow-md backdrop-blur-xs animate-in fade-in slide-in-from-top-1">
-      <span className="flex items-center gap-1 text-xs font-semibold text-muted-foreground mr-1">
-        <TableIcon className="h-3.5 w-3.5 text-blue-600" />
-        Table:
-      </span>
+    <div
+      role="toolbar"
+      aria-label="MS Word Level Table Controls"
+      className="flex max-w-full items-center gap-1 overflow-x-auto no-scrollbar rounded-full border border-blue-200 bg-white/98 px-3 py-1 text-xs shadow-lg backdrop-blur-md my-1 select-none animate-in fade-in"
+    >
+      {/* Badge */}
+      <div className="flex items-center gap-1 pr-1.5 border-r border-slate-200 text-slate-500 font-bold shrink-0">
+        <TableIcon className="size-3.5 text-blue-600" />
+        <span className="text-[11px] hidden sm:inline">Table:</span>
+      </div>
 
-      {/* Row Operations */}
-      <Tooltip content="Insert row above">
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1" onClick={() => c().addRowBefore().run()}>
-          <Plus className="h-3 w-3 text-emerald-600" /> Row Above
-        </Button>
-      </Tooltip>
-      <Tooltip content="Insert row below">
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1" onClick={() => c().addRowAfter().run()}>
-          <Plus className="h-3 w-3 text-emerald-600" /> Row Below
-        </Button>
-      </Tooltip>
-      <Tooltip content="Delete current row">
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1 text-amber-700 hover:text-amber-800" onClick={() => c().deleteRow().run()}>
-          <Minus className="h-3 w-3" /> Del Row
-        </Button>
-      </Tooltip>
+      {/* Row Controls Dropdown */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold text-slate-700 hover:bg-slate-100 active:scale-95 shrink-0"
+          >
+            <Rows className="size-3 text-blue-600" />
+            <span>Rows ▾</span>
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-44">
+          <DropdownMenuItem onSelect={() => c().addRowBefore().run()}>
+            <Plus className="mr-2 size-3.5 text-emerald-600" />
+            <span>Insert row above</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => c().addRowAfter().run()}>
+            <Plus className="mr-2 size-3.5 text-emerald-600" />
+            <span>Insert row below</span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => c().deleteRow().run()} className="text-amber-700 focus:text-amber-800">
+            <Minus className="mr-2 size-3.5" />
+            <span>Delete current row</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
-      <div className="h-4 w-px bg-border mx-0.5" />
+      {/* Column Controls Dropdown */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold text-slate-700 hover:bg-slate-100 active:scale-95 shrink-0"
+          >
+            <Columns className="size-3 text-blue-600" />
+            <span>Cols ▾</span>
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-44">
+          <DropdownMenuItem onSelect={() => c().addColumnBefore().run()}>
+            <Plus className="mr-2 size-3.5 text-emerald-600" />
+            <span>Insert column left</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => c().addColumnAfter().run()}>
+            <Plus className="mr-2 size-3.5 text-emerald-600" />
+            <span>Insert column right</span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => c().deleteColumn().run()} className="text-amber-700 focus:text-amber-800">
+            <Minus className="mr-2 size-3.5" />
+            <span>Delete current column</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
-      {/* Column Operations */}
-      <Tooltip content="Insert column left">
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1" onClick={() => c().addColumnBefore().run()}>
-          <Plus className="h-3 w-3 text-emerald-600" /> Col Left
-        </Button>
-      </Tooltip>
-      <Tooltip content="Insert column right">
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1" onClick={() => c().addColumnAfter().run()}>
-          <Plus className="h-3 w-3 text-emerald-600" /> Col Right
-        </Button>
-      </Tooltip>
-      <Tooltip content="Delete current column">
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1 text-amber-700 hover:text-amber-800" onClick={() => c().deleteColumn().run()}>
-          <Minus className="h-3 w-3" /> Del Col
-        </Button>
-      </Tooltip>
+      {/* Merge & Split Cells (MS Word standard) */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold text-slate-700 hover:bg-slate-100 active:scale-95 shrink-0"
+          >
+            <Combine className="size-3 text-indigo-600" />
+            <span>Merge/Split ▾</span>
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-48">
+          <DropdownMenuItem onSelect={() => { c().mergeCells().run(); toast.success('Merged selected cells'); }}>
+            <Combine className="mr-2 size-3.5 text-indigo-600" />
+            <span>Merge selected cells</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => { c().splitCell().run(); toast.success('Cell split'); }}>
+            <Split className="mr-2 size-3.5 text-indigo-600" />
+            <span>Split merged cell</span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => { c().toggleHeaderRow().run(); toast.success('Header row toggled'); }}>
+            <Heading className="mr-2 size-3.5 text-slate-600" />
+            <span>Toggle header row</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => { c().toggleHeaderColumn().run(); toast.success('Header column toggled'); }}>
+            <Heading className="mr-2 size-3.5 text-slate-600" />
+            <span>Toggle header column</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
-      <div className="h-4 w-px bg-border mx-0.5" />
+      <div className="h-4 w-px bg-slate-200 mx-0.5 shrink-0" />
 
-      {/* Cell Background Color */}
+      {/* Cell Shading / Background Color */}
       <Popover>
-        <Tooltip content="Cell background color">
-          <PopoverTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1">
-              <PaintBucket className="h-3.5 w-3.5 text-blue-600" />
-              <span>Cell Color</span>
-            </Button>
-          </PopoverTrigger>
-        </Tooltip>
-        <PopoverContent align="center" className="w-auto p-2.5 shadow-pop">
-          <div className="text-[11px] font-semibold text-muted-foreground mb-1.5 px-0.5">Shading</div>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold text-slate-700 hover:bg-slate-100 active:scale-95 shrink-0"
+            title="Cell shading"
+          >
+            <PaintBucket className="size-3 text-blue-600" />
+            <span>Shading</span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="center" className="w-56 p-2.5 shadow-xl">
+          <div className="text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-2">Cell Shading</div>
           <div className="grid grid-cols-4 gap-1.5">
-            {INDIVIDUAL_COLORS.map((color) => (
+            {INDIVIDUAL_COLORS.map((item) => (
               <button
-                key={color}
+                key={item.name}
                 type="button"
-                onClick={() => setCellColor(color)}
-                style={{ backgroundColor: color }}
-                className="h-6 w-6 rounded border border-slate-300 hover:scale-110 transition-transform shadow-2xs"
-                title={color}
-              />
+                onClick={() => setCellColor(item.color)}
+                style={{ backgroundColor: item.color || '#ffffff' }}
+                className={cn(
+                  'h-6 w-full rounded border border-slate-300 hover:scale-105 transition-transform flex items-center justify-center text-[9px] font-semibold',
+                  !item.color && 'border-dashed border-red-300 text-red-500'
+                )}
+                title={item.name}
+              >
+                {!item.color && 'None'}
+              </button>
             ))}
           </div>
         </PopoverContent>
       </Popover>
 
-      {/* Word-style Table Themes */}
+      {/* MS Word Table Themes */}
       <Popover>
-        <Tooltip content="MS Word Table Themes">
-          <PopoverTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1 text-purple-700 dark:text-purple-400">
-              <Palette className="h-3.5 w-3.5 text-purple-600" />
-              <span>Theme</span>
-            </Button>
-          </PopoverTrigger>
-        </Tooltip>
-        <PopoverContent align="center" className="w-56 p-2 shadow-pop">
-          <div className="text-[11px] font-semibold text-muted-foreground mb-2 px-1">Word-style Table Themes</div>
-          <div className="space-y-1.5">
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold text-purple-700 hover:bg-purple-50 active:scale-95 shrink-0"
+            title="MS Word Table Themes"
+          >
+            <Palette className="size-3 text-purple-600" />
+            <span>Themes</span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="center" className="w-60 p-2 shadow-xl">
+          <div className="text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-2 px-1">Word Table Styles</div>
+          <div className="space-y-1">
             {TABLE_THEMES.map((t) => (
               <button
                 key={t.name}
                 type="button"
                 onClick={() => applyTableTheme(t)}
-                className="w-full flex items-center justify-between p-1.5 rounded hover:bg-muted text-left text-xs transition-colors"
+                className="w-full flex items-center justify-between p-1.5 rounded-lg hover:bg-slate-100 text-left text-xs transition-colors"
               >
-                <span>{t.name}</span>
-                <div className="flex h-4 w-8 rounded border overflow-hidden" style={{ borderColor: t.borderColor }}>
+                <span className="font-medium text-slate-800 truncate pr-2">{t.name}</span>
+                <div className="flex h-4 w-9 rounded border overflow-hidden shrink-0" style={{ borderColor: t.borderColor }}>
                   <div className="w-1/2 h-full" style={{ backgroundColor: t.headerBg }} />
                   <div className="w-1/2 h-full" style={{ backgroundColor: t.rowBg }} />
                 </div>
@@ -198,15 +279,21 @@ export function TableControlsBar({ editor }: TableControlsBarProps) {
         </PopoverContent>
       </Popover>
 
-      <div className="h-4 w-px bg-border mx-0.5" />
+      <div className="h-4 w-px bg-slate-200 mx-0.5 shrink-0" />
 
-      {/* Delete Table */}
-      <Tooltip content="Delete entire table">
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => c().deleteTable().run()}>
-          <Trash2 className="h-3.5 w-3.5" />
-          <span>Delete Table</span>
-        </Button>
-      </Tooltip>
+      {/* Delete Entire Table */}
+      <button
+        type="button"
+        onClick={() => {
+          c().deleteTable().run();
+          toast.success('Table deleted');
+        }}
+        className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold text-red-600 hover:bg-red-50 active:scale-95 shrink-0"
+        title="Delete entire table"
+      >
+        <Trash2 className="size-3 text-red-600" />
+        <span>Delete Table</span>
+      </button>
     </div>
   );
 }

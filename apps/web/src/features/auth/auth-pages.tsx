@@ -1,4 +1,5 @@
 import { KingsChatButton } from './kingschat-button';
+import { OnboardingScreens, ONBOARDING_COMPLETED_KEY } from './onboarding-screens';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { checkEmailSyntaxAndTypo, getTypoSuggestion, forgotPasswordSchema, loginSchema, passwordSchema, registerSchema, type LoginInput, type RegisterInput } from '@qub/shared';
 import { useMutation } from '@tanstack/react-query';
@@ -76,6 +77,17 @@ export function LoginPage() {
     !!search.neon_auth_session_verifier;
   const [resendCooldown, setResendCooldown] = useState(0);
   const [verifying, setVerifying] = useState(isCallback);
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    if (isCallback) return false;
+    if (typeof window === 'undefined') return false;
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('onboarding') === 'true') return true;
+      return !localStorage.getItem(ONBOARDING_COMPLETED_KEY);
+    } catch {
+      return false;
+    }
+  });
 
   // Handle redirect callback from Neon Auth magic link email verification
   useEffect(() => {
@@ -179,6 +191,19 @@ export function LoginPage() {
     }
   };
 
+  if (showOnboarding && !isCallback) {
+    return (
+      <OnboardingScreens
+        onComplete={() => {
+          try {
+            localStorage.setItem(ONBOARDING_COMPLETED_KEY, 'true');
+          } catch {}
+          setShowOnboarding(false);
+        }}
+      />
+    );
+  }
+
   if (verifying) {
     return (
       <AuthCard title="Signing you in..." subtitle="Verifying your sign-in with QubDocs">
@@ -236,12 +261,23 @@ export function LoginPage() {
       title="Welcome to QubDocs"
       subtitle="Sign in with KingsChat or your email to continue to QubDocs"
       footer={
-        <>
-          New to QubDocs?{' '}
-          <Link to="/register" search={{ redirect: search.redirect }} className="font-medium text-primary hover:underline">
-            Create an account
-          </Link>
-        </>
+        <div className="space-y-2">
+          <div>
+            New to QubDocs?{' '}
+            <Link to="/register" search={{ redirect: search.redirect }} className="font-medium text-primary hover:underline">
+              Create an account
+            </Link>
+          </div>
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowOnboarding(true)}
+              className="text-xs text-muted hover:text-foreground hover:underline transition-colors"
+            >
+              Learn about QubDocs
+            </button>
+          </div>
+        </div>
       }
     >
       <FormError error={error || kcError} />
@@ -301,6 +337,17 @@ export function RegisterPage() {
     !!search.neon_auth_session_verifier;
   const [resendCooldown, setResendCooldown] = useState(0);
   const [verifying, setVerifying] = useState(isCallback);
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    if (isCallback) return false;
+    if (typeof window === 'undefined') return false;
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('onboarding') === 'true') return true;
+      return !localStorage.getItem(ONBOARDING_COMPLETED_KEY);
+    } catch {
+      return false;
+    }
+  });
 
   // Handle redirect callback from Neon Auth magic link email verification
   useEffect(() => {
@@ -408,6 +455,19 @@ export function RegisterPage() {
       setLoading(false);
     }
   };
+
+  if (showOnboarding && !isCallback) {
+    return (
+      <OnboardingScreens
+        onComplete={() => {
+          try {
+            localStorage.setItem(ONBOARDING_COMPLETED_KEY, 'true');
+          } catch {}
+          setShowOnboarding(false);
+        }}
+      />
+    );
+  }
 
   if (verifying) {
     return (

@@ -63,6 +63,10 @@ import { MoveDialog } from '../drive/dialogs';
 import { getServiceUrl } from '@/lib/ecosystem-urls';
 import { setPageMetadata } from '@/lib/meta';
 import { ShareDialog } from '../sharing/share-dialog';
+import { PasswordProtectionDialog } from '../security/password-protection-dialog';
+import { DocumentLockScreen } from '../security/document-lock-screen';
+import { documentProtection } from '../security/document-protection';
+import { Shield, Lock } from 'lucide-react';
 import { RequestAccessDialog } from '../sharing/request-access-dialog';
 import { normalizeRange } from './geometry';
 import { Grid, type FillDirection, type GridHandle, type Selection } from './grid';
@@ -222,6 +226,9 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
   const [conditionalOpen, setConditionalOpen] = useState(false);
   const [pivotOpen, setPivotOpen] = useState(false);
   const [conditionalRules, setConditionalRules] = useState<ConditionalFormatRule[]>([]);
+  const [protectionOpen, setProtectionOpen] = useState(false);
+  const [isUnlocked, setIsUnlocked] = useState(() => documentProtection.isSessionUnlocked(id));
+  const isProtected = documentProtection.get(id)?.enabled ?? false;
   const [charts, setCharts] = useState<SheetChart[]>([]);
   const [showGridlines, setShowGridlines] = useState(true);
   const [sheetFontFamily, setSheetFontFamily] = useState('Inter, system-ui, sans-serif');
@@ -859,6 +866,18 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
     setShareOpen(true);
   };
 
+  if (isProtected && !isUnlocked) {
+    return (
+      <DocumentLockScreen
+        fileId={id}
+        documentTitle={meta.data.title || 'Spreadsheet'}
+        itemType="Spreadsheet"
+        onUnlocked={() => setIsUnlocked(true)}
+        onBack={() => navigate({ to: '/drive' })}
+      />
+    );
+  }
+
   return (
     <div className="flex h-dvh min-h-dvh w-full flex-col bg-background">
       <div className="border-b border-border">
@@ -883,9 +902,14 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
                     Version history
                   </DropdownMenuItem>
                   {canEdit && (
-                    <DropdownMenuItem icon={<FolderInput />} onSelect={() => setMoveOpen(true)}>
-                      Move
-                    </DropdownMenuItem>
+                    <>
+                      <DropdownMenuItem icon={<FolderInput />} onSelect={() => setMoveOpen(true)}>
+                        Move
+                      </DropdownMenuItem>
+                      <DropdownMenuItem icon={<Shield className="text-blue-600" />} onSelect={() => setProtectionOpen(true)}>
+                        Password protection...
+                      </DropdownMenuItem>
+                    </>
                   )}
                   {(meta.data.capabilities.canDownload || canEdit) && <DropdownMenuSeparator />}
                   {meta.data.capabilities.canDownload && (
@@ -1071,6 +1095,17 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
               <Tooltip content="Version history">
                 <Button variant="subtle" size="icon" onClick={() => setPanel((p) => (p === 'versions' ? null : 'versions'))} aria-label="Version history">
                   <History />
+                </Button>
+              </Tooltip>
+              <Tooltip content={isProtected ? 'Spreadsheet protected (click to manage)' : 'Protect spreadsheet with password'}>
+                <Button
+                  variant={isProtected ? 'secondary' : 'subtle'}
+                  size="icon"
+                  onClick={() => setProtectionOpen(true)}
+                  aria-label="Password protection"
+                  className={cn(isProtected && 'bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-300')}
+                >
+                  <Shield className="size-4" />
                 </Button>
               </Tooltip>
             </>
@@ -1573,6 +1608,16 @@ function SheetEditor({ initial }: { initial: SpreadsheetDto }) {
         onSave={(validation) => {
           run([{ type: 'setStyle', sheetId: sheet.id, range, style: { validation } }]);
           setValidationOpen(false);
+        }}
+      />
+      <PasswordProtectionDialog
+        open={protectionOpen}
+        onOpenChange={setProtectionOpen}
+        fileId={id}
+        documentTitle={meta.data.title}
+        itemType="spreadsheet"
+        onProtectionChanged={(prot) => {
+          if (!prot) setIsUnlocked(true);
         }}
       />
       <ShareDialog

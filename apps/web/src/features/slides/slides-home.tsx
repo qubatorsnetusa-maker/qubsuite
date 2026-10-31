@@ -15,7 +15,6 @@ import {
 import { toast } from 'sonner';
 import { getServiceUrl } from '@/lib/ecosystem-urls';
 import { getStoredDecks, createDeckFromTemplate, deleteDeck, duplicateSlideInDeck, saveDeck } from './slides-storage';
-import { STARTER_TEMPLATES } from './slide-templates';
 import { SLIDE_THEMES, type PresentationDeck } from './slides-types';
 import { AiGenerateDialog } from './ai-generate-dialog';
 import { cn } from '@/lib/utils';
@@ -97,17 +96,18 @@ export function SlidesHome() {
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             onClick={() => setAiOpen(true)}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-sm transition-all"
+            className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-sm transition-all"
+            aria-label="AI Assist"
           >
             <AiAssistIcon className="size-3.5 text-indigo-200" />
-            <span>AI Assist</span>
+            <span className="hidden sm:inline">AI Assist</span>
           </button>
           <button
             onClick={() => handleCreateFromTemplate('blank')}
-            className="flex items-center gap-2 text-xs font-semibold px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-colors"
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-colors"
           >
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">New Presentation</span><span className="sm:hidden">New</span>
@@ -116,7 +116,7 @@ export function SlidesHome() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-6xl w-full mx-auto p-6 md:p-8 space-y-10">
+      <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 md:p-8 space-y-8 sm:space-y-10">
         {/* Template Gallery Section */}
         <section className="space-y-4">
           <div className="flex items-center justify-between">
@@ -125,72 +125,30 @@ export function SlidesHome() {
             </h2>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 max-w-md sm:max-w-xl gap-3 sm:gap-4">
             {/* AI Designer Tile */}
             <div
               onClick={() => setAiOpen(true)}
-              className="group cursor-pointer rounded-xl border border-purple-500/40 bg-gradient-to-br from-purple-500/10 via-indigo-500/5 to-surface-2 p-5 flex flex-col items-center justify-center text-center aspect-[16/10] transition-all hover:shadow-lg hover:border-purple-500"
+              className="group cursor-pointer rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-500/10 via-indigo-500/5 to-surface-2 p-4 sm:p-5 flex flex-col items-center justify-center text-center aspect-[16/10] transition-all hover:shadow-lg hover:border-purple-500 active:scale-[0.98]"
             >
-              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-600 to-amber-500 text-white flex items-center justify-center mb-3 group-hover:scale-110 shadow-md transition-transform">
+              <div className="size-10 sm:size-11 rounded-full bg-gradient-to-tr from-purple-600 to-amber-500 text-white flex items-center justify-center mb-2.5 group-hover:scale-110 shadow-md transition-transform">
                 <AiAssistIcon className="size-5 text-indigo-100" />
               </div>
               <span className="font-semibold text-xs text-foreground">AI Assist</span>
-              <span className="text-[10px] text-muted mt-0.5">Upload document or paste text</span>
+              <span className="text-[10px] text-muted mt-0.5 line-clamp-1">Upload document or paste text</span>
             </div>
 
             {/* Blank Tile */}
             <div
               onClick={() => handleCreateFromTemplate('blank')}
-              className="group cursor-pointer rounded-xl border border-dashed border-border hover:border-blue-500 bg-surface-2 p-5 flex flex-col items-center justify-center text-center aspect-[16/10] transition-all hover:shadow-md"
+              className="group cursor-pointer rounded-2xl border border-dashed border-border hover:border-blue-500 bg-surface-2 p-4 sm:p-5 flex flex-col items-center justify-center text-center aspect-[16/10] transition-all hover:shadow-md active:scale-[0.98]"
             >
-              <div className="w-10 h-10 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                <Plus className="w-5 h-5" />
+              <div className="size-10 sm:size-11 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform">
+                <Plus className="size-5" />
               </div>
-              <span className="font-medium text-xs">Blank</span>
-              <span className="text-[10px] text-muted mt-0.5">Start from scratch</span>
+              <span className="font-semibold text-xs text-foreground">Blank Canvas</span>
+              <span className="text-[10px] text-muted mt-0.5 line-clamp-1">Start from scratch</span>
             </div>
-
-            {/* Template Tiles */}
-            {Object.entries(STARTER_TEMPLATES)
-              .filter(([key]) => key !== 'blank')
-              .map(([key, t]) => {
-                const themeDef = SLIDE_THEMES[t.deck.theme];
-                return (
-                  <div
-                    key={key}
-                    onClick={() => handleCreateFromTemplate(key)}
-                    className="group cursor-pointer rounded-xl border border-border hover:border-blue-500 bg-surface-2 overflow-hidden flex flex-col aspect-[16/10] transition-all hover:shadow-md"
-                  >
-                    {/* Visual Deck Preview Header */}
-                    <div className={cn('h-28 p-3.5 flex flex-col justify-between border-b text-[10px] relative overflow-hidden', themeDef.cardBg)}>
-                      <div className={cn('absolute top-0 left-0 right-0 h-1', themeDef.accentBg)} />
-                      {t.deck.slides[0]?.imageUrl && (
-                        <img
-                          src={t.deck.slides[0].imageUrl}
-                          alt=""
-                          className="absolute right-2 bottom-2 w-16 h-12 object-cover rounded-md border border-slate-200/80 shadow-xs opacity-90"
-                        />
-                      )}
-                      <div className="relative z-10 pr-16">
-                        <span className={cn('font-bold block truncate text-xs', themeDef.titleColor)}>{t.deck.title}</span>
-                        <span className={cn('text-[9px] opacity-80 block truncate mt-0.5', themeDef.textColor)}>{t.deck.slides[0]?.subtitle ?? ''}</span>
-                      </div>
-                      <span className={cn('relative z-10 text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded w-fit border', themeDef.badgeBg)}>
-                        {themeDef.name}
-                      </span>
-                    </div>
-                    {/* Metadata Footer */}
-                    <div className="p-3 flex-1 flex flex-col justify-between bg-surface-2">
-                      <span className="font-medium text-xs text-foreground group-hover:text-blue-500 transition-colors">
-                        {t.name}
-                      </span>
-                      <span className="text-[10px] text-muted line-clamp-1">
-                        {t.description}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
           </div>
         </section>
 

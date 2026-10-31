@@ -519,8 +519,7 @@ function DriveShell() {
                   </Button>
                 </div>
                 <div className="border-b border-border/70 px-3 pb-3">
-                  <div className="mb-1.5 px-2 text-[11px] font-semibold uppercase tracking-wider text-muted">Qub Suite</div>
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <div className="grid grid-cols-3 gap-1.5 pt-1">
                     {QUB_SUITE_APPS.map((app) => (
                       <button
                         key={app.id}
@@ -544,6 +543,7 @@ function DriveShell() {
                       setMobileCreateOpen(true);
                     }}
                   />
+
                 </div>
               </div>
             </div>

@@ -30,6 +30,10 @@ import {
   BookOpen,
   FileCheck,
   CaseSensitive,
+  Shield,
+  CheckCheck,
+  PenTool,
+  Layers,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -76,6 +80,10 @@ export interface DocMenusProps {
   onTogglePageNumbers?(): void;
   showPageNumbers?: boolean;
   onVoiceTyping?(): void;
+  onPasswordProtection?(): void;
+  onSpellingCheck?(): void;
+  onHandwriting?(): void;
+  onHeaderFooter?(): void;
   onVersionHistory(): void;
   onMove(): void;
   onTrash(): void;
@@ -236,6 +244,11 @@ export function DocMenus(p: DocMenusProps) {
           </DropdownMenuItem>
           {p.canEdit && (
             <>
+              {p.onPasswordProtection && (
+                <DropdownMenuItem icon={<Shield className="text-blue-600" />} onSelect={p.onPasswordProtection}>
+                  Password protection...
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem icon={<Layout />} onSelect={p.onPageSetup}>
                 Page setup &amp; watermark
               </DropdownMenuItem>
@@ -375,6 +388,16 @@ export function DocMenus(p: DocMenusProps) {
                 <DropdownMenuItem icon={<ImagePlus />} onSelect={p.onInsertImage}>
                   Image
                 </DropdownMenuItem>
+                {p.onHandwriting && (
+                  <DropdownMenuItem icon={<PenTool className="text-blue-600" />} onSelect={p.onHandwriting}>
+                    Handwriting &amp; sketch
+                  </DropdownMenuItem>
+                )}
+                {p.onHeaderFooter && (
+                  <DropdownMenuItem icon={<Layers />} onSelect={p.onHeaderFooter}>
+                    Header &amp; footer
+                  </DropdownMenuItem>
+                )}
                 <TableGridPicker editor={editor}>
                   <button
                     type="button"
@@ -534,6 +557,11 @@ export function DocMenus(p: DocMenusProps) {
           {p.canEdit && p.onVoiceTyping && (
             <DropdownMenuItem icon={<Mic />} shortcut="Ctrl+Shift+S" onSelect={p.onVoiceTyping}>
               Voice typing
+            </DropdownMenuItem>
+          )}
+          {p.onSpellingCheck && (
+            <DropdownMenuItem icon={<CheckCheck className="text-blue-600" />} onSelect={p.onSpellingCheck}>
+              Spelling and grammar check
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>

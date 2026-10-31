@@ -4,11 +4,14 @@ import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view';
 
 export const PAGE = { width: 816, height: 1056, margin: 96, gap: 24 } as const;
 const CONTENT_HEIGHT = PAGE.height - 2 * PAGE.margin;
-/** Below this width the editor switches to a continuous (unpaged) mobile layout. */
-const MIN_PAGED_WIDTH = 900;
-
-/** True when the editor shows discrete Letter pages (desktop); false in the continuous mobile layout. */
-export const isPagedLayout = () => window.innerWidth >= MIN_PAGED_WIDTH;
+/** True when the editor shows discrete Letter pages; false only in explicitly pageless mode. */
+export const isPagedLayout = (view?: EditorView) => {
+  if (typeof document !== 'undefined') {
+    const stack = (view?.dom as HTMLElement | undefined)?.closest?.('.qub-page-stack') ?? document.querySelector('.qub-page-stack');
+    if (stack?.getAttribute('data-pageless') === 'true') return false;
+  }
+  return true;
+};
 
 interface Break {
   pos: number;
@@ -29,7 +32,7 @@ function sameBreaks(a: Break[], b: Break[]) {
  * the next block always starts a new page.
  */
 function computeBreaks(view: EditorView): Break[] {
-  if (!isPagedLayout()) return [];
+  if (!isPagedLayout(view)) return [];
   const breaks: Break[] = [];
   let spacerTotal = 0;
   let pageTop = 0;
@@ -105,7 +108,7 @@ export const Pagination = Extension.create({
               if (!view.dom.isConnected) return;
               const next = computeBreaks(view);
               const pages = next.length + 1;
-              view.dom.style.minHeight = !isPagedLayout() ? '' : `${pages * CONTENT_HEIGHT + (pages - 1) * (2 * PAGE.margin + PAGE.gap)}px`;
+              view.dom.style.minHeight = !isPagedLayout(view) ? '' : `${pages * CONTENT_HEIGHT + (pages - 1) * (2 * PAGE.margin + PAGE.gap)}px`;
               view.dom.dataset.pages = String(pages);
               if (!sameBreaks(next, current)) {
                 current = next;

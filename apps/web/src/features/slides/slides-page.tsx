@@ -26,6 +26,7 @@ import {
   Shapes,
   Grid,
   Download,
+  MoreVertical,
   Table as TableIcon,
   BarChart3,
   Columns3,
@@ -64,6 +65,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/menu';
 import { Button } from '@/components/ui/button';
@@ -455,33 +457,33 @@ export function SlidesPage() {
       />
 
       {/* Top Header Bar */}
-      <header className="h-14 border-b border-slate-200 bg-white px-4 flex items-center justify-between shrink-0 z-30">
-        <div className="flex items-center gap-3">
+      <header className="h-14 border-b border-slate-200 bg-white px-3 sm:px-4 flex items-center justify-between shrink-0 z-30 gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <button
             onClick={() => navigate({ to: '/slides' as any })}
-            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors shrink-0"
             title="All Presentations"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
 
-          <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-600 border border-amber-200/60">
+          <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-600 border border-amber-200/60 shrink-0">
             <Presentation className="w-4 h-4" />
           </div>
 
-          <div className="flex flex-col">
+          <div className="flex flex-col min-w-0">
             <input
               type="text"
               value={deck.title}
               onChange={(e) => handleTitleChange(e.target.value)}
-              className="font-semibold text-sm text-slate-900 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none transition-colors px-1"
+              className="font-semibold text-xs sm:text-sm text-slate-900 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none transition-colors px-1 truncate max-w-[130px] xs:max-w-[180px] sm:max-w-xs md:max-w-md"
             />
-            <span className="text-[10px] text-slate-400 px-1">All changes saved</span>
+            <span className="text-[10px] text-slate-400 px-1 hidden xs:inline truncate">All changes saved</span>
           </div>
         </div>
 
-        {/* Primary Right Actions */}
-        <div className="flex items-center gap-2">
+        {/* Primary Right Actions - Desktop */}
+        <div className="hidden md:flex items-center gap-2">
           {/* Slide Sorter Grid View Toggle */}
           <button
             type="button"
@@ -591,20 +593,98 @@ export function SlidesPage() {
             <span>Present</span>
           </button>
         </div>
+
+        {/* Primary Right Actions - Mobile */}
+        <div className="flex md:hidden items-center gap-1.5 shrink-0">
+          {/* Mobile AI Assist */}
+          <button
+            onClick={() => setAiOpen(true)}
+            className="flex items-center gap-1 text-xs font-semibold px-2 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-2xs"
+            title="AI Assist"
+          >
+            <AiAssistIcon className="size-3.5 text-indigo-100" />
+            <span className="text-[11px]">AI</span>
+          </button>
+
+          {/* Mobile Present */}
+          <button
+            onClick={() => setIsPresenterOpen(true)}
+            className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-2xs"
+            title="Present Fullscreen"
+          >
+            <Play className="size-3 fill-white" />
+            <span className="hidden xs:inline text-[11px]">Present</span>
+          </button>
+
+          {/* Mobile More Options Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 active:scale-95"
+                aria-label="More options"
+              >
+                <MoreVertical className="size-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 max-h-[80vh] overflow-y-auto">
+              <DropdownMenuItem onSelect={() => setSorterView((v) => !v)}>
+                <div className="flex items-center gap-2">
+                  <Grid className="size-4 text-blue-600" />
+                  <span className="text-xs font-medium">{sorterView ? 'Editor View' : 'Slide Sorter'}</span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setNotesOpen((o) => !o)}>
+                <div className="flex items-center gap-2">
+                  <FileText className="size-4 text-amber-600" />
+                  <span className="text-xs font-medium">{notesOpen ? 'Hide Notes' : 'Speaker Notes'}</span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Theme</div>
+              {VISIBLE_SLIDE_THEMES.map((thm) => (
+                <DropdownMenuItem key={thm} onSelect={() => handleThemeChange(thm)}>
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-3.5 h-3.5 rounded-full border border-slate-300 shadow-2xs"
+                        style={{ backgroundColor: SLIDE_THEMES[thm].swatchColor }}
+                      />
+                      <span className="text-xs font-medium">{SLIDE_THEMES[thm].name}</span>
+                    </div>
+                    {deck.theme === thm && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                  </div>
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Export</div>
+              <DropdownMenuItem onSelect={handleExportHtmlDeck}>
+                <span className="text-xs font-medium">Standalone HTML (.html)</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => window.print()}>
+                <span className="text-xs font-medium">Print / Save as PDF (.pdf)</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={handleExportJsonDeck}>
+                <span className="text-xs font-medium">QubSlides Archive (.json)</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </header>
 
       {/* Secondary PowerPoint-Style Formatting & Customization Ribbon */}
-      <div className="border-b border-slate-200 bg-slate-50/90 px-3 sm:px-4 py-1.5 flex items-center gap-2 text-xs shrink-0 z-20 overflow-x-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden flex-nowrap">
+      <div className="border-b border-slate-200 bg-slate-50/95 px-2.5 sm:px-4 py-1.5 flex items-center gap-1.5 sm:gap-2 text-xs shrink-0 z-20 overflow-x-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden flex-nowrap">
         {/* Slide Actions */}
-        <div className="flex items-center gap-1 pr-2 border-r border-slate-200">
+        <div className="flex items-center gap-1 pr-1.5 sm:pr-2 border-r border-slate-200 shrink-0">
           <button
             type="button"
             onClick={() => handleAddSlide('title-content')}
-            className="flex items-center gap-1 px-2 py-1 rounded-md bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-medium shadow-2xs"
+            className="flex items-center gap-1 px-2 py-1 rounded-md bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-medium shadow-2xs whitespace-nowrap active:scale-95"
             title="Insert new slide"
           >
             <Plus className="w-3.5 h-3.5 text-blue-600" />
-            <span>New Slide</span>
+            <span className="hidden sm:inline">New Slide</span>
+            <span className="sm:hidden">Slide</span>
           </button>
 
           {/* Layout Picker */}
@@ -612,11 +692,11 @@ export function SlidesPage() {
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-medium shadow-2xs"
+                className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-md bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-medium shadow-2xs whitespace-nowrap active:scale-95"
                 title="Change slide layout"
               >
                 <Layout className="w-3.5 h-3.5 text-slate-500" />
-                <span>{LAYOUT_DESCRIPTIONS[currentSlide.layout]?.label ?? 'Layout'}</span>
+                <span className="truncate max-w-[65px] sm:max-w-none">{LAYOUT_DESCRIPTIONS[currentSlide.layout]?.label ?? 'Layout'}</span>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-64 max-h-96 overflow-y-auto">
@@ -636,11 +716,12 @@ export function SlidesPage() {
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-medium shadow-2xs"
+                className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-md bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-medium shadow-2xs whitespace-nowrap active:scale-95"
                 title="Insert shapes, callouts, tables, charts, or diagrams"
               >
                 <Shapes className="w-3.5 h-3.5 text-indigo-600" />
-                <span>Insert Element</span>
+                <span className="hidden sm:inline">Insert Element</span>
+                <span className="sm:hidden">Insert</span>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-60">
@@ -703,13 +784,13 @@ export function SlidesPage() {
         </div>
 
         {/* Typography Controls: Font Family & Sizes */}
-        <div className="flex items-center gap-1.5 pr-2 border-r border-slate-200">
+        <div className="flex items-center gap-1 sm:gap-1.5 pr-1.5 sm:pr-2 border-r border-slate-200 shrink-0">
           <Type className="w-3.5 h-3.5 text-slate-400 hidden sm:inline" />
           <select
             aria-label="Font family"
             value={slideStyle.fontFamily ?? 'sans'}
             onChange={(e) => handleUpdateSlideStyle({ fontFamily: e.target.value as SlideFontFamily })}
-            className="h-7 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 font-medium focus:outline-none focus:border-blue-500"
+            className="h-7 rounded-md border border-slate-200 bg-white px-1.5 sm:px-2 text-xs text-slate-700 font-medium focus:outline-none focus:border-blue-500"
           >
             <option value="sans">Inter Sans</option>
             <option value="serif">Editorial Serif</option>
@@ -721,31 +802,31 @@ export function SlidesPage() {
             aria-label="Title font size"
             value={slideStyle.titleSize ?? (currentSlide.layout === 'title' || currentSlide.layout === 'section' ? 'xl' : 'lg')}
             onChange={(e) => handleUpdateSlideStyle({ titleSize: e.target.value as SlideFontSize })}
-            className="h-7 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 focus:outline-none focus:border-blue-500"
+            className="h-7 rounded-md border border-slate-200 bg-white px-1 sm:px-2 text-xs text-slate-700 focus:outline-none focus:border-blue-500"
             title="Heading size"
           >
-            <option value="sm">Heading S</option>
-            <option value="md">Heading M</option>
-            <option value="lg">Heading L</option>
-            <option value="xl">Heading XL</option>
+            <option value="sm">H-S</option>
+            <option value="md">H-M</option>
+            <option value="lg">H-L</option>
+            <option value="xl">H-XL</option>
           </select>
 
           <select
             aria-label="Body font size"
             value={slideStyle.bodySize ?? 'md'}
             onChange={(e) => handleUpdateSlideStyle({ bodySize: e.target.value as SlideFontSize })}
-            className="h-7 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 focus:outline-none focus:border-blue-500"
+            className="h-7 rounded-md border border-slate-200 bg-white px-1 sm:px-2 text-xs text-slate-700 focus:outline-none focus:border-blue-500"
             title="Body text size"
           >
-            <option value="sm">Body S</option>
-            <option value="md">Body M</option>
-            <option value="lg">Body L</option>
-            <option value="xl">Body XL</option>
+            <option value="sm">B-S</option>
+            <option value="md">B-M</option>
+            <option value="lg">B-L</option>
+            <option value="xl">B-XL</option>
           </select>
         </div>
 
         {/* Text Alignment */}
-        <div className="flex items-center gap-0.5 bg-white border border-slate-200 rounded-md p-0.5 pr-1">
+        <div className="flex items-center gap-0.5 bg-white border border-slate-200 rounded-md p-0.5 pr-1 shrink-0">
           {(['left', 'center', 'right'] as SlideTextAlign[]).map((align) => (
             <button
               key={align}
@@ -767,19 +848,20 @@ export function SlidesPage() {
         </div>
 
         {/* Media & Image Insertion */}
-        <div className="relative flex items-center gap-1.5 pl-1 pr-2 border-r border-slate-200">
+        <div className="relative flex items-center gap-1.5 pl-1 pr-1.5 sm:pr-2 border-r border-slate-200 shrink-0">
           <button
             type="button"
             onClick={() => setImagePopoverOpen((v) => !v)}
             className={cn(
-              'flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-medium transition-colors shadow-2xs',
+              'flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-md border text-xs font-medium transition-colors shadow-2xs whitespace-nowrap active:scale-95',
               currentSlide.imageUrl || imagePopoverOpen
                 ? 'border-blue-200 bg-blue-50 text-blue-700'
                 : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
             )}
           >
             <ImageIcon className="w-3.5 h-3.5" />
-            <span>{currentSlide.imageUrl ? 'Slide Image' : 'Add Image'}</span>
+            <span className="hidden sm:inline">{currentSlide.imageUrl ? 'Slide Image' : 'Add Image'}</span>
+            <span className="sm:hidden">Image</span>
           </button>
 
           {currentSlide.imageUrl && (
@@ -787,13 +869,13 @@ export function SlidesPage() {
               aria-label="Image position"
               value={slideStyle.imagePosition ?? 'right'}
               onChange={(e) => handleUpdateSlideStyle({ imagePosition: e.target.value as SlideImagePosition })}
-              className="h-7 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 focus:outline-none focus:border-blue-500"
+              className="h-7 rounded-md border border-slate-200 bg-white px-1 sm:px-2 text-xs text-slate-700 focus:outline-none focus:border-blue-500"
               title="Image placement"
             >
-              <option value="right">Image Right</option>
-              <option value="left">Image Left</option>
-              <option value="top">Image Top</option>
-              <option value="background">Soft Background</option>
+              <option value="right">Right</option>
+              <option value="left">Left</option>
+              <option value="top">Top</option>
+              <option value="background">Bg</option>
             </select>
           )}
 

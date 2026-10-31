@@ -28,6 +28,72 @@ declare module '@tiptap/core' {
  * `excludes: ''` lets several anchors overlap.
  */
 
+export const CustomImage = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      layout: {
+        default: 'wrap-left',
+        parseHTML: (el) =>
+          el.getAttribute('data-layout') ||
+          (el.style.float === 'right'
+            ? 'wrap-right'
+            : el.style.float === 'left'
+            ? 'wrap-left'
+            : el.style.display === 'inline-block'
+            ? 'inline'
+            : 'break'),
+        renderHTML: (attrs) => ({ 'data-layout': attrs.layout || 'wrap-left' }),
+      },
+      width: {
+        default: null,
+        parseHTML: (el) => el.getAttribute('width') || el.style.width || null,
+        renderHTML: (attrs) => (attrs.width ? { width: attrs.width } : {}),
+      },
+      height: {
+        default: null,
+        parseHTML: (el) => el.getAttribute('height') || el.style.height || null,
+        renderHTML: (attrs) => (attrs.height ? { height: attrs.height } : {}),
+      },
+      offsetX: {
+        default: 0,
+        parseHTML: (el) => Number(el.getAttribute('data-offset-x') || 0),
+        renderHTML: (attrs) =>
+          attrs.offsetX ? { 'data-offset-x': String(Math.round(Number(attrs.offsetX))) } : {},
+      },
+      offsetY: {
+        default: 0,
+        parseHTML: (el) => Number(el.getAttribute('data-offset-y') || 0),
+        renderHTML: (attrs) =>
+          attrs.offsetY ? { 'data-offset-y': String(Math.round(Number(attrs.offsetY))) } : {},
+      },
+    };
+  },
+  renderHTML({ HTMLAttributes }) {
+    const layout = HTMLAttributes['data-layout'] || 'wrap-left';
+    const ox = Number(HTMLAttributes['data-offset-x'] || 0);
+    const oy = Number(HTMLAttributes['data-offset-y'] || 0);
+    let style = '';
+    if (layout === 'wrap-left') {
+      style = 'float: left; margin: 0.5rem 1.25rem 0.5rem 0; max-width: 65%; clear: left;';
+    } else if (layout === 'wrap-right') {
+      style = 'float: right; margin: 0.5rem 0 0.5rem 1.25rem; max-width: 65%; clear: right;';
+    } else if (layout === 'inline') {
+      style = 'display: inline-block; vertical-align: middle; margin: 0 0.25rem;';
+    } else {
+      style = 'display: block; margin: 1rem auto; clear: both;';
+    }
+    if (HTMLAttributes.width) {
+      const w = String(HTMLAttributes.width);
+      style += ` width: ${w.endsWith('%') || w.endsWith('px') ? w : `${w}px`};`;
+    }
+    if (ox || oy) {
+      style += ` position: relative; transform: translate3d(${ox}px, ${oy}px, 0);`;
+    }
+    return ['img', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, { style })];
+  },
+});
+
 export const CustomTableCell = TableCell.extend({
   addAttributes() {
     return {
@@ -121,7 +187,7 @@ export function documentExtensions(options: DocumentExtensionOptions = {}): AnyE
     SafeFontFamily,
     Highlight.configure({ multicolor: true }),
     TextAlign.configure({ types: ['heading', 'paragraph'] }),
-    Image.configure({ inline: false, allowBase64: false }),
+    CustomImage.configure({ inline: false, allowBase64: false }),
     TableKit.configure({
       table: { resizable: true, handleWidth: 6, cellMinWidth: 40, lastColumnResizable: true },
       tableCell: false,

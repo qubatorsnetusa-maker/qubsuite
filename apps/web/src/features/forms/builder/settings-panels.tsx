@@ -150,13 +150,16 @@ function NumberPanel(p: PanelProps) {
 }
 
 function DatePanel(p: PanelProps) {
-  const { setV } = setters(p);
   const type = p.field.type === 'DATETIME' ? 'datetime-local' : 'date';
   return (
-    <Row>
-      <TextSetting type={type} label="Earliest" value={p.field.validation.minDate} disabled={!p.canEdit} onCommit={(x) => setV({ minDate: x || undefined })} />
-      <TextSetting type={type} label="Latest" value={p.field.validation.maxDate} disabled={!p.canEdit} onCommit={(x) => setV({ maxDate: x || undefined })} />
-    </Row>
+    <div className="pt-1">
+      <Input
+        type={type}
+        disabled
+        className="h-9 w-48 bg-slate-50/80 text-slate-400 cursor-default border-slate-200 rounded-lg"
+        aria-label="Date"
+      />
+    </div>
   );
 }
 

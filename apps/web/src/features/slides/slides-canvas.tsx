@@ -89,17 +89,17 @@ const FONT_CLASS_MAP = {
 } as const;
 
 const TITLE_SIZE_MAP = {
-  sm: 'text-2xl md:text-3xl',
-  md: 'text-3xl md:text-4xl',
-  lg: 'text-4xl md:text-5xl',
-  xl: 'text-4xl md:text-6xl',
+  sm: 'text-sm sm:text-xl md:text-3xl',
+  md: 'text-base sm:text-2xl md:text-4xl',
+  lg: 'text-lg sm:text-3xl md:text-5xl',
+  xl: 'text-xl sm:text-4xl md:text-6xl',
 } as const;
 
 const BODY_SIZE_MAP = {
-  sm: 'text-sm md:text-base',
-  md: 'text-base md:text-lg',
-  lg: 'text-lg md:text-xl',
-  xl: 'text-xl md:text-2xl',
+  sm: 'text-[10px] sm:text-xs md:text-base',
+  md: 'text-[11px] sm:text-sm md:text-lg',
+  lg: 'text-xs sm:text-base md:text-xl',
+  xl: 'text-sm sm:text-lg md:text-2xl',
 } as const;
 
 const IMAGE_ROUNDED_MAP = {
@@ -229,7 +229,7 @@ export function SlidesCanvas({
     return (
       <div
         className={cn(
-          'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wider shadow-2xs',
+          'inline-flex items-center gap-1 sm:gap-1.5 rounded-full border px-2 sm:px-3 py-0.5 sm:py-1 text-[9px] sm:text-[11px] font-bold uppercase tracking-wider shadow-2xs',
           themeConfig.badgeBg
         )}
         style={
@@ -242,7 +242,7 @@ export function SlidesCanvas({
             : undefined
         }
       >
-        {iconName && iconName !== 'none' && <SlideBadgeIcon name={iconName} className="size-3.5 shrink-0" />}
+        {iconName && iconName !== 'none' && <SlideBadgeIcon name={iconName} className="size-3 sm:size-3.5 shrink-0" />}
         {readOnly ? (
           <span>{badgeText}</span>
         ) : (
@@ -251,7 +251,7 @@ export function SlidesCanvas({
             value={badgeText ?? ''}
             onChange={(e) => handleStyleChange({ badgeText: e.target.value })}
             placeholder="BADGE LABEL"
-            className="bg-transparent border-0 outline-none focus:ring-0 uppercase tracking-wider font-bold text-[11px] w-36"
+            className="bg-transparent border-0 outline-none focus:ring-0 uppercase tracking-wider font-bold text-[9px] sm:text-[11px] w-24 sm:w-36"
           />
         )}
       </div>
@@ -302,13 +302,13 @@ export function SlidesCanvas({
   const maxChartVal = Math.max(...chartData.values, 1);
 
   return (
-    <div className="w-full h-full flex items-center justify-center p-2 sm:p-4 select-text">
+    <div className="w-full h-full flex items-center justify-center p-0 sm:p-2 md:p-4 select-text">
       {/* Slide Card */}
       <div
         ref={cardRef}
         style={customCardStyle}
         className={cn(
-          'relative w-full max-w-[1080px] rounded-2xl p-8 md:p-14 flex flex-col justify-between transition-all duration-300 border overflow-hidden',
+          'relative w-full max-w-[1080px] rounded-xl sm:rounded-2xl p-3 sm:p-6 md:p-14 flex flex-col justify-between transition-all duration-300 border overflow-hidden shadow-xs',
           aspectRatio === '4:3' ? 'aspect-[4/3] max-w-[920px]' : 'aspect-[16/9]',
           themeConfig.cardBg,
           fontClass
@@ -338,14 +338,14 @@ export function SlidesCanvas({
           {slide.layout === 'title' && (
             <div
               className={cn(
-                'grid gap-8 items-center my-auto w-full',
+                'grid gap-2 sm:gap-6 md:gap-8 items-center my-auto w-full',
                 slide.imageUrl && imgPos !== 'background' ? 'grid-cols-1 md:grid-cols-12' : 'grid-cols-1'
               )}
             >
               <div
                 className={cn(
                   slide.imageUrl && imgPos !== 'background' ? 'md:col-span-7' : 'w-full',
-                  'flex flex-col space-y-4',
+                  'flex flex-col space-y-1 sm:space-y-3 md:space-y-4',
                   alignClass
                 )}
               >
@@ -355,7 +355,7 @@ export function SlidesCanvas({
                   <h1
                     className={cn(
                       TITLE_SIZE_MAP[customStyle.titleSize ?? 'xl'],
-                      'tracking-tight leading-[1.12]',
+                      'tracking-tight leading-tight',
                       themeConfig.titleColor
                     )}
                     style={customStyle.textColor ? { color: customStyle.textColor } : undefined}
@@ -364,12 +364,16 @@ export function SlidesCanvas({
                   </h1>
                 ) : (
                   <textarea
-                    rows={2}
+                    rows={1}
                     value={slide.title}
-                    onChange={(e) => handleChange({ title: e.target.value })}
+                    onChange={(e) => {
+                      handleChange({ title: e.target.value });
+                      e.target.style.height = 'auto';
+                      e.target.style.height = `${e.target.scrollHeight}px`;
+                    }}
                     placeholder="Presentation Title..."
                     className={cn(
-                      'w-full bg-transparent resize-none border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none tracking-tight leading-[1.12]',
+                      'w-full bg-transparent resize-none border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none tracking-tight leading-tight',
                       TITLE_SIZE_MAP[customStyle.titleSize ?? 'xl'],
                       customStyle.textAlign === 'center'
                         ? 'text-center'
@@ -386,7 +390,7 @@ export function SlidesCanvas({
                   <p
                     className={cn(
                       BODY_SIZE_MAP[customStyle.bodySize ?? 'lg'],
-                      'font-medium leading-relaxed opacity-90',
+                      'font-medium leading-normal opacity-90',
                       themeConfig.textColor
                     )}
                   >
@@ -399,7 +403,7 @@ export function SlidesCanvas({
                     onChange={(e) => handleChange({ subtitle: e.target.value })}
                     placeholder="Click to add subtitle, presenter name, or organization..."
                     className={cn(
-                      'w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none font-medium leading-relaxed',
+                      'w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none font-medium leading-normal mt-0.5 sm:mt-1',
                       BODY_SIZE_MAP[customStyle.bodySize ?? 'lg'],
                       customStyle.textAlign === 'center'
                         ? 'text-center'
@@ -422,7 +426,7 @@ export function SlidesCanvas({
 
           {/* 2. SECTION HEADER LAYOUT */}
           {slide.layout === 'section' && (
-            <div className={cn('my-auto flex flex-col space-y-4 w-full', alignClass)}>
+            <div className={cn('my-auto flex flex-col space-y-1.5 sm:space-y-3 md:space-y-4 w-full', alignClass)}>
               {renderBadge('SECTION')}
               {readOnly ? (
                 <h1
@@ -479,7 +483,7 @@ export function SlidesCanvas({
 
           {/* SHARED HEADER FOR CONTENT SLIDES */}
           {slide.layout !== 'title' && slide.layout !== 'section' && (
-            <div className={cn('flex flex-col space-y-2 mb-5 w-full', alignClass)}>
+            <div className={cn('flex flex-col space-y-1 sm:space-y-2 mb-2 sm:mb-5 w-full', alignClass)}>
               {(customStyle.badgeText || (customStyle.iconName && customStyle.iconName !== 'none')) && renderBadge()}
               {readOnly ? (
                 <h2
@@ -516,7 +520,7 @@ export function SlidesCanvas({
           {slide.layout === 'title-content' && (
             <div
               className={cn(
-                'grid gap-8 my-auto items-center w-full',
+                'grid gap-3 sm:gap-6 md:gap-8 my-auto items-center w-full',
                 slide.imageUrl && imgPos !== 'background'
                   ? imgPos === 'top'
                     ? 'grid-cols-1'
@@ -529,21 +533,21 @@ export function SlidesCanvas({
               )}
 
               {slide.imageUrl && imgPos === 'top' && (
-                <div className="w-full flex justify-center">{renderImageFrame('h-36', 'max-h-40')}</div>
+                <div className="w-full flex justify-center">{renderImageFrame('h-24 sm:h-36', 'max-h-28 sm:max-h-40')}</div>
               )}
 
               <div
                 className={cn(
                   slide.imageUrl && (imgPos === 'right' || imgPos === 'left') ? 'md:col-span-7' : 'w-full',
-                  'space-y-3.5'
+                  'space-y-1.5 sm:space-y-3.5'
                 )}
               >
-                <ul className="space-y-3.5">
+                <ul className="space-y-1.5 sm:space-y-3.5">
                   {(slide.bullets ?? []).map((bullet, idx) => (
-                    <li key={idx} className="flex items-start gap-3.5 group">
+                    <li key={idx} className="flex items-start gap-2 sm:gap-3.5 group">
                       <span
                         className={cn(
-                          'mt-1.5 flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white shadow-2xs',
+                          'mt-1 sm:mt-1.5 flex size-4 sm:size-6 shrink-0 items-center justify-center rounded-full text-[10px] sm:text-xs font-bold text-white shadow-2xs',
                           themeConfig.accentBg
                         )}
                         style={customAccentBgStyle}
@@ -609,8 +613,8 @@ export function SlidesCanvas({
 
           {/* 4. TWO-COLUMN LAYOUT */}
           {slide.layout === 'two-column' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-auto w-full">
-              <div className="p-5 rounded-2xl bg-slate-50/90 border border-slate-200/90 shadow-2xs space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-6 my-auto w-full">
+              <div className="p-2.5 sm:p-5 rounded-xl sm:rounded-2xl bg-slate-50/90 border border-slate-200/90 shadow-2xs space-y-1 sm:space-y-2">
                 {readOnly ? (
                   <div
                     className={cn(
@@ -623,7 +627,7 @@ export function SlidesCanvas({
                   </div>
                 ) : (
                   <textarea
-                    rows={6}
+                    rows={3}
                     value={slide.columnLeft ?? ''}
                     onChange={(e) => handleChange({ columnLeft: e.target.value })}
                     placeholder="Left column content (comparison, current state, key points)..."
@@ -635,7 +639,7 @@ export function SlidesCanvas({
                   />
                 )}
               </div>
-              <div className="p-5 rounded-2xl bg-blue-50/40 border border-blue-200/70 shadow-2xs space-y-2">
+              <div className="p-2.5 sm:p-5 rounded-xl sm:rounded-2xl bg-blue-50/40 border border-blue-200/70 shadow-2xs space-y-1 sm:space-y-2">
                 {readOnly ? (
                   <div
                     className={cn(
@@ -648,7 +652,7 @@ export function SlidesCanvas({
                   </div>
                 ) : (
                   <textarea
-                    rows={6}
+                    rows={3}
                     value={slide.columnRight ?? ''}
                     onChange={(e) => handleChange({ columnRight: e.target.value })}
                     placeholder="Right column content (advantages, outcomes, future state)..."
@@ -665,16 +669,16 @@ export function SlidesCanvas({
 
           {/* 5. THREE-COLUMN PILLARS LAYOUT */}
           {slide.layout === 'three-column' && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 my-auto w-full">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 sm:gap-5 my-auto w-full">
               {threeCards.map((card, idx) => (
                 <div
                   key={idx}
-                  className="p-5 rounded-2xl bg-white/90 border border-slate-200/90 shadow-xs flex flex-col justify-between space-y-3"
+                  className="p-2.5 sm:p-5 rounded-xl sm:rounded-2xl bg-white/90 border border-slate-200/90 shadow-xs flex flex-col justify-between space-y-1.5 sm:space-y-3"
                 >
-                  <div className="space-y-2.5">
+                  <div className="space-y-1.5 sm:space-y-2.5">
                     <div
                       className={cn(
-                        'inline-flex items-center justify-center w-8 h-8 rounded-lg text-xs font-bold text-white',
+                        'inline-flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-lg text-[10px] sm:text-xs font-bold text-white',
                         themeConfig.accentBg
                       )}
                       style={customAccentBgStyle}
@@ -682,7 +686,7 @@ export function SlidesCanvas({
                       0{idx + 1}
                     </div>
                     {readOnly ? (
-                      <h3 className={cn('text-base md:text-lg font-bold', themeConfig.titleColor)}>{card.title}</h3>
+                      <h3 className={cn('text-sm sm:text-base md:text-lg font-bold', themeConfig.titleColor)}>{card.title}</h3>
                     ) : (
                       <input
                         type="text"
@@ -692,23 +696,23 @@ export function SlidesCanvas({
                           handleChange({ cards: next });
                         }}
                         className={cn(
-                          'w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-base md:text-lg font-bold',
+                          'w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-sm sm:text-base md:text-lg font-bold',
                           themeConfig.titleColor
                         )}
                       />
                     )}
                     {readOnly ? (
-                      <p className={cn('text-xs md:text-sm leading-relaxed', themeConfig.textColor)}>{card.body}</p>
+                      <p className={cn('text-[11px] sm:text-xs md:text-sm leading-relaxed', themeConfig.textColor)}>{card.body}</p>
                     ) : (
                       <textarea
-                        rows={4}
+                        rows={2}
                         value={card.body}
                         onChange={(e) => {
                           const next = threeCards.map((c, i) => (i === idx ? { ...c, body: e.target.value } : c));
                           handleChange({ cards: next });
                         }}
                         className={cn(
-                          'w-full bg-transparent resize-none focus:outline-none text-xs md:text-sm leading-relaxed',
+                          'w-full bg-transparent resize-none focus:outline-none text-[11px] sm:text-xs md:text-sm leading-relaxed',
                           themeConfig.textColor
                         )}
                       />
@@ -722,17 +726,17 @@ export function SlidesCanvas({
           {/* 6. TIMELINE / PROCESS DIAGRAM LAYOUT */}
           {slide.layout === 'timeline' && (
             <div className="my-auto w-full">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-2 sm:gap-4 relative">
                 {timelineSteps.map((item, idx) => (
                   <div
                     key={idx}
-                    className="relative p-4 rounded-2xl bg-white/95 border border-slate-200/90 shadow-xs space-y-2"
+                    className="relative p-2.5 sm:p-4 rounded-xl sm:rounded-2xl bg-white/95 border border-slate-200/90 shadow-xs space-y-1 sm:space-y-2"
                   >
                     <div className="flex items-center justify-between">
                       {readOnly ? (
                         <span
                           className={cn(
-                            'text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full',
+                            'text-[9px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full',
                             themeConfig.badgeBg
                           )}
                         >
@@ -747,15 +751,15 @@ export function SlidesCanvas({
                             handleChange({ steps: next });
                           }}
                           className={cn(
-                            'w-24 text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border',
+                            'w-20 sm:w-24 text-[9px] sm:text-[11px] font-bold uppercase tracking-wider px-1.5 sm:px-2 py-0.5 rounded-full border',
                             themeConfig.badgeBg
                           )}
                         />
                       )}
-                      <span className="text-xs font-mono text-slate-300 font-bold">0{idx + 1}</span>
+                      <span className="text-[10px] sm:text-xs font-mono text-slate-300 font-bold">0{idx + 1}</span>
                     </div>
                     {readOnly ? (
-                      <h4 className={cn('text-sm md:text-base font-bold pt-1', themeConfig.titleColor)}>
+                      <h4 className={cn('text-xs sm:text-sm md:text-base font-bold pt-0.5 sm:pt-1', themeConfig.titleColor)}>
                         {item.title}
                       </h4>
                     ) : (
@@ -767,16 +771,16 @@ export function SlidesCanvas({
                           handleChange({ steps: next });
                         }}
                         className={cn(
-                          'w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-sm md:text-base font-bold pt-1',
+                          'w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-xs sm:text-sm md:text-base font-bold pt-0.5 sm:pt-1',
                           themeConfig.titleColor
                         )}
                       />
                     )}
                     {readOnly ? (
-                      <p className={cn('text-xs leading-relaxed', themeConfig.textColor)}>{item.description}</p>
+                      <p className={cn('text-[10px] sm:text-xs leading-relaxed', themeConfig.textColor)}>{item.description}</p>
                     ) : (
                       <textarea
-                        rows={3}
+                        rows={2}
                         value={item.description}
                         onChange={(e) => {
                           const next = timelineSteps.map((s, i) =>
@@ -785,7 +789,7 @@ export function SlidesCanvas({
                           handleChange({ steps: next });
                         }}
                         className={cn(
-                          'w-full bg-transparent resize-none focus:outline-none text-xs leading-relaxed',
+                          'w-full bg-transparent resize-none focus:outline-none text-[10px] sm:text-xs leading-relaxed',
                           themeConfig.textColor
                         )}
                       />
@@ -798,15 +802,15 @@ export function SlidesCanvas({
 
           {/* 7. KPI DASHBOARD GRID (3 METRICS) */}
           {slide.layout === 'metrics-grid' && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 my-auto w-full">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 sm:gap-6 my-auto w-full">
               {metricsList.map((m, idx) => (
                 <div
                   key={idx}
-                  className="p-6 rounded-2xl bg-white/95 border border-slate-200/90 shadow-xs flex flex-col justify-between space-y-3"
+                  className="p-3 sm:p-6 rounded-xl sm:rounded-2xl bg-white/95 border border-slate-200/90 shadow-xs flex flex-col justify-between space-y-1.5 sm:space-y-3"
                 >
                   {readOnly ? (
                     <div
-                      className={cn('text-4xl md:text-5xl font-black tracking-tight', themeConfig.accentColor)}
+                      className={cn('text-2xl sm:text-4xl md:text-5xl font-black tracking-tight', themeConfig.accentColor)}
                       style={customAccentStyle}
                     >
                       {m.value}
@@ -822,14 +826,14 @@ export function SlidesCanvas({
                         handleChange({ metricsList: next });
                       }}
                       className={cn(
-                        'w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-4xl md:text-5xl font-black tracking-tight',
+                        'w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-2xl sm:text-4xl md:text-5xl font-black tracking-tight',
                         themeConfig.accentColor
                       )}
                       style={customAccentStyle}
                     />
                   )}
                   {readOnly ? (
-                    <p className={cn('text-sm font-semibold leading-snug', themeConfig.titleColor)}>{m.label}</p>
+                    <p className={cn('text-xs sm:text-sm font-semibold leading-snug', themeConfig.titleColor)}>{m.label}</p>
                   ) : (
                     <input
                       type="text"
@@ -841,7 +845,7 @@ export function SlidesCanvas({
                         handleChange({ metricsList: next });
                       }}
                       className={cn(
-                        'w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-sm font-semibold',
+                        'w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-xs sm:text-sm font-semibold',
                         themeConfig.titleColor
                       )}
                     />
@@ -849,7 +853,7 @@ export function SlidesCanvas({
                   {(m.delta || !readOnly) && (
                     <div>
                       {readOnly ? (
-                        <span className="inline-block text-xs font-mono font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span className="inline-block text-[10px] sm:text-xs font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                           {m.delta}
                         </span>
                       ) : (
@@ -863,7 +867,7 @@ export function SlidesCanvas({
                             handleChange({ metricsList: next });
                           }}
                           placeholder="+Delta / YoY"
-                          className="w-32 text-xs font-mono font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 focus:outline-none"
+                          className="w-28 text-[10px] sm:text-xs font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 focus:outline-none"
                         />
                       )}
                     </div>
@@ -1152,26 +1156,26 @@ export function SlidesCanvas({
 
           {/* 11. QUOTE LAYOUT */}
           {slide.layout === 'quote' && (
-            <div className="my-auto py-4 px-6 max-w-3xl mx-auto text-center space-y-4 w-full">
+            <div className="my-auto py-2 sm:py-4 px-2 sm:px-6 max-w-3xl mx-auto text-center space-y-1.5 sm:space-y-4 w-full">
               {readOnly ? (
-                <p className={cn('text-xl md:text-3xl italic leading-relaxed font-serif', themeConfig.titleColor)}>
+                <p className={cn('text-sm sm:text-xl md:text-3xl italic leading-relaxed font-serif', themeConfig.titleColor)}>
                   “{slide.quote?.text ?? 'Quote text here'}”
                 </p>
               ) : (
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={slide.quote?.text ?? ''}
                   onChange={(e) => handleChange({ quote: { text: e.target.value, author: slide.quote?.author ?? '' } })}
                   placeholder="Enter memorable executive or scripture quote..."
                   className={cn(
-                    'w-full text-center bg-transparent resize-none border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-xl md:text-3xl italic leading-relaxed font-serif',
+                    'w-full text-center bg-transparent resize-none border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-sm sm:text-xl md:text-3xl italic leading-relaxed font-serif',
                     themeConfig.titleColor
                   )}
                 />
               )}
               {readOnly ? (
                 <p
-                  className={cn('text-sm md:text-base font-bold tracking-wider uppercase', themeConfig.accentColor)}
+                  className={cn('text-xs sm:text-base font-bold tracking-wider uppercase', themeConfig.accentColor)}
                   style={customAccentStyle}
                 >
                   — {slide.quote?.author ?? 'Author'}
@@ -1183,7 +1187,7 @@ export function SlidesCanvas({
                   onChange={(e) => handleChange({ quote: { text: slide.quote?.text ?? '', author: e.target.value } })}
                   placeholder="Author or citation..."
                   className={cn(
-                    'w-full text-center bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-sm md:text-base font-bold tracking-wider uppercase',
+                    'w-full text-center bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-xs sm:text-base font-bold tracking-wider uppercase',
                     themeConfig.accentColor
                   )}
                   style={customAccentStyle}
@@ -1279,8 +1283,8 @@ export function SlidesCanvas({
 
         {/* Slide Footer with Page Number */}
         {showFooter && (
-          <div className="relative z-10 flex items-center justify-between text-xs text-slate-400 pt-4 border-t border-slate-200/70">
-            <span className="truncate max-w-[260px] font-medium">{slide.title || 'Presentation'}</span>
+          <div className="relative z-10 flex items-center justify-between text-[9px] sm:text-xs text-slate-400 pt-1.5 sm:pt-4 border-t border-slate-200/70">
+            <span className="truncate max-w-[180px] sm:max-w-[260px] font-medium">{slide.title || 'Presentation'}</span>
             <span className="font-mono font-semibold">
               {slideNumber} / {totalSlides}
             </span>

@@ -109,12 +109,12 @@ export function FormTopBar({
         readOnlyLabel={canEdit ? undefined : 'View only'}
         onShare={() => setShare(true)}
         actions={
-          <>
+          <div className="flex items-center gap-1 sm:gap-2">
             {leading}
             <Tooltip content="Preview">
-              <Button asChild variant="subtle" size="icon" aria-label="Preview">
+              <Button asChild variant="subtle" size="icon" className="size-7 sm:size-8" aria-label="Preview">
                 <Link to="/forms/$formId/preview" params={{ formId: form.id }}>
-                  <Eye />
+                  <Eye className="size-3.5 sm:size-4" />
                 </Link>
               </Button>
             </Tooltip>
@@ -128,20 +128,30 @@ export function FormTopBar({
               </Tooltip>
             </div>
             {form.isPublished && (
-              <Tooltip content="Copy respondent link">
-                <Button variant="subtle" size="icon" aria-label="Copy respondent link" onClick={() => void navigator.clipboard.writeText(publicUrl).then(() => toast.success('Link copied'))}>
-                  <Link2 />
-                </Button>
-              </Tooltip>
+              <div className="hidden sm:inline-flex">
+                <Tooltip content="Copy respondent link">
+                  <Button variant="subtle" size="icon" aria-label="Copy respondent link" onClick={() => void navigator.clipboard.writeText(publicUrl).then(() => toast.success('Link copied'))}>
+                    <Link2 />
+                  </Button>
+                </Tooltip>
+              </div>
             )}
             {canEdit && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="subtle" size="icon" aria-label="More">
-                    <Settings2 />
+                  <Button variant="subtle" size="icon" className="size-7 sm:size-8" aria-label="More">
+                    <Settings2 className="size-3.5 sm:size-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="w-56">
+                  {form.isPublished && (
+                    <DropdownMenuItem icon={<Link2 />} onSelect={() => void navigator.clipboard.writeText(publicUrl).then(() => toast.success('Link copied'))}>
+                      Copy respondent link
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem icon={<PanelsTopLeft />} onSelect={() => void navigate({ to: '/formsv2/$formId/content', params: { formId: form.id } })}>
+                    Conversational mode
+                  </DropdownMenuItem>
                   <DropdownMenuItem icon={<FolderInput />} onSelect={() => setMove(true)}>
                     Move
                   </DropdownMenuItem>
@@ -154,11 +164,11 @@ export function FormTopBar({
               </DropdownMenu>
             )}
             {canEdit && (
-              <Button onClick={() => publish.mutate(!form.isPublished)} loading={publish.isPending} variant={form.isPublished ? 'outline' : 'primary'}>
+              <Button size="sm" onClick={() => publish.mutate(!form.isPublished)} loading={publish.isPending} variant={form.isPublished ? 'outline' : 'primary'} className="text-xs px-2.5 sm:px-3 h-7 sm:h-8 font-medium">
                 {form.isPublished ? 'Unpublish' : 'Publish'}
               </Button>
             )}
-          </>
+          </div>
         }
       />
       <nav className="flex justify-center gap-2" aria-label="Form views">
@@ -377,18 +387,18 @@ function Builder() {
   };
 
   const undoRedo = canEdit && (
-    <>
+    <div className="flex items-center gap-0.5 rounded-lg border border-border/60 bg-surface-2/50 p-0.5 shrink-0">
       <Tooltip content={ops.undoLabel ? `Undo ${ops.undoLabel}` : 'Undo'}>
-        <Button variant="subtle" size="icon" aria-label="Undo" disabled={!ops.canUndo} onClick={ops.undo}>
-          <Undo2 />
+        <Button variant="subtle" size="icon" className="size-7 sm:size-8" aria-label="Undo" disabled={!ops.canUndo} onClick={ops.undo}>
+          <Undo2 className="size-3.5 sm:size-4" />
         </Button>
       </Tooltip>
       <Tooltip content={ops.redoLabel ? `Redo ${ops.redoLabel}` : 'Redo'}>
-        <Button variant="subtle" size="icon" aria-label="Redo" disabled={!ops.canRedo} onClick={ops.redo}>
-          <Redo2 />
+        <Button variant="subtle" size="icon" className="size-7 sm:size-8" aria-label="Redo" disabled={!ops.canRedo} onClick={ops.redo}>
+          <Redo2 className="size-3.5 sm:size-4" />
         </Button>
       </Tooltip>
-    </>
+    </div>
   );
 
   const hasWelcome = form.fields.some((f) => f.type === 'WELCOME');
@@ -589,16 +599,7 @@ function Builder() {
                     <Plus /> Add ending
                   </Button>
                   <ThemeButton form={form} />
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="bg-background">
-                        <Variable /> Variables{form.variables.length ? ` (${form.variables.length})` : ''}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[28rem]">
-                      <VariablesPanel form={form} issues={issues} />
-                    </PopoverContent>
-                  </Popover>
+{/* Variables button hidden */}
                   <Button variant="outline" className="bg-background" onClick={() => setSettingsOpen(true)}>
                     <Settings2 /> Settings
                   </Button>
